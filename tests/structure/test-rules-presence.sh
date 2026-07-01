@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# rules/ presence (BK3/C14/§1F). The always-on steering that CC delivered via
-# SessionStart / UserPromptSubmit now lives in rules/*.md. This asserts the 3
-# rules files exist, are listed in plugin.json .rules[], mention the load-bearing
-# strings (Zensu PLM, the TDD workflow, the write-gate rationale), and carry no
-# Claude-only tool names. (Replaces CC's banner/primer SessionStart tests.)
+# rules/ presence (BK3/C14/§1F). The always-on steering lives in rules/*.md. This
+# asserts the 3 rules files exist, are listed in plugin.json .rules[], mention the
+# load-bearing strings (Zensu PLM, the TDD workflow, the write-gate rationale),
+# and carry no foreign tool names.
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -38,10 +37,10 @@ fi
 [ -f "$TDD" ] && grep -qiE 'tdd' "$TDD" && ok "tdd rule mentions the TDD workflow" || bad "tdd rule does not mention TDD"
 [ -f "$GATE" ] && grep -qiE 'gate|mutation|write' "$GATE" && ok "write-gate rule explains the gate rationale" || bad "write-gate rule lacks gate/mutation rationale"
 
-# No Claude-only tool names / colon-form in rules bodies.
+# No foreign tool names / colon-form in rules bodies.
 if [ -d "$ROOT/rules" ]; then
   HITS="$(grep -rnE '/zensu:[a-z]|AskUserQuestion|MultiEdit|\bSkill tool\b' "$ROOT/rules" 2>/dev/null || true)"
-  [ -z "$HITS" ] && ok "rules/ free of Claude-only tool names + colon-form" || { bad "Claude-only references in rules:"; printf '%s\n' "$HITS" | head -3; }
+  [ -z "$HITS" ] && ok "rules/ free of legacy tool names + colon-form" || { bad "legacy references in rules:"; printf '%s\n' "$HITS" | head -3; }
 fi
 
 printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"

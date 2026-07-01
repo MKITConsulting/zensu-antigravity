@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # zensu-antigravity installer. Google Antigravity discovers a whole plugin
-# DIRECTORY at a fixed path, so — unlike the Kiro port, which scattered files
-# onto shared surfaces — this stages the ENTIRE plugin subtree into the plugin
-# dirs:
+# DIRECTORY at a fixed path, so this stages the ENTIRE plugin subtree into the
+# plugin dirs:
 #
 #   ~/.gemini/config/plugins/zensu/            IDE plugins   (the ZENSU_HOME runtime)
 #   ~/.gemini/antigravity-cli/plugins/zensu/   CLI plugins
@@ -176,14 +175,14 @@ INSTALL_FAILED=0
 
 # Stage list (relative to SRC). Plugin RUNTIME only — meta/test files excluded.
 #   plugin.json, skills/, rules/, workflows/, agents/, hooks/ (RECURSIVE incl.
-#   hooks/antigravity + hooks/lib), config.example.json, mcp_config.json
+#   hooks/antigravity + hooks/lib), config.example.json
 stage_into() { # $1=dest plugin root
   local DEST="$1" LIST f rel
   MANIFEST="$(manifest_path "$DEST")"
   LIST="$(mktemp)"
 
   # top-level runtime files
-  for f in plugin.json config.example.json mcp_config.json; do
+  for f in plugin.json config.example.json; do
     [ -f "$SRC/$f" ] && install_file "$SRC/$f" "$DEST/$f" "$LIST"
   done
 

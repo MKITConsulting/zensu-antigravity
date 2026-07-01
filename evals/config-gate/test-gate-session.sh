@@ -1,12 +1,11 @@
 #!/bin/bash
-# Antigravity adaptation of CC's test-gate-session.sh. Upstream gated the
-# SessionStart `session-start-pulse.sh` banner on the `pulseSession` config key.
-# Antigravity exposes no SessionStart hook to plugin hooks.json, so that banner
-# side-effect moved to hooks/antigravity/lazy-init.sh (fired by the shim on the
-# first pre-* hook). The CONFIG plumbing is engine-neutral and ported intact:
-# this pins that the `pulseSession` toggle round-trips through zensu-config.sh
-# (default-on; explicit true; explicit false), and that the lazy-init script the
-# banner migrated to exists and runs idempotently without breaking the host.
+# SessionStart config gate. Antigravity exposes no SessionStart hook to plugin
+# hooks.json, so the `session-start-pulse.sh` banner side-effect lives in
+# hooks/antigravity/lazy-init.sh (fired by the shim on the first pre-* hook).
+# The CONFIG plumbing is engine-neutral: this pins that the `pulseSession`
+# toggle round-trips through zensu-config.sh (default-on; explicit true; explicit
+# false), and that the lazy-init script the banner migrated to exists and runs
+# idempotently without breaking the host.
 set -u
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"

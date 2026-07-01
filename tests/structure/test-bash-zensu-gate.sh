@@ -1,12 +1,11 @@
 #!/bin/bash
 set -u
 
-# Ported from CC. The behavioral gate logic is engine-neutral: pre-bash-zensu-
-# gate.sh reads the flat CC payload (tool_input.command) that the shim's
-# normalize-payload.js produces, so every classification case ports verbatim. The
-# ONLY Antigravity adaptation is the wiring assertion (B3): instead of CC's
-# hooks.json `Bash` matcher, we assert the gate is shim-wrapped under a
-# `run_command` matcher in hooks.json.template.
+# The behavioral gate logic is engine-neutral: pre-bash-zensu-gate.sh reads the
+# flat payload (tool_input.command) that the shim's normalize-payload.js
+# produces, so every classification case applies directly. The wiring assertion
+# (B3) asserts the gate is shim-wrapped under a `run_command` matcher in
+# hooks.json.template.
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOK="$PLUGIN_DIR/hooks/pre-bash-zensu-gate.sh"
 TPL="$PLUGIN_DIR/hooks.json.template"
@@ -27,7 +26,7 @@ check "B1 hook exists" PASS
 bash -n "$HOOK" 2>/dev/null && check "B2 bash -n syntax check passes" PASS || check "B2 bash -n syntax check passes" FAIL
 
 # B3 (Antigravity wiring): registered in hooks.json.template under a run_command
-# matcher, shim-wrapped with a BARE script name. No CC `Bash` matcher.
+# matcher, shim-wrapped with a BARE script name.
 if node -e '
   const t = JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
   let hit = false;
@@ -57,7 +56,7 @@ grep -qF 'zensu-mcp-tools.sh' "$HOOK" && grep -qF 'zensu-cli-map.sh' "$HOOK" \
   && check "B4b reuses zensu-mcp-tools.sh + zensu-cli-map.sh" PASS \
   || check "B4b reuses zensu-mcp-tools.sh + zensu-cli-map.sh" FAIL
 
-# Build a flat CC PreToolUse payload carrying tool_input.command (the shape the
+# Build a flat PreToolUse payload carrying tool_input.command (the shape the
 # normalizer hands the wrapped script).
 payload() {
   CMD="$1" AT="${2:-}" SID="${3:-gate-test}" node -e '

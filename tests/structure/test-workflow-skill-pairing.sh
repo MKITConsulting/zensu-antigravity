@@ -3,7 +3,7 @@
 # is a thin `workflows/zensu-<name>.md` shim that loads `skills/<bare-verb>/
 # SKILL.md`. This pins the bijection: 13 skills, 13 workflows, no orphans on
 # either side, and every workflow body references its skill. Also pins that
-# plugin.json lists both arrays consistently, and no Claude `/zensu:` colon-form
+# plugin.json lists both arrays consistently, and no `/zensu:` colon-form
 # leaks into a workflow body.
 set -u
 
@@ -63,10 +63,10 @@ while IFS= read -r d; do
 done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
 [ -z "$ORPHAN" ] && ok "no orphan skills (every skill maps to a verb)" || bad "orphan skill(s):$ORPHAN"
 
-# No Claude colon-form invocation in any workflow body.
+# No `/zensu:` colon-form invocation in any workflow body.
 if [ -d "$ROOT/workflows" ]; then
   HITS="$(grep -rnE '/zensu:[a-z]' "$ROOT/workflows" 2>/dev/null || true)"
-  [ -z "$HITS" ] && ok "no Claude '/zensu:' colon-form in workflows/" || { bad "Claude colon-form in workflows:"; printf '%s\n' "$HITS" | head -3; }
+  [ -z "$HITS" ] && ok "no '/zensu:' colon-form in workflows/" || { bad "colon-form in workflows:"; printf '%s\n' "$HITS" | head -3; }
 fi
 
 printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"

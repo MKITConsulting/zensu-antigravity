@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end engine-payload-shape test (kiro's test-gate-kiro-payloads analog):
+# End-to-end engine-payload-shape test:
 # feed the shim REAL Antigravity-shaped payloads (toolCall.name / args.CommandLine
 # envelope, run_command tool) and assert the CLI write-gate denies free-standing
 # mutations and allows reads, THROUGH the shim's normalize -> wrapped gate ->

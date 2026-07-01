@@ -4,8 +4,8 @@ set -u
 # THE build-time gate from the repo conventions: every skills/*/SKILL.md that
 # runs a `zensu <noun> <verb>` mutation (resolved via zensu-cli-map.sh,
 # classified via zensu-mcp-tools.sh) must be wrapped in --workflow-begin /
-# --workflow-end markers. Engine-neutral SoT — ported wholesale from CC; the libs
-# are byte-identical and the test self-resolves the plugin root.
+# --workflow-end markers. Engine-neutral SoT; the test self-resolves the plugin
+# root.
 : "${ZENSU_PLUGIN_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh" 2>/dev/null || true
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh" 2>/dev/null || true

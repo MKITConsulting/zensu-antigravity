@@ -12,7 +12,7 @@
 #   hooks.autoFixIncludeSuggestions=false -> route Critical+Important only (default, backward-compat)
 #   hooks.autoFixMaxRounds=<int 1..99>    -> loop guard (default 5)
 #
-# Counter state lives at ${ZENSU_PLUGIN_DATA_OVERRIDE:-${ZENSU_PROJECT_DIR:-.}/.zensu/state}/rounds-<session_id>.json. claude-code's auto-set ZENSU_PLUGIN_DATA is intentionally IGNORED (use ZENSU_PLUGIN_DATA_OVERRIDE to relocate).
+# Counter state lives at ${ZENSU_PLUGIN_DATA_OVERRIDE:-${ZENSU_PROJECT_DIR:-.}/.zensu/state}/rounds-<session_id>.json. Any host auto-set ZENSU_PLUGIN_DATA is intentionally IGNORED (use ZENSU_PLUGIN_DATA_OVERRIDE to relocate).
 
 set -u
 

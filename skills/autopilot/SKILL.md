@@ -65,8 +65,8 @@ Three phases. Track each as a tracked progress item so the user has a live progr
 ### Phase 0 — Probe & Plan  (the ONLY interactive gate)
 
 **0.A — Worktree.** If `git rev-parse --show-toplevel` is the origin checkout (not a
-worktree under `.claude/worktrees/`), create one and continue inside it
-(`git worktree add .claude/worktrees/<slug> -b <branch> <base>`). Never build on the
+worktree under `.worktrees/`), create one and continue inside it
+(`git worktree add .worktrees/<slug> -b <branch> <base>`). Never build on the
 origin checkout. See Critical Conventions.
 
 **0.B — Probe (self-setup).** Resolve the four seams the run needs — **boot**, **gates**,
@@ -196,7 +196,7 @@ The worst case is still a reviewed, gated PR. The skill never produces nothing.
 ## Critical Conventions
 
 - **Worktree only.** The origin checkout is never built on. If the session starts there,
-  `git worktree add .claude/worktrees/<slug> -b <branch> <base>` and continue inside it.
+  `git worktree add .worktrees/<slug> -b <branch> <base>` and continue inside it.
 - **One planning gate.** Zero questions after approval — safest reversible assumption +
   note for non-blockers; halt + report only on a true blocker.
 - **Credential-blind.** The AI never receives a password or token; a script delivers auth

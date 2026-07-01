@@ -4,19 +4,14 @@
 ![host](https://img.shields.io/badge/host-Google%20Antigravity-blue)
 ![license](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue)
 
-`zensu-antigravity` is a faithful port of the
-[`zensu-claude-code`](https://github.com/MKITConsulting/zensu-claude-code) plugin
-(**v0.10.0** baseline; later upstream changes tracked per release in
-[CHANGELOG.md](CHANGELOG.md)) to **Google Antigravity**'s native plugin system. It packages
-the same behavior — feature tracking with `KEY-N` ids, strict RED→GREEN TDD behind a
-phase-gated edit guard, a five-perspective code-review chain, security reviews with STRIDE
-threat models, release-readiness gating, and greenfield/brownfield onboarding — as an
-Antigravity plugin: a `plugin.json` manifest, `skills/`, `rules/`, `workflows/`, `agents/`,
-and event hooks. Like upstream (post
-[#117](https://github.com/MKITConsulting/zensu-claude-code/pull/117)), the plugin is
-**CLI-driven** — it talks to Zensu through the typed [`zensu` CLI](https://zensu.dev)
-(≥ 0.2.0); the hosted MCP server stays live for the Zensu web app's assistant but is **not
-wired into the plugin** (`mcp_config.json` ships empty).
+**Zensu — a Product Lifecycle Manager plugin for Google Antigravity.** It makes features
+first-class citizens across the whole development lifecycle: feature tracking with `KEY-N`
+ids, strict RED→GREEN TDD behind a phase-gated edit guard, a five-perspective code-review
+chain, security reviews with STRIDE threat models, release-readiness gating, and
+greenfield/brownfield onboarding. It ships as a native Antigravity plugin — a `plugin.json`
+manifest with `skills/`, `rules/`, `workflows/`, `agents/`, and event hooks — and drives
+Zensu through the typed [`zensu` CLI](https://zensu.dev) (≥ 0.2.0). The plugin ships **no MCP
+configuration** — every operation runs through that CLI.
 
 > **Status:** local plugin, not yet published. Install from this checkout with `install.sh`
 > (see below).
@@ -38,6 +33,79 @@ Zensu makes **features first-class citizens** across the whole lifecycle. Three 
 Feature IDs are `KEY-N` (e.g. `ZEN-42`, referenced in commits as `[ZEN-42]`); the lifecycle
 is `planned → in-progress → testing → released`, gated by security score, docs completeness,
 and journey health.
+
+## Architecture & Workflow
+
+Every hook is registered as `antigravity-shim.sh <script>.sh`. The **antigravity-shim** is
+the only host-translation layer: it normalizes the Antigravity payload to the flat
+snake_case the engine-neutral scripts read, runs the wrapped script, classifies its stdout
+(`deny | block | context | raw`), and emits a top-level Antigravity verdict — always exiting
+`0` (fail-open), so a crashed hook can never become an accidental deny.
+
+```mermaid
+flowchart TD
+    EV["Antigravity hook event<br/>PreToolUse · PostToolUse<br/>PreInvocation · Stop"] --> SHIM["antigravity-shim.sh"]
+    SHIM --> NORM["normalize payload<br/>camelCase/nested → flat snake_case<br/>workspace root → ZENSU_PROJECT_DIR"]
+    NORM --> LAZY{"pre-* or<br/>user-prompt-* hook?"}
+    LAZY -->|"yes"| INIT["lazy-init<br/>(SessionStart replacement:<br/>pin root, capture session id)"]
+    LAZY -->|"no"| RUN
+    INIT --> RUN["run wrapped engine-neutral script"]
+    RUN --> CLS{"classify stdout"}
+    CLS -->|"permissionDecision: deny"| DENY["emit deny verdict"]
+    CLS -->|"decision: block"| BLOCK["emit block verdict<br/>(Stop backstop)"]
+    CLS -->|"additionalContext"| CTX["emit context verdict<br/>(PreInvocation de-bounced per turn)"]
+    CLS -->|"non-JSON / crashed / empty"| RAW["RAW fail-open<br/>never surface exit code"]
+    DENY --> DONE(["always exit 0"])
+    BLOCK --> DONE
+    CTX --> DONE
+    RAW --> DONE
+
+    style EV fill:#4a9eff,color:#fff
+    style SHIM fill:#ffa94d,color:#fff
+    style DENY fill:#ff6b6b,color:#fff
+    style BLOCK fill:#fee2e2,stroke:#991b1b,color:#1e293b
+    style CTX fill:#dbeafe,stroke:#1e40af,color:#1e293b
+    style RAW fill:#dcfce7,stroke:#166534,color:#1e293b
+    style DONE fill:#51cf66,color:#fff
+```
+
+The `/zensu-tdd` skill runs strict Test-Driven Development in the main thread. Before any
+edit, the agent declares the current phase; the `pre-edit-tdd-reminder.sh` PreToolUse gate
+allows or denies each file-edit tool call by phase. The invariant: `IMPL` requires a prior
+`RED_FAIL` marker for the same step — no production code without a failing test on record.
+
+```mermaid
+stateDiagram-v2
+    [*] --> UNINITIALIZED
+    UNINITIALIZED --> RED_WRITE: --phase RED_WRITE
+    RED_WRITE --> RED_RUN: --phase RED_RUN
+    RED_RUN --> RED_FAIL: test FAILS (correct RED)
+    RED_RUN --> RED_WRITE: test PASSES (fake-green, rewrite)
+    RED_FAIL --> IMPL: --phase IMPL
+    IMPL --> GREEN_RUN: --phase GREEN_RUN
+    GREEN_RUN --> GREEN_PASS: test PASSES
+    GREEN_RUN --> IMPL: test FAILS (retry, max 3)
+    GREEN_PASS --> REFACTOR: --phase REFACTOR (optional)
+    GREEN_PASS --> [*]: next step
+    REFACTOR --> [*]: next step
+
+    note right of UNINITIALIZED
+      Gate denies all file edits
+    end note
+    note right of IMPL
+      Gate allows iff RED_FAIL
+      for this step in history
+    end note
+    note right of GREEN_PASS
+      Gate allows test paths only
+    end note
+```
+
+With `hooks.tddImplementation:false` (the default, **vanilla**) the RED→GREEN ceremony is
+dropped and the gate passes through; set it `true` for the strict gate. The evidence audits
+and the review chain run in both modes. Full diagrams — the three-layer flow, the review
+chain, the write-gates, and session-id resolution — live in
+[docs/architecture.md](docs/architecture.md).
 
 ## Requirements
 
@@ -109,16 +177,16 @@ the workflow loads the matching skill):
 | **zensu-code-reviewer** | Read-only quality review. Standalone: walks 5 specialist perspectives (conventions, bugs, architecture, tests, security). In the `/zensu-tdd` chain: runs in fan-out consume mode, surfacing the report merged from five parallel `zensu-review-aspect` agents. Write-free tool list. |
 | **zensu-review-aspect** | Single-perspective read-only reviewer. The `/zensu-tdd` chain spawns five in one parallel batch (one per perspective), then merges in the main thread. Runs zero build/test commands. |
 
-> **Subagent fidelity.** If Antigravity exposes a first-class plugin subagent format, these
-> run as isolated subagents. If it does not, each agent body is followed as orchestrator
-> prose — the main agent adopts the persona inline (sequential persona adoption) and the
-> review fan-out runs as sequential self-review passes. Findings parity is preserved;
-> wall-clock and context isolation are not.
+> **Subagent execution.** When Antigravity runs a plugin subagent as an isolated agent,
+> these run as isolated subagents. Where the host does not spawn an isolated subagent, each
+> agent body is followed as orchestrator prose — the main agent adopts the persona inline
+> and the review fan-out runs as sequential self-review passes. The set of findings is the
+> same either way; wall-clock and context isolation are not.
 
 ### Rules (always-on steering)
 
-Antigravity has no SessionStart / UserPromptSubmit hook events, so upstream's advisory hooks
-migrate to always-on `rules/` (declared in `plugin.json`):
+Antigravity has no SessionStart or UserPromptSubmit hook event, so the plugin's always-on
+steering lives in `rules/` (declared in `plugin.json`):
 
 | Rule | What it steers |
 |---|---|
@@ -142,8 +210,9 @@ which translates the Antigravity payload + verdict contract. Wrapped scripts:
 | `stop-chain-enforcer.sh` | Stop | Review-chain backstop — holds the turn open until the review chain and `/zensu-self-review` complete. |
 
 The PreInvocation array re-fires before every model step, so the shim de-bounces identical
-advisory context per user turn. Upstream's `context-nudge` hook is intentionally unwired (its
-essence lives in `rules/zensu-conventions.md`).
+advisory context per user turn. The context-compaction nudge is intentionally unwired as a
+hook — its essence lives in `rules/zensu-conventions.md`, which proposes `/compact` when the
+context grows large.
 
 ## Configuration (`~/.zensu/config.json`)
 
@@ -159,36 +228,36 @@ implementation mode: no RED→GREEN ceremony, the edit gate passes through, test
 agent's discretion — but the evidence audits and the review chain stay enforced. Set
 `true` for the strict RED→GREEN gate. The mode is frozen per session at `--tdd-begin`.
 
-## Claude Code → Antigravity fidelity matrix
+## Enforcement & capabilities
 
-| Upstream (CC) mechanism | Antigravity expression | Fidelity |
+What each mechanism does on Antigravity. Gates are **blocking** (a PreToolUse deny stops the
+tool call); steering is **advisory** (it injects context, never blocks). See
+[docs/architecture.md](docs/architecture.md) for the full flow.
+
+| Mechanism | What it does on Antigravity | Kind |
 |---|---|---|
-| Plugin packaging (`.claude-plugin/` + marketplace) | native `plugin.json` at repo root, staged by `install.sh` | **FULL** |
-| Skills (colon-namespaced slash commands) | `/zensu-<name>` workflow shim → loads the skill | **FULL** |
-| `Bash` tool gates | `run_command` matcher | **FULL** |
-| Edit/Write phase-gate | `write_to_file\|replace_file_content\|multi_replace_file_content` matcher | **FULL** |
-| TDD phase-gate (PreToolUse deny) | deny verdict via the shim's verdict contract | **FULL** |
-| Zensu CLI write-gate | `run_command` gate + CLI-map classification | **FULL** |
-| Source-write gate (tracked-file clobber) | `run_command` gate on `tool_input.command` + `cwd` | **FULL** |
-| Source-write gate (cross-worktree escape) | shim exports `ZENSU_PROJECT_DIR` from the workspace root | **FULL** |
-| Review auto-fix loop + Stop chain enforcement | Stop hook via the shim | **FULL** |
-| 3 subagents | `agents/zensu-*.md` (native subagent format, or orchestrator prose) | **FULL → DEGRADED** if no first-class plugin subagent format (sequential persona adoption; findings parity kept) |
-| `marketplace.json` version sync | **N/A** — no marketplace; version lives in `plugin.json` + README badge + CHANGELOG (D8) | **N/A** |
-| `${ZENSU_PLUGIN_ROOT}` hook wiring | `install.sh` renders absolute paths into `hooks.json`; libs resolve via `~/.zensu/plugin-root` | **FULL** |
-| SessionStart banner / primer | migrated to always-on `rules/` | **DEGRADED** (always-on prose, not a per-start event) |
-| SessionStart pulse / session-id capture | lazy first-call init (no SessionStart event) | **DEGRADED** (lazy, not at start) |
-| UserPromptSubmit intent-router / TDD-reminder | PreInvocation hooks via the shim (de-bounced per turn) | **FULL** (pending PreInvocation host verification) |
-| ExitPlanMode plan-approval TDD ask | replaced by the PreInvocation TDD-reminder + `rules/zensu-tdd.md` | **DEGRADED by design** (no plan-approval event) |
-| Context-compaction nudge | unwired hook; essence folded into `rules/zensu-conventions.md` | **DEGRADED** (advisory rule, no transcript read) |
-| Hosted MCP server | intentionally unwired (`mcp_config.json` empty) — CLI-driven | **N/A by design** |
+| Plugin packaging | native `plugin.json` at the repo root; `install.sh` stages the subtree into the IDE + CLI plugin paths | — |
+| Skills & workflows | each skill is invoked through its `/zensu-<name>` workflow shim, which loads and runs the skill | — |
+| TDD phase-gate | blocks production edits before a failing test — a `PreToolUse` deny on `write_to_file` / `replace_file_content` / `multi_replace_file_content` while a TDD session is armed | blocking |
+| Zensu CLI write-gate | default-denies state-mutating `zensu` commands outside a workflow window or the `zensu-plm` agent — a `PreToolUse` deny on `run_command`, classified via the CLI map; reads and `--help` pass | blocking |
+| Source-write integrity gate | denies raw shell writes (`>`, `sed -i`, `tee`, heredoc, `dd of=`) that clobber a tracked source file or escape the workspace root into a sibling checkout — a `PreToolUse` deny on `run_command`; the shim exports the workspace root as `ZENSU_PROJECT_DIR` so the escape check works | blocking |
+| Review auto-fix loop | after `zensu-code-reviewer` reports, Critical/Important findings are fixed in-thread under the phase-gate and the reviewer is re-spawned, up to `autoFixMaxRounds` | — |
+| Stop review-chain backstop | holds the turn open until the review chain and `/zensu-self-review` complete — a `Stop` verdict via the shim | advisory unless the host honors a blocking `Stop`; then blocking |
+| 3 subagents | `agents/zensu-*.md`; run as isolated subagents where the host spawns them, else as inline orchestrator prose (same findings, no context isolation) | — |
+| Hook wiring & root resolution | `install.sh` renders absolute paths into `hooks.json`; the libs resolve the root via `ZENSU_PLUGIN_ROOT` > `ANTIGRAVITY_PLUGIN_ROOT` > the `~/.zensu/plugin-root` pointer | — |
+| Session banner / primer | always-on prose in `rules/zensu-conventions.md` (Antigravity has no SessionStart event) | advisory |
+| Session-id / pulse capture | lazy first-call init via `lazy-init.sh` on the first hook of a session (no SessionStart event) | — |
+| Intent router / TDD reminder | `PreInvocation` hooks via the shim, de-bounced once per user turn | advisory |
+| Plan → TDD decision | steered by `rules/zensu-tdd.md` + the per-turn TDD reminder — plan first, then ask whether to run `/zensu-tdd` before the first edit (Antigravity has no plan-approval event) | advisory |
+| Context-compaction nudge | folded into `rules/zensu-conventions.md`, which proposes `/compact` when context grows large (unwired as a hook) | advisory |
 
 ## Versioning & releases
 
 The version lives in three places that must carry the same value in the same commit:
 `plugin.json`, the README `version-X.Y.Z-blue` badge, and the newest `## [X.Y.Z]` CHANGELOG
-heading (commit subject `chore(release): bump version to X.Y.Z`). There is **no
-`marketplace.json`** — Antigravity has no marketplace manifest, the one simplification over
-upstream. See [AGENTS.md](AGENTS.md) for the full convention.
+heading (commit subject `chore(release): bump version to X.Y.Z`). There is no marketplace
+manifest — Antigravity has none, so there is no fourth file. See [AGENTS.md](AGENTS.md) for
+the full convention.
 
 ## Repository layout
 
@@ -196,7 +265,6 @@ upstream. See [AGENTS.md](AGENTS.md) for the full convention.
 zensu-antigravity/
 ├── plugin.json              # native manifest (root)
 ├── hooks.json.template      # tracked; install.sh renders → hooks.json (gitignored, abs paths)
-├── mcp_config.json          # empty {"mcpServers":{}} — MCP intentionally unwired
 ├── agents/                  # zensu-plm, zensu-code-reviewer, zensu-review-aspect
 ├── rules/                   # always-on steering (conventions, tdd, write-gate)
 ├── skills/                  # skills/<verb>/SKILL.md ×13
@@ -216,7 +284,7 @@ zensu-antigravity/
 | `zensu` CLI not found | Install it (`curl -fsSL https://zensu.dev/install.sh \| sh`) and ensure it is on `PATH`. |
 | Backend unreachable | Verify network to `https://api.zensu.dev` (or your `ZENSU_API_URL`) and that `zensu auth status` shows a logged-in session. |
 | Hooks not firing after install | Restart Antigravity — the plugin loads at startup, and `hooks.json` is regenerated by `install.sh` with absolute paths. |
-| A steering behavior is missing | Some SessionStart/UserPromptSubmit behaviors are now always-on `rules/` (see the fidelity matrix), not per-event hooks. |
+| A steering behavior is missing | Some steering runs as always-on `rules/` (see [Enforcement & capabilities](#enforcement--capabilities)), not per-event hooks — Antigravity has no SessionStart or UserPromptSubmit event. |
 | TDD phase gate blocking a legitimate edit | Set `ZENSU_TDD_GATE=off` for that edit, or declare the correct phase via `zensu-log.sh --phase <PHASE> --step <id>` first. |
 
 ## License

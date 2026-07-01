@@ -57,7 +57,7 @@ The following standards apply to maintainer commits:
 - **Conventional Commits** — use prefixes like `feat:`, `fix:`, `chore:`, `docs:`
 - **Skills** — follow the existing phase-based workflow pattern (see `skills/bootstrap/SKILL.md` for reference). Each skill ships YAML frontmatter (`name:` + `description:`) and is invoked through its `/zensu-<name>` workflow.
 - **Agents** — follow the structure of `agents/zensu-plm.md` (decision rules, tool references, important rules). The two reviewer agents (`zensu-code-reviewer`, `zensu-review-aspect`) declare a write-free `tools:` list.
-- **Hooks** — engine-neutral hook scripts stay byte-aligned with upstream `zensu-claude-code`; Antigravity-specific translation lives only in `hooks/antigravity/antigravity-shim.sh`. Use `bash -c` with proper error handling and `2>/dev/null` for optional commands.
+- **Hooks** — the wrapped hook scripts under `hooks/` stay engine-neutral (they read the normalized payload and know nothing about the host); all host-specific translation lives only in `hooks/antigravity/antigravity-shim.sh`. Use `bash -c` with proper error handling and `2>/dev/null` for optional commands.
 
 ## Licensing
 

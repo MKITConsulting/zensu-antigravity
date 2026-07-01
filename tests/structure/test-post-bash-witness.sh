@@ -1,11 +1,11 @@
 #!/bin/bash
 set -u
 
-# Ported from CC. post-bash-witness.sh logs cmd+exit+tail to witness-<sid>.log
-# only when a TDD session is active. Engine-neutral: it reads the flat CC payload
-# the shim's normalize-payload.js produces (tool_input.command +
-# tool_response.{exit_code,stdout,interrupted}, BK7), so the scenarios port
-# verbatim. The 5-field newline-delimited format is bash-3.2 safe.
+# post-bash-witness.sh logs cmd+exit+tail to witness-<sid>.log only when a TDD
+# session is active. Engine-neutral: it reads the flat payload the shim's
+# normalize-payload.js produces (tool_input.command +
+# tool_response.{exit_code,stdout,interrupted}, BK7). The 5-field
+# newline-delimited format is bash-3.2 safe.
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOK="$PLUGIN_DIR/hooks/post-bash-witness.sh"
 LOG="$PLUGIN_DIR/hooks/lib/zensu-log.sh"

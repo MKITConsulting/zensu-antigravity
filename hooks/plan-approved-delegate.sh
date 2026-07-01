@@ -1,6 +1,6 @@
 #!/bin/bash
 # PostToolUse hook fired when ExitPlanMode succeeds (= user approved plan).
-# Returns JSON via stdout that Claude Code injects as additionalContext
+# Returns JSON via stdout that the host injects as additionalContext
 # next to the tool result. By default (autoTdd enabled) the directive tells
 # the main agent to ASK the user — via the AskUserQuestion tool — whether to
 # run the strict /zensu-tdd flow for this plan, then act on the answer IN THE

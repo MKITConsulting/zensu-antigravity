@@ -69,7 +69,7 @@ TRANSCRIPT="$TRANSCRIPT" WINDOW="$WINDOW" THRESHOLD="$THRESHOLD" STATE_FILE="$ST
     fs.closeSync(fd);
     const lines = buf.toString("utf8").split("\n");
 
-    // Most recent NON-ZERO usage block. Claude Code transcripts can end with a
+    // Most recent NON-ZERO usage block. Session transcripts can end with a
     // trailing assistant record whose usage is all zeros (e.g. a stop/summary
     // record) — reading the literal last usage would mask the real occupancy, so
     // we skip zero-sum blocks and take the latest one that actually carries tokens.
@@ -92,7 +92,7 @@ TRANSCRIPT="$TRANSCRIPT" WINDOW="$WINDOW" THRESHOLD="$THRESHOLD" STATE_FILE="$ST
     // Hooks never receive the real context-window size. The only unambiguous signal
     // is occupancy: a 200k window cannot exceed 200k, so >200k proves a 1M session.
     // With context.windowSize unset we stay silent at or below 200k (a 200k session
-    // is handled by Claude Code itself via auto-compaction; a 1M session there is nowhere
+    // is handled by the host itself via auto-compaction; a 1M session there is nowhere
     // near full) and treat anything past 200k as the 1M window.
     const configured = Number.isInteger(cfgWindow) && cfgWindow > 0;
     let window;

@@ -1,12 +1,11 @@
 #!/bin/bash
-# Antigravity adaptation of CC's test-no-pluginroot-env.sh. The guarantee is
-# engine-neutral: the hook scripts self-resolve their plugin root from their own
-# path and must work even when ZENSU_PLUGIN_ROOT is unset. The two delegate
-# hooks (post-review-tdd-delegate.sh, plan-approved-delegate.sh) are kept on disk
-# but unwired in Antigravity (MJ5: hooks.json.template ships the safe Scenario-B
-# default; they are documented prose for the Scenario-A upgrade). CC's third
-# assertion targeted session-start-pulse.sh, which Antigravity dropped in favor
-# of hooks/antigravity/lazy-init.sh — so that line is retargeted to lazy-init.
+# Plugin-root self-resolution guarantee: the hook scripts resolve their plugin
+# root from their own path and must work even when ZENSU_PLUGIN_ROOT is unset.
+# The two delegate hooks (post-review-tdd-delegate.sh, plan-approved-delegate.sh)
+# are kept on disk but unwired in Antigravity (MJ5: hooks.json.template ships the
+# safe Scenario-B default; they are documented prose for the Scenario-A upgrade).
+# The third assertion targets hooks/antigravity/lazy-init.sh, Antigravity's
+# SessionStart replacement.
 set -u
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -47,10 +46,10 @@ else
   check "plan-approved-delegate.sh present (kept-but-unwired)" FAIL
 fi
 
-# CC tested session-start-pulse.sh here; Antigravity's SessionStart replacement
-# is lazy-init.sh. It pins the plugin-root pointer + captures the session id; it
-# must self-resolve its root and never break the call when ZENSU_PLUGIN_ROOT is
-# absent. Run in a sandbox HOME so the real ~/.zensu pointer is untouched.
+# Antigravity's SessionStart replacement is lazy-init.sh. It pins the plugin-root
+# pointer + captures the session id; it must self-resolve its root and never
+# break the call when ZENSU_PLUGIN_ROOT is absent. Run in a sandbox HOME so the
+# real ~/.zensu pointer is untouched.
 LAZY="$PLUGIN_DIR/hooks/antigravity/lazy-init.sh"
 if [ -f "$LAZY" ]; then
   SBX_HOME="$(mktemp -d)"

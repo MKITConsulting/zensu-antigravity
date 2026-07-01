@@ -5,13 +5,12 @@
 # test exists. Emits the host's deny schema (hookSpecificOutput.permissionDecision
 # = "deny"), which the antigravity-shim re-emits as the host verdict.
 #
-# Engine portability: the wrapped script stays byte-comparable to Claude Code /
-# Codex; on Antigravity the shim normalizes the payload so the gate reads
-# `tool_name` + `tool_input.file_path`. The matcher gates the three Antigravity
-# file writers (`write_to_file` / `replace_file_content` /
-# `multi_replace_file_content`); the retained multi-file patch-envelope fallback
-# (`*** Update/Add/Delete File:` scanning) is inert here — Antigravity has no
-# `apply_patch` — but is kept so the script stays diff-comparable to Codex.
+# The wrapped script is engine-neutral; the antigravity-shim normalizes the
+# payload so the gate reads `tool_name` + `tool_input.file_path`. The matcher
+# gates the three Antigravity file writers (`write_to_file` /
+# `replace_file_content` / `multi_replace_file_content`); the multi-file
+# patch-envelope fallback (`*** Update/Add/Delete File:` scanning) is inert
+# here — Antigravity has no `apply_patch` — but is kept as a harmless fallback.
 #
 # While a session is active, edits to the session-state files (.zensu/state/)
 # are denied in BOTH modes (normalized-path classification, no spelling evasion).

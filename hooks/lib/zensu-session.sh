@@ -45,13 +45,11 @@ zensu_resolve_session_id() {
       return 0
     fi
   fi
-  # Kiro delta (upstream-sync candidate, documented in AGENTS.md): the
-  # project-scoped current-session file — written only by this port's
-  # agentSpawn capture hook — outranks the Claude-transcript helper. On a
-  # machine where Claude Code has been used in the same project, the helper
-  # would otherwise return the (possibly live-changing) newest Claude
-  # transcript id and detach the armed Kiro state mid-session. Explicit ids
-  # keep absolute precedence above.
+  # The project-scoped current-session file — written by the lazy-init
+  # capture hook — outranks the transcript helper. The helper would otherwise
+  # return the (possibly live-changing) newest transcript id and detach the
+  # armed session state mid-session. Explicit ids keep absolute precedence
+  # above.
   cache="${ZENSU_PROJECT_DIR:-.}/.zensu/state/session-id-current.txt"
   if [ -f "$cache" ]; then
     cached="$(cat "$cache" 2>/dev/null)"

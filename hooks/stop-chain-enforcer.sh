@@ -8,10 +8,9 @@
 # this Stop hook is the replacement hard backstop: it refuses to let the main
 # agent end its turn while a TDD session has finished implementation
 # (chain-state implComplete=true) but the review/auto-fix chain has not
-# terminated (chainDone=true). On Claude Code it coordinates with
-# post-review-tdd-delegate.sh, which sets chainDone at PASS / max-rounds; on
-# Antigravity that hook never fires (reference-only) and the skill prose plus the
-# /zensu-self-review terminus set chainDone instead.
+# terminated (chainDone=true). post-review-tdd-delegate.sh is reference-only here
+# and never fires; the skill prose plus the /zensu-self-review terminus set
+# chainDone instead.
 #
 # Activation: only when chain-state `active` is true for THIS session. Other
 # sessions, non-TDD work, and plain CLI stop normally.
@@ -84,8 +83,7 @@ fi
 # flag written at --tdd-begin, never live config): strict sessions are told to
 # fix under the gate, vanilla sessions to fix directly while keeping the
 # CHECKPOINT/AUDIT evidence discipline. The chain guarantee itself is
-# mode-independent. Antigravity-local divergence from upstream #112 (which left this
-# hook mode-blind): post-review-tdd-delegate never fires on Antigravity, so this
+# mode-independent. Because post-review-tdd-delegate never fires here, this
 # Stop hook is the only wired carrier of the mode-aware fix discipline.
 if [ "$(tdd_vanilla_mode "$STATE_FILE")" = "true" ]; then
   FIX_PHRASE="directly (vanilla mode — no RED→GREEN cycle required; keep the structured CHECKPOINT/AUDIT evidence discipline)"

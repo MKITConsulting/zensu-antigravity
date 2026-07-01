@@ -1,10 +1,10 @@
 name: Release
 
-# Adapted from the zensu-codex release pipeline for the Antigravity port: the
+# Release pipeline for the Zensu Antigravity plugin: the
 # version lives in plugin.json (repo root) + the README badge + the newest
 # CHANGELOG heading — all bumped together (machine-enforced by
 # tests/structure/test-version-sync.sh, which runs in the test gate below).
-# Antigravity has NO marketplace manifest (unlike upstream's marketplace.json),
+# Antigravity has NO marketplace manifest,
 # so there is no fourth file and no marketplace drift to guard against.
 #
 # Flow:

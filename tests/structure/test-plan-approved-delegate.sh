@@ -1,15 +1,14 @@
 #!/bin/bash
 set -u
 
-# Plan->TDD decision gate. CC fired plan-approved-delegate.sh on ExitPlanMode
-# (PostToolUse) to route an approved plan into the TDD-vs-direct decision.
-# Antigravity has NO ExitPlanMode analog (fidelity matrix: DEGRADE ->
-# workflow/rule), so the delegate is NOT WIRED in hooks.json.template; the plan-
-# time decision is re-expressed as always-on rules + the workflow shims. The
-# engine-neutral delegate SCRIPT is still shipped (kept-but-unwired) and ports
-# verbatim, so this pins BOTH: (a) the script routes to skill='zensu:tdd' when
-# run directly, and (b) the re-expression — the delegate is NOT in the template,
-# and rules/ + the tdd workflow carry the plan-time TDD steering.
+# Plan->TDD decision gate. plan-approved-delegate.sh routes an approved plan into
+# the TDD-vs-direct decision. Antigravity has NO ExitPlanMode analog (fidelity
+# matrix: DEGRADE -> workflow/rule), so the delegate is NOT WIRED in
+# hooks.json.template; the plan-time decision is re-expressed as always-on rules +
+# the workflow shims. The engine-neutral delegate SCRIPT is still shipped
+# (kept-but-unwired), so this pins BOTH: (a) the script routes to skill='zensu:tdd'
+# when run directly, and (b) the re-expression — the delegate is NOT in the
+# template, and rules/ + the tdd workflow carry the plan-time TDD steering.
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$PLUGIN_DIR/hooks/plan-approved-delegate.sh"
 TPL="$PLUGIN_DIR/hooks.json.template"

@@ -27,7 +27,7 @@ None. This skill answers from embedded knowledge and the plugin's canonical docs
 
 ## Invocation convention (embedded)
 
-Every Zensu capability is invoked as a workflow named `/zensu-<name>` — the user-facing trigger is the workflow (filename stem under `workflows/`), which loads and runs the matching skill in `skills/<name>/SKILL.md`. There is no `:` namespacing on Antigravity (that is a Claude Code-ism); the namespace is baked into the hyphenated workflow name. Examples: `/zensu-tdd`, `/zensu-implement`, `/zensu-help`. Run `/zensu-help` for orientation; `/zensu-tdd` runs the gate-enforced TDD build.
+Every Zensu capability is invoked as a workflow named `/zensu-<name>` — the user-facing trigger is the workflow (filename stem under `workflows/`), which loads and runs the matching skill in `skills/<name>/SKILL.md`. The namespace is baked into the hyphenated workflow name. Examples: `/zensu-tdd`, `/zensu-implement`, `/zensu-help`. Run `/zensu-help` for orientation; `/zensu-tdd` runs the gate-enforced TDD build.
 
 ## Core Glossary (embedded — stable concepts)
 
@@ -44,7 +44,7 @@ Every Zensu capability is invoked as a workflow named `/zensu-<name>` — the us
 ## Three Layers (embedded — architecture overview)
 
 1. **Planning** (`zensu-plm` agent) — `/zensu-bootstrap` (greenfield: a plan/vision doc, no code yet) or `/zensu-ghost-scan` (brownfield: an existing codebase) produce tracked features, user journeys, and linked docs. **Hybrid** (existing code *and* a forward plan doc): ghost-scan first to import what is built, then create the plan's not-yet-built items as `planned` features. The agent triages by asking: (1) code already built or starting fresh? (2) plan/vision doc present? (3) if both, does the plan describe things not yet built?
-2. **Implementation** (`/zensu-tdd` skill in the MAIN thread + `zensu-code-reviewer` subagent) — strict RED→IMPL→GREEN TDD enforced by a PreToolUse FSM gate, followed by 5 sequential code-review perspectives, then an auto-fix loop guaranteed by the `Stop` hook (`stop-chain-enforcer.sh`). Since upstream (zensu-claude-code) 0.4.0 the TDD workflow runs in the main agent (was a `tdd-manager` subagent); `zensu-code-reviewer` is the only subagent the TDD chain spawns directly (`zensu-plm` and `zensu-review-aspect` are the other shipped subagents).
+2. **Implementation** (`/zensu-tdd` skill in the MAIN thread + `zensu-code-reviewer` subagent) — strict RED→IMPL→GREEN TDD enforced by a PreToolUse FSM gate, followed by 5 sequential code-review perspectives, then an auto-fix loop backed by the `Stop` hook (`stop-chain-enforcer.sh`). The TDD workflow runs in the main thread (not a subagent); `zensu-code-reviewer` is the only subagent the TDD chain spawns directly (`zensu-plm` and `zensu-review-aspect` are the other shipped subagents).
 3. **Tracking** — web dashboard surfaces security scores, journey health, tier matrix, coverage trends.
 
 ## Agents (embedded — one-liners)
@@ -53,7 +53,7 @@ Every Zensu capability is invoked as a workflow named `/zensu-<name>` — the us
 - `zensu-review-aspect` — read-only single-perspective reviewer; five run in parallel during the TDD review fan-out.
 - `zensu-code-reviewer` — single READ-ONLY subagent running 5 sequential perspectives: conventions, bugs, architecture, tests, security.
 
-TDD discipline (RED→IMPL→GREEN, FSM-gated edits, 3-retry IMPL escalation, completeness audit) is NOT a subagent — it runs in the main thread via the `/zensu-tdd` skill (migrated from the `tdd-manager` subagent in upstream zensu-claude-code 0.4.0).
+TDD discipline (RED→IMPL→GREEN, FSM-gated edits, 3-retry IMPL escalation, completeness audit) is NOT a subagent — it runs in the main thread via the `/zensu-tdd` skill.
 
 ## Topic Routing (live read for volatile facts)
 
@@ -65,11 +65,11 @@ Before answering questions in the right column, `read` the source file in the le
 | CLI command surface / install; plugin wiring | `README.md` § CLI + `zensu --help` + `plugin.json` (the MCP server stays live for the Zensu web app but is no longer wired into the plugin) |
 | Hook flags (`autoTdd`, `tddImplementation`, `chainEnforcer`, `autoFix`, `autoFixIncludeSuggestions`, `autoFixMaxRounds`, `combinedSummary`, `pulseSession`, `sessionBanner`, `intentRouter`, `mcpGate`, `bashWriteGate`, `selfReview`) | `README.md` § Configuration → Hook Opt-Out table + `config.example.json` |
 | Hook event wiring (which scripts fire on which event, via the shim) | `hooks.json.template` + `hooks/antigravity/antigravity-shim.sh` |
-| Context-nudge settings (`context.compactionNudge`, `context.nudgeThreshold`, `context.windowSize`) — top-level `context` node | `README.md` § Configuration + `config.example.json` (the context-nudge hook ships unwired on Antigravity — see the README fidelity matrix) |
+| Context-nudge settings (`context.compactionNudge`, `context.nudgeThreshold`, `context.windowSize`) — top-level `context` node | `README.md` § Configuration + `config.example.json` (the context-nudge ships as a `rules/` steer, not a hook — see `rules/zensu-conventions.md`) |
 | Config resolution order, `ZENSU_CONFIG` precedence | `README.md` § Config Resolution Order + `hooks/lib/zensu-config.sh` (header comment) |
 | Environment variables (`ZENSU_API_KEY`, `ZENSU_TDD_GATE`, `ZENSU_TEST_WITNESS`, `ZENSU_CHAIN`, `ZENSU_MCP_GATE`, `ZENSU_BASH_WRITE_GATE`, `ZENSU_AG_HOOK_CONTRACT`, `ZENSU_AG_STOP_BLOCKS`) | `README.md` § Environment Variables |
-| TDD FSM details, phase transitions, gate logic, three-channel logging | `docs/tdd-manager-workflow.md` |
-| Documentation: doc types, how to write code-grounded feature/wiki docs | `docs/documentation-guide.md` |
+| TDD FSM details, phase transitions, gate logic, the hook pipeline | `docs/architecture.md` |
+| Architecture: shim pipeline, write-gates, review chain, session-id resolution | `docs/architecture.md` |
 | Hook scripts (what each does, when it fires) | `README.md` § Hooks table + `hooks/<script>.sh` source |
 | Data flow, what's transmitted, retention, self-hosting | `README.md` § Data & Privacy |
 | Pulse session lifecycle, idempotency, privacy guarantees | `skills/pulse/SKILL.md` + `README.md` § Data & Privacy |
@@ -79,12 +79,12 @@ Before answering questions in the right column, `read` the source file in the le
 | "What changed in version X" | `CHANGELOG.md` (search for `[X.Y.Z]`) |
 | License / Permitted Purpose / Competing Use | `README.md` § License + `LICENSE` file |
 | Platform support, Windows caveats | `README.md` § Platform Support |
-| Antigravity vs Claude Code capability differences | `README.md` § Claude Code → Antigravity fidelity matrix |
+| What each enforcement mechanism does (blocking vs advisory) | `README.md` § Enforcement & capabilities + `docs/architecture.md` |
 | Troubleshooting (`zensu` CLI not found, OAuth login, gate blocking) | `README.md` § Troubleshooting |
 
 ## Response Style
 
-- Cite sources as `README.md:200` or `docs/tdd-manager-workflow.md`.
+- Cite sources as `README.md:200` or `docs/architecture.md`.
 - If the embedded glossary fully answers it → answer directly, no Read needed.
 - If a routed source applies → `read` first, quote facts verbatim, cite.
 - Never invent tool names, hook names, config flags, or version numbers — verify via `read`.

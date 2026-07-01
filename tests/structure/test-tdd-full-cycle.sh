@@ -2,11 +2,11 @@
 # Full /zensu-tdd lifecycle — hermetic end-to-end walk (no live agy, no API).
 # Drives ONE session through the COMPLETE cycle via the real hooks/libs in the
 # real order, asserting the phase-gate, witness, post-review routing and Stop-hook
-# at EVERY transition. Engine-neutral: the hooks read the flat CC payload the
-# shim produces, so this ports from CC near-verbatim. The Stop-block assertions
-# run the enforcer DIRECTLY (its CC `decision:block` output is what the shim's
-# ZENSU_AG_STOP_BLOCKS=1 path forwards); the shim-level Stop dialect is pinned
-# separately by test-antigravity-shim-stop.sh.
+# at EVERY transition. Engine-neutral: the hooks read the flat payload the shim
+# produces. The Stop-block assertions run the enforcer DIRECTLY (its
+# `decision:block` output is what the shim's ZENSU_AG_STOP_BLOCKS=1 path
+# forwards); the shim-level Stop dialect is pinned separately by
+# test-antigravity-shim-stop.sh.
 set -u
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"

@@ -7,7 +7,7 @@
 #   generated hooks.json -> exists, parses, EVERY command is an ABSOLUTE path
 #                       under the install root that resolves to an existing file,
 #                       with ZERO __ZENSU_HOME__ / ${...} placeholders left (the
-#                       core new-vs-CC assertion)
+#                       core generation assertion)
 #   staging scope    -> hooks/ is staged RECURSIVELY (antigravity/ + lib/);
 #                       tests/, evals/, reference/, README/CHANGELOG/LICENSE/
 #                       install.* are EXCLUDED

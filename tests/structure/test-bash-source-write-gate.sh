@@ -1,11 +1,10 @@
 #!/bin/bash
 set -u
 
-# Ported from CC. The redirection/sed-i/tee/heredoc/worktree-escape parser is
-# engine-neutral: pre-bash-source-write-gate.sh reads the flat CC payload
-# (tool_input.command + cwd) the shim produces, so the behavioral cases port
-# verbatim. Antigravity adaptation: the W4 wiring assertion checks the shim-
-# wrapped run_command form in hooks.json.template (not CC's Bash matcher). BK6:
+# The redirection/sed-i/tee/heredoc/worktree-escape parser is engine-neutral:
+# pre-bash-source-write-gate.sh reads the flat payload (tool_input.command + cwd)
+# the shim produces, so the behavioral cases apply directly. The W4 wiring
+# assertion checks the shim-wrapped run_command form in hooks.json.template. BK6:
 # rule-B (cross-worktree escape) needs ZENSU_PROJECT_DIR (workspace root) !=
 # cwd (command cwd), which the shim wires from workspacePaths[0] vs args.Cwd.
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"

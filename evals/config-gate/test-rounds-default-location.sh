@@ -99,7 +99,7 @@ else
 fi
 
 if [ -f "$LEAK_PLUGIN_C6" ]; then
-  check "C6c: counter MUST NOT write to ZENSU_PLUGIN_DATA (claude-code's auto-set value is ignored)" FAIL
+  check "C6c: counter MUST NOT write to ZENSU_PLUGIN_DATA (an ambient plugin-data env is ignored)" FAIL
 else
   check "C6c: counter ignored ZENSU_PLUGIN_DATA (no file at $LEAK_PLUGIN_C6)" PASS
 fi

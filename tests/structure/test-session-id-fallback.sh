@@ -1,8 +1,7 @@
 #!/bin/bash
 set -u
 
-# Ported verbatim from CC (zensu-session.sh is byte-identical per BK9 — the lib
-# headers are NOT widened). Pins zensu_resolve_session_id: stdin id ->
+# Pins zensu_resolve_session_id: stdin id ->
 # verbatim-sanitized; empty -> deterministic fallback_<key>; stable
 # zensu_session_key (<pid>_<cksum>); graceful ps/cksum degradation -> bare PPID.
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"

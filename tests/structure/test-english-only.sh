@@ -2,8 +2,8 @@
 # English-only repository guard (org convention): no German text in any tracked
 # file. Checks umlauts/sharp-s and a high-signal German word list over git
 # ls-files. Carve-out (C15): this guard itself (its detection word list IS
-# German) and the TDD-reminder hook + the plan-approved delegate, which mirror
-# upstream's multilingual user-preference match-literals ('mit tdd', 'kein tdd',
+# German) and the TDD-reminder hook + the plan-approved delegate, which carry
+# multilingual user-preference match-literals ('mit tdd', 'kein tdd',
 # 'tdd bitte', 'mach mal', 'los gehts', 'jetzt umsetzen', ...) verbatim. The
 # docs/ snapshot of the build plan (CONTRACTS/PLAN) is reference material that
 # quotes those same literals, so it is exempt too.

@@ -10,7 +10,7 @@
 #   - event keys come from the Antigravity set {PreToolUse, PreInvocation,
 #     PostToolUse, Stop} (C10)
 #   - the edit matcher is exactly `write_to_file|replace_file_content|
-#     multi_replace_file_content` (BK4 — never drop multi_*, never add CC's
+#     multi_replace_file_content` (BK4 — never drop multi_*, never add
 #     Edit|Write|MultiEdit), the shell matcher is `run_command` (C3)
 #   - the wrapped scripts wired per event match C10 exactly
 #   - every wrapped script resolves to a file under hooks/ on disk
@@ -179,8 +179,8 @@ done < <(node -e '
 ' "$TPL" 2>/dev/null)
 [ -z "$MISSING" ] && ok "every wrapped script resolves to a file under hooks/" || bad "wrapped scripts missing on disk:$MISSING"
 
-# No Claude colon-form names leaked into the template commands.
-grep -qE 'zensu:[a-z]' "$TPL" && bad "template carries Claude colon-form (zensu:foo)" || ok "no Claude colon-form names in template"
+# No `zensu:` colon-form names leaked into the template commands.
+grep -qE 'zensu:[a-z]' "$TPL" && bad "template carries colon-form (zensu:foo)" || ok "no colon-form names in template"
 
 printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

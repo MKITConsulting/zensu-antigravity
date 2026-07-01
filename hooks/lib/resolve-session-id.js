@@ -3,7 +3,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { execFileSync } = require('child_process');
 
 function gitToplevel() {
@@ -25,8 +24,11 @@ function sanitizeProjectDir(p) {
 }
 
 function projectsBase() {
-  if (process.env.ZENSU_PROJECTS_DIR) return process.env.ZENSU_PROJECTS_DIR;
-  return path.join(os.homedir(), '.claude', 'projects');
+  // The transcript-scan fallback is opt-in: point ZENSU_PROJECTS_DIR at a
+  // directory of per-project *.jsonl transcripts to enable it. With no such
+  // directory configured (the default), this resolver contributes nothing and
+  // session-id resolution falls through to the project-scoped pointer + synth.
+  return process.env.ZENSU_PROJECTS_DIR || null;
 }
 
 function listCandidates(dir) {
@@ -97,9 +99,11 @@ function main() {
   }
 
   const helperStartMs = Date.now();
+  const base = projectsBase();
+  if (!base) { process.stdout.write(''); return 0; }
   const projectDir = process.env.ZENSU_PROJECT_DIR || gitToplevel() || process.cwd();
   const subdir = sanitizeProjectDir(projectDir);
-  const projectsDir = path.join(projectsBase(), subdir);
+  const projectsDir = path.join(base, subdir);
 
   let files = listCandidates(projectsDir);
 

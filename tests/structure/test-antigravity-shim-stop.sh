@@ -5,7 +5,7 @@
 #   1 -> the wrapped Stop hook's {"decision":"block","reason":...} is emitted as
 #        the Antigravity Stop-block shape (full parity).
 #   0 -> the directive is emitted as ADVISORY allow-context instead (Stop is
-#        advisory; the agent is nudged, not forced — codex's degrade).
+#        advisory; the agent is nudged, not forced — an advisory degrade).
 # Either way the shim exits 0. The reason text is plain (no schema leakage).
 set -u
 

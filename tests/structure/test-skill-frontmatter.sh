@@ -2,7 +2,7 @@
 # Skill frontmatter compliance for all 13 zensu skills. Each skills/<verb>/
 # SKILL.md must carry YAML frontmatter whose `name` equals the folder name
 # (lowercase letters, digits, hyphens; max 64 chars) and a non-empty
-# `description` (max 1024 chars). No skill body may reference the Claude Code
+# `description` (max 1024 chars). No skill body may reference the
 # `/zensu:x` colon-form invocation (Antigravity invokes via the `/<name>`
 # workflow shims, D4).
 set -u
@@ -28,10 +28,10 @@ for name in $EXPECTED; do
   [ "${#DESC}" -le 1024 ] && ok "$name: description <= 1024 chars (${#DESC})" || bad "$name: description too long (${#DESC})"
 done
 
-# No Claude Code colon-form invocation anywhere in skill bodies.
+# No `/zensu:` colon-form invocation anywhere in skill bodies.
 if [ -d "$ROOT/skills" ]; then
   HITS="$(grep -rn "/zensu:" "$ROOT/skills" 2>/dev/null || true)"
-  [ -z "$HITS" ] && ok "no /zensu: Claude-isms in skills/" || { bad "Claude-isms found:"; printf '%s\n' "$HITS" | head -5; }
+  [ -z "$HITS" ] && ok "no /zensu: colon-form in skills/" || { bad "colon-form found:"; printf '%s\n' "$HITS" | head -5; }
 fi
 
 printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"

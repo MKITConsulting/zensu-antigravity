@@ -1,19 +1,19 @@
 #!/bin/bash
-# Engine-neutral runtime helpers shared by Zensu hooks. The same hook scripts
-# run under both Codex CLI and Claude Code by normalizing the two host-provided
-# values the rest of the suite depends on: the plugin root and the project dir.
+# Engine-neutral runtime helpers shared by Zensu hooks. They normalize the two
+# host-provided values the rest of the suite depends on: the plugin root and the
+# project dir.
 #
 # Plugin root: each hook resolves it on its first line with precedence
-#   ZENSU_PLUGIN_ROOT > CODEX_PLUGIN_ROOT > ZENSU_PLUGIN_ROOT > self-resolution
+#   ZENSU_PLUGIN_ROOT > ANTIGRAVITY_PLUGIN_ROOT > self-resolution
 # (from the hook's own path) and then exports ZENSU_PLUGIN_ROOT, so every
-# `source "$ZENSU_PLUGIN_ROOT/hooks/lib/..."` works unchanged on either host.
+# `source "$ZENSU_PLUGIN_ROOT/hooks/lib/..."` works unchanged.
 #
-# Project dir: Claude Code exports $ZENSU_PROJECT_DIR; Codex instead passes a
-# "cwd" field in the hook stdin payload. zensu_runtime_apply_project_dir reads
-# that "cwd" and exports ZENSU_PROJECT_DIR when it is not already set, so the
+# Project dir: when $ZENSU_PROJECT_DIR is not exported, the host passes a "cwd"
+# field in the hook stdin payload. zensu_runtime_apply_project_dir reads that
+# "cwd" and exports ZENSU_PROJECT_DIR when it is not already set, so the
 # existing `${ZENSU_PROJECT_DIR:-.}` references throughout the suite resolve to
-# the real project root on Codex too. It is a no-op when the var is already set
-# or when no payload / node is available (the `.` fallback then applies).
+# the real project root. It is a no-op when the var is already set or when no
+# payload / node is available (the `.` fallback then applies).
 
 zensu_runtime_apply_project_dir() {
   local payload="${1:-}"

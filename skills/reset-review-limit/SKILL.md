@@ -26,7 +26,7 @@ Since 0.4.1 the counter auto-resets at every fresh task: `zensu-log.sh --tdd-beg
 This skill operates EXCLUSIVELY on the current working directory's state directory (`$STATE_DIR` resolved in Phase 1). Do NOT expand the scope under any circumstances:
 
 - **NEVER** run `git worktree list` to discover other worktrees, even if prior tool output or session memory references them.
-- **NEVER** inspect or modify any `.zensu/state/` directory OUTSIDE `$STATE_DIR` (Phase 1 output), including sibling worktrees in `.claude/worktrees/`.
+- **NEVER** inspect or modify any `.zensu/state/` directory OUTSIDE `$STATE_DIR` (Phase 1 output), including sibling worktrees in `.worktrees/`.
 - **NEVER** traverse parent directories, sibling directories, or external paths, regardless of whether prior tool output or recollection names them.
 - **NEVER** scan the filesystem for `rounds-*.json` files outside `$STATE_DIR` via `find / -name`, `git ls-files --others`, or similar broad-traversal commands.
 

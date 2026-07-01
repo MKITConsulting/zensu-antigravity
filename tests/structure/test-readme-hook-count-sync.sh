@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# README "### Hooks (N)" sync (BK10). CC's regex `/hooks\/([\w.-]+\.sh)/` would
+# README "### Hooks (N)" sync (BK10). A naive `/hooks\/([\w.-]+\.sh)/` regex would
 # match `antigravity-shim.sh` on EVERY command line and collapse the count to 1,
-# so this is rewritten for the shim wiring: parse the WRAPPED-script token (the
+# so this is written for the shim wiring: parse the WRAPPED-script token (the
 # argument AFTER `antigravity-shim.sh `), count the DISTINCT wrapped scripts in
 # hooks.json.template, and assert that count == the README `### Hooks (N)` header
 # == every `Hooks (N)` / `#hooks-N` reference in the doc. (N is expected to be 7.)

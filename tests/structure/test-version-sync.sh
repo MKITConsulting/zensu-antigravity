@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# The version invariant (lesson from upstream's marketplace.json drift):
-# plugin.json version == README badge == newest CHANGELOG heading, all in the
-# same commit. Machine-enforced here, used by .github/workflows/release.yml.
-# Antigravity has NO marketplace manifest (unlike upstream's marketplace.json),
-# so the invariant is 3 files, not 4 — there is intentionally no marketplace.json
-# to keep in sync.
+# The version invariant: plugin.json version == README badge == newest CHANGELOG
+# heading, all in the same commit. Machine-enforced here, used by
+# .github/workflows/release.yml. Antigravity has NO marketplace manifest, so the
+# invariant is 3 files — there is intentionally no marketplace.json to keep in
+# sync.
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -33,7 +32,6 @@ fi
 
 # marketplace.json is intentionally absent (Antigravity has no marketplace).
 [ -f "$ROOT/marketplace.json" ] && bad "marketplace.json present (Antigravity has no marketplace — D8)" || ok "no marketplace.json (Antigravity has none — intentional)"
-[ -f "$ROOT/.claude-plugin/marketplace.json" ] && bad ".claude-plugin/marketplace.json present (should not exist)" || ok "no .claude-plugin/marketplace.json (correct)"
 
 printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

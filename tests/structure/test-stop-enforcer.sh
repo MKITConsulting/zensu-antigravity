@@ -2,7 +2,7 @@
 set -u
 
 # stop-chain-enforcer.sh — the Stop backstop. Engine-neutral: it reads the flat
-# CC payload and emits the CC {"decision":"block","reason":...} shape that the
+# payload and emits the {"decision":"block","reason":...} shape that the
 # shim forwards (under ZENSU_AG_STOP_BLOCKS=1) or degrades to advisory context
 # (=0). This test exercises the enforcer DIRECTLY (its raw output), pinning:
 # block during the chain (implComplete && !chainDone), two-stage routing to

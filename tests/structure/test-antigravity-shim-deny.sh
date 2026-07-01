@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# antigravity-shim.sh DENY translation. The shim runs a wrapped CC-schema script,
+# antigravity-shim.sh DENY translation. The shim runs a wrapped engine-neutral script,
 # reads its stdout, and on `hookSpecificOutput.permissionDecision="deny"` emits a
 # TOP-LEVEL Antigravity verdict. The output dialect is the one [AMBIGUOUS] item,
 # parameterized by ZENSU_AG_HOOK_CONTRACT ∈ {superset, allow_tool, decision, exit}

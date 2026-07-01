@@ -30,8 +30,8 @@ set -u
 
 command -v node >/dev/null 2>&1 || exit 0
 
-# Drain stdin before any early exit so an upstream writer never sees a broken
-# pipe (mirrors pre-bash-zensu-gate.sh's ordering).
+# Drain stdin before any early exit so the caller feeding the pipe never sees a
+# broken pipe (mirrors pre-bash-zensu-gate.sh's ordering).
 INPUT="$(cat 2>/dev/null || true)"
 
 # Process-env escapes.

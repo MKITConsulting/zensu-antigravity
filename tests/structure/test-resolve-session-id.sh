@@ -1,8 +1,8 @@
 #!/bin/bash
 set -u
 
-# resolve-session-id.js project-scoped transcript resolution (engine-neutral,
-# byte-identical to CC per BK9). Pins: ZENSU_TRANSCRIPT_PATH fast-path, project-
+# resolve-session-id.js project-scoped transcript resolution (engine-neutral).
+# Pins: ZENSU_TRANSCRIPT_PATH fast-path, project-
 # scoped newest-transcript pick, Layer-1 mtime cutoff (argv[2]), Layer-2
 # ZENSU_OWN_CMD cmdline tail-match disambiguation, path sanitization of the
 # project dir into the projects-subdir name, and empty output when nothing

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pointer-first session resolution on Antigravity (the kiro lesson). The shell
+# Pointer-first session resolution on Antigravity. The shell
 # tool (run_command-launched zensu-log) and the plugin hooks run in DIFFERENT
 # process ancestry, so a PPID-keyed cache written by a hook can never match a
 # shell-tool caller. Contract (implemented order): explicit id >

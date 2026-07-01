@@ -2,8 +2,7 @@
 # PostToolUse hook — the test-run witness. Records every shell command run while
 # a TDD session is active to .zensu/logs/witness-<sid>.log, as an independent
 # anti-hallucination evidence channel the $zensu-tdd Phase 6 audit cross-checks
-# against claimed test runs. Wired to the host's shell tool (Codex `shell`,
-# Claude Code `Bash`).
+# against claimed test runs. Wired to the host shell tool (`run_command`).
 set -u
 
 : "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
@@ -25,13 +24,13 @@ printf '%s' "$INPUT" | node -e '
     try {
       const j = JSON.parse(s);
       const ti = j.tool_input || {};
-      // Command: Codex shell passes an argv array (e.g. ["bash","-lc","..."]);
-      // Claude Bash passes a string. Normalize both to one string.
+      // Command: the shell tool may pass the command as a string or as an
+      // argv array (e.g. ["bash","-lc","..."]). Normalize both to one string.
       let cmd = "";
       if (typeof ti.command === "string") cmd = ti.command;
       else if (Array.isArray(ti.command)) cmd = ti.command.join(" ");
       else if (typeof ti.cmd === "string") cmd = ti.cmd;
-      // Response: tolerate the different shapes Codex / Claude use.
+      // Response: tolerate the different response shapes the shell tool may use.
       const resp = j.tool_response || j.tool_output || j.output || {};
       const pick = (o, k) => (o && typeof o[k] !== "undefined") ? o[k] : undefined;
       let exit = pick(resp, "exit_code");

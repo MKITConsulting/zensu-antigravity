@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # normalize-payload.js — the ONE place that knows Antigravity's stdin envelope.
 # It translates an Antigravity hook payload (camelCase, nested toolCall.*) into
-# the flat snake_case CC schema the engine-neutral wrapped scripts read, and
+# the flat snake_case schema the engine-neutral wrapped scripts read, and
 # prints the workspace root on line 1 (the shim exports it as ZENSU_PROJECT_DIR,
 # BK6). This pins every mapping in C4 + BK7 (PostToolUse result -> tool_response.*).
 set -u

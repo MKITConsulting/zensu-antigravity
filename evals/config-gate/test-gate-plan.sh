@@ -1,10 +1,9 @@
 #!/bin/bash
-# Ported wholesale from zensu-claude-code. plan-approved-delegate.sh is shipped in
-# the Antigravity tree (kept-but-unwired: Antigravity has no ExitPlanMode hook, so
-# the plan->TDD decision is steered by rules/ + the workflows, but the engine-
-# neutral delegate script itself is identical and still emits the CC additional-
-# Context envelope routing to skill='zensu:tdd'). This offline test exercises that
-# script directly, so it is engine-agnostic and ports unchanged.
+# plan-approved-delegate.sh is shipped in the Antigravity tree (kept-but-unwired:
+# Antigravity has no ExitPlanMode hook, so the plan->TDD decision is steered by
+# rules/ + the workflows, but the engine-neutral delegate script still emits the
+# additionalContext envelope routing to skill='zensu:tdd'). This offline test
+# exercises that script directly, so it is engine-agnostic.
 set -u
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"

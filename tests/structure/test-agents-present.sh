@@ -4,7 +4,7 @@
 # declare a non-empty, WRITE-FREE tools list:
 #   zensu-code-reviewer  -> tools: read, run_command, grep, glob   (no write/edit)
 #   zensu-review-aspect  -> tools: read, grep, glob                (no run_command)
-# The CC-specific TaskCreate/TaskUpdate must be dropped.
+# TaskCreate/TaskUpdate are not Antigravity tools and must be absent.
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -56,7 +56,7 @@ if [ -f "$REVIEWER" ]; then
   fi
   # may run commands (read, run_command, grep, glob)
   printf '%s' "$T" | grep -q 'run_command' && ok "zensu-code-reviewer may run_command (read-only verification)" || bad "zensu-code-reviewer lacks run_command"
-  # no leftover CC task tools
+  # no leftover task-tracking tools
   printf '%s' "$T" | grep -qiE 'taskcreate|taskupdate' && bad "zensu-code-reviewer still lists TaskCreate/TaskUpdate (CC-only)" || ok "zensu-code-reviewer dropped TaskCreate/TaskUpdate"
 fi
 
