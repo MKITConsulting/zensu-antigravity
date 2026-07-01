@@ -5,9 +5,9 @@ set -u
 # (repo conventions): every CLI-map mutation entry is a member of
 # ZENSU_MUTATION_TOOL_NAMES; the read allowlist classifies reads as read; alias
 # nouns normalize. A new verb that is mapped-but-unclassified fails the build here.
-: "${CLAUDE_PLUGIN_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh" 2>/dev/null || true
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh" 2>/dev/null || true
+: "${ZENSU_PLUGIN_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh" 2>/dev/null || true
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh" 2>/dev/null || true
 
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); printf '  ok   %s\n' "$*"; }

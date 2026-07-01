@@ -48,7 +48,7 @@ fi
 check "P1 plan-approved-delegate.sh present (kept-but-unwired)" PASS
 bash -n "$SCRIPT" 2>/dev/null && check "P2 bash -n syntax check passes" PASS || check "P2 bash -n syntax check passes" FAIL
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 PAYLOAD='{"tool_name":"ExitPlanMode","tool_input":{"plan":"build a slugify helper"}}'
 
 # autoTdd enabled (default) -> routes to skill='zensu:tdd' with additionalContext

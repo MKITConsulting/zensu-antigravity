@@ -6,7 +6,7 @@ set -u
 # (tool_input.command + cwd) the shim produces, so the behavioral cases port
 # verbatim. Antigravity adaptation: the W4 wiring assertion checks the shim-
 # wrapped run_command form in hooks.json.template (not CC's Bash matcher). BK6:
-# rule-B (cross-worktree escape) needs CLAUDE_PROJECT_DIR (workspace root) !=
+# rule-B (cross-worktree escape) needs ZENSU_PROJECT_DIR (workspace root) !=
 # cwd (command cwd), which the shim wires from workspacePaths[0] vs args.Cwd.
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOK="$PLUGIN_DIR/hooks/pre-bash-source-write-gate.sh"
@@ -86,7 +86,7 @@ classify() {
 run() {
   local label="$1" cmd="$2" exp="$3" cwd="${4:-$PROJ}" cfg="${5:-$CFG_DEF}"
   local out
-  out="$(payload "$cmd" "$cwd" | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" CLAUDE_PROJECT_DIR="$PROJ" \
+  out="$(payload "$cmd" "$cwd" | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_PROJECT_DIR="$PROJ" \
         ZENSU_CONFIG="$cfg" ZENSU_BSWGATE_TEMP_DIRS="$FAKETMP" bash "$HOOK" 2>/dev/null | classify)"
   [ "$out" = "$exp" ] && check "$label -> $exp" PASS || check "$label (got '$out' want '$exp')" FAIL
 }
@@ -100,7 +100,7 @@ run "W13 dd of= tracked .rs"              "dd if=/dev/null of=src/app.rs"       
 HEREDOC="$(printf 'cat > src/app.rs <<EOF\nZZZ_BROKEN\nEOF\n')"
 run "W14 heredoc clobber tracked .rs"     "$HEREDOC"                              DENY
 
-# (B) worktree / project escape -> DENY (BK6: needs CLAUDE_PROJECT_DIR != cwd)
+# (B) worktree / project escape -> DENY (BK6: needs ZENSU_PROJECT_DIR != cwd)
 run "W15 relative escape to sibling"      "printf x >> ../sibling/src/lib.rs"     DENY
 run "W16 cd-into-sibling then write"      "cd ../sibling && printf x >> src/lib.rs" DENY
 run "W17 escape, brand-new file"          "printf x > ../sibling/src/brandnew.rs" DENY
@@ -119,18 +119,18 @@ run "W28 inline ZENSU_MCP_GATE=off"        "ZENSU_MCP_GATE=off printf x >> src/a
 run "W29 config bashWriteGate:false"       "printf x >> src/app.rs" ALLOW "$PROJ" "$CFG_OFF"
 
 # Fail-open: empty + non-JSON -> ALLOW
-OUT="$(printf '' | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_DEF" bash "$HOOK" 2>/dev/null | classify)"
-OUT2="$(printf '%s' 'not json' | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_DEF" bash "$HOOK" 2>/dev/null | classify)"
+OUT="$(printf '' | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_DEF" bash "$HOOK" 2>/dev/null | classify)"
+OUT2="$(printf '%s' 'not json' | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_DEF" bash "$HOOK" 2>/dev/null | classify)"
 { [ "$OUT" = "ALLOW" ] && [ "$OUT2" = "ALLOW" ]; } \
   && check "W31 fail-open: empty + non-JSON -> ALLOW" PASS || check "W31 fail-open (empty='$OUT' nonjson='$OUT2')" FAIL
 
 # Deny-reason content
-REASON_A="$(payload 'printf x >> src/app.rs' | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" CLAUDE_PROJECT_DIR="$PROJ" \
+REASON_A="$(payload 'printf x >> src/app.rs' | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_PROJECT_DIR="$PROJ" \
           ZENSU_CONFIG="$CFG_DEF" ZENSU_BSWGATE_TEMP_DIRS="$FAKETMP" bash "$HOOK" 2>/dev/null)"
 { printf '%s' "$REASON_A" | grep -qF 'tracked' && printf '%s' "$REASON_A" | grep -qF 'ZENSU_BASH_WRITE_GATE=off'; } \
   && check "W32 clobber deny-reason: 'tracked' + escape-hatch hint" PASS || check "W32 clobber deny-reason content" FAIL
 
-REASON_B="$(payload 'printf x >> ../sibling/src/lib.rs' | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" CLAUDE_PROJECT_DIR="$PROJ" \
+REASON_B="$(payload 'printf x >> ../sibling/src/lib.rs' | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_PROJECT_DIR="$PROJ" \
           ZENSU_CONFIG="$CFG_DEF" ZENSU_BSWGATE_TEMP_DIRS="$FAKETMP" bash "$HOOK" 2>/dev/null)"
 { printf '%s' "$REASON_B" | grep -qiF 'worktree' && printf '%s' "$REASON_B" | grep -qF 'ZENSU_BASH_WRITE_GATE=off'; } \
   && check "W33 escape deny-reason: 'worktree' + escape-hatch hint [BK6]" PASS || check "W33 escape deny-reason content" FAIL

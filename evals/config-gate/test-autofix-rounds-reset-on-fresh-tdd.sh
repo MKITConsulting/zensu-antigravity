@@ -22,13 +22,13 @@ TMP_DIR="$(mktemp -d)"
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
-export CLAUDE_PLUGIN_DATA_OVERRIDE="$TMP_DIR/state"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_DATA_OVERRIDE="$TMP_DIR/state"
 export TDD_STATE_DIR="$TMP_DIR/tdd"
-mkdir -p "$CLAUDE_PLUGIN_DATA_OVERRIDE" "$TDD_STATE_DIR"
+mkdir -p "$ZENSU_PLUGIN_DATA_OVERRIDE" "$TDD_STATE_DIR"
 
 SID="sess-reset-001"
-COUNTER_FILE="$CLAUDE_PLUGIN_DATA_OVERRIDE/rounds-${SID}.json"
+COUNTER_FILE="$ZENSU_PLUGIN_DATA_OVERRIDE/rounds-${SID}.json"
 PHASE_FILE="$TDD_STATE_DIR/tdd-phase-${SID}.json"
 
 seed_counter() { printf '{"count":4,"ts":"2026-01-01T00:00:00Z"}\n' > "$COUNTER_FILE"; }

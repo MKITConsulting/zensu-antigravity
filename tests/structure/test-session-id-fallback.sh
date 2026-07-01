@@ -29,11 +29,11 @@ PROJECT_DIR="$TMP_DIR/proj"
 mkdir -p "$PROJECT_DIR/.zensu/state"
 
 # Case 1 — stdin id present -> returned verbatim sanitized.
-OUT1=$(CLAUDE_PROJECT_DIR="$PROJECT_DIR" bash -c "source '$HELPER'; zensu_resolve_session_id 'abc-123_real'")
+OUT1=$(ZENSU_PROJECT_DIR="$PROJECT_DIR" bash -c "source '$HELPER'; zensu_resolve_session_id 'abc-123_real'")
 [ "$OUT1" = "abc-123_real" ] && check "S2-C1 stdin id present -> returned verbatim" PASS || check "S2-C1 stdin id (got '$OUT1')" FAIL
 
 # Case 4 — sanitization strips dangerous chars.
-OUT4=$(CLAUDE_PROJECT_DIR="$PROJECT_DIR" bash -c "source '$HELPER'; zensu_resolve_session_id '../foo/bar baz'")
+OUT4=$(ZENSU_PROJECT_DIR="$PROJECT_DIR" bash -c "source '$HELPER'; zensu_resolve_session_id '../foo/bar baz'")
 case "$OUT4" in
   *../*|*/*|*' '*) check "S2-C4 dangerous chars stripped (got '$OUT4')" FAIL ;;
   *) [ -n "$OUT4" ] && check "S2-C4 dangerous chars (../, /, space) stripped" PASS || check "S2-C4 sanitized id non-empty" FAIL ;;
@@ -64,7 +64,7 @@ echo "RESOLVED=\${RESOLVED}"
 echo "KEY=\${KEY}"
 EOF
 chmod +x "$SEED3"
-OUT3_RAW=$(CLAUDE_PROJECT_DIR="$PROJECT_DIR3" "$SEED3" 2>&1)
+OUT3_RAW=$(ZENSU_PROJECT_DIR="$PROJECT_DIR3" "$SEED3" 2>&1)
 OUT3=$(echo "$OUT3_RAW" | grep '^RESOLVED=' | cut -d= -f2-)
 KEY3=$(echo "$OUT3_RAW" | grep '^KEY=' | cut -d= -f2-)
 [ "$OUT3" = "fallback_${KEY3}" ] && check "S2-C3 stdin empty + cache missing -> fallback_<key>" PASS || check "S2-C3 fallback (got '$OUT3' expected 'fallback_${KEY3}')" FAIL
@@ -81,7 +81,7 @@ case "$DEGRADED_KEY" in
   [0-9]*)   check "S2-C7 ps/cksum stubbed-failing -> bare numeric PPID fallback" PASS ;;
   *)        check "S2-C7 ps/cksum stubbed (got '$DEGRADED_KEY')" FAIL ;;
 esac
-DEGRADED_RESOLVE=$(env PATH="$DEG:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$PROJECT_DIR3" bash -c "source '$HELPER'; zensu_resolve_session_id ''")
+DEGRADED_RESOLVE=$(env PATH="$DEG:/usr/bin:/bin" ZENSU_PROJECT_DIR="$PROJECT_DIR3" bash -c "source '$HELPER'; zensu_resolve_session_id ''")
 case "$DEGRADED_RESOLVE" in
   fallback_[0-9]*) check "S2-C7b ps/cksum failing -> resolve returns fallback_<bare-pid>" PASS ;;
   *)               check "S2-C7b ps/cksum failing resolve (got '$DEGRADED_RESOLVE')" FAIL ;;

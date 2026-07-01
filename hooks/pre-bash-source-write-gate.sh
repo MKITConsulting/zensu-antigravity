@@ -12,7 +12,7 @@
 # either:
 #   (A) the file already exists and is git-tracked inside the project (clobbering
 #       real tracked source), or
-#   (B) the resolved path escapes the session root (CLAUDE_PROJECT_DIR / cwd) into
+#   (B) the resolved path escapes the session root (ZENSU_PROJECT_DIR / cwd) into
 #       a sibling or main checkout — the cross-session contamination vector.
 # Relative targets resolve against a cwd that tracks `cd` across the command, so
 # `cd ../main && printf ... >> src/x.rs` is caught by (B).
@@ -26,7 +26,7 @@
 # /private/tmp, /var/folders). mv/cp are out of scope.
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}}}"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
 
 command -v node >/dev/null 2>&1 || exit 0
 
@@ -40,10 +40,10 @@ INPUT="$(cat 2>/dev/null || true)"
 
 [ -z "$INPUT" ] && exit 0
 
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_hook_enabled bashWriteGate || exit 0
 
-REASON="$(PAYLOAD="$INPUT" node "${CLAUDE_PLUGIN_ROOT}/hooks/lib/bash-source-write-parse.js" 2>/dev/null)"
+REASON="$(PAYLOAD="$INPUT" node "${ZENSU_PLUGIN_ROOT}/hooks/lib/bash-source-write-parse.js" 2>/dev/null)"
 [ -z "$REASON" ] && exit 0
 
 REASON="$REASON" node -e '

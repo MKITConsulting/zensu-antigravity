@@ -14,7 +14,7 @@ zensu_session_key() {
 }
 
 zensu_resolve_session_via_helper() {
-  local helper_root="${CLAUDE_PLUGIN_ROOT:-}"
+  local helper_root="${ZENSU_PLUGIN_ROOT:-}"
   if [ -z "$helper_root" ]; then
     helper_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
   fi
@@ -52,7 +52,7 @@ zensu_resolve_session_id() {
   # would otherwise return the (possibly live-changing) newest Claude
   # transcript id and detach the armed Kiro state mid-session. Explicit ids
   # keep absolute precedence above.
-  cache="${CLAUDE_PROJECT_DIR:-.}/.zensu/state/session-id-current.txt"
+  cache="${ZENSU_PROJECT_DIR:-.}/.zensu/state/session-id-current.txt"
   if [ -f "$cache" ]; then
     cached="$(cat "$cache" 2>/dev/null)"
     cached="${cached//$'\n'/}"
@@ -70,7 +70,7 @@ zensu_resolve_session_id() {
     fi
   fi
   key="$(zensu_session_key)"
-  cache="${CLAUDE_PROJECT_DIR:-.}/.zensu/state/session-id-${key}.txt"
+  cache="${ZENSU_PROJECT_DIR:-.}/.zensu/state/session-id-${key}.txt"
   if [ -f "$cache" ]; then
     cached="$(cat "$cache" 2>/dev/null)"
     cached="${cached//$'\n'/}"

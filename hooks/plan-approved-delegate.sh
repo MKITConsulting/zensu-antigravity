@@ -14,8 +14,8 @@
 
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}}}"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_hook_enabled autoTdd || exit 0
 
 if zensu_tdd_strict_enabled; then

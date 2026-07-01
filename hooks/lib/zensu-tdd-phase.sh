@@ -1,22 +1,22 @@
 #!/bin/bash
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+: "${ZENSU_PLUGIN_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 
 tdd_state_file() {
   local session_id="${1:-}"
   local sanitized="${session_id//[^A-Za-z0-9_-]/_}"
   if [ -z "$sanitized" ]; then
-    if [ -f "${CLAUDE_PLUGIN_ROOT:-}/hooks/lib/zensu-session.sh" ]; then
-      source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+    if [ -f "${ZENSU_PLUGIN_ROOT:-}/hooks/lib/zensu-session.sh" ]; then
+      source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
       sanitized="fallback_$(zensu_session_key)"
     else
       sanitized="fallback_${PPID}"
     fi
   fi
-  local dir="${TDD_STATE_DIR:-${CLAUDE_PROJECT_DIR:-.}/.zensu/state}"
+  local dir="${TDD_STATE_DIR:-${ZENSU_PROJECT_DIR:-.}/.zensu/state}"
   echo "${dir}/tdd-phase-${sanitized}.json"
 }
 
@@ -432,7 +432,7 @@ tdd_has_red_fail() {
 }
 
 zensu_pending_review_file() {
-  local dir="${TDD_STATE_DIR:-${CLAUDE_PROJECT_DIR:-.}/.zensu/state}"
+  local dir="${TDD_STATE_DIR:-${ZENSU_PROJECT_DIR:-.}/.zensu/state}"
   echo "${dir}/pending-review.json"
 }
 

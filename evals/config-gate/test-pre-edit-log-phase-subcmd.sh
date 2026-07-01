@@ -12,7 +12,7 @@ check() {
   else echo "  FAIL  $label"; FAIL=$((FAIL+1)); fi
 }
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 TDD_STATE_DIR="$(mktemp -d)"
 export TDD_STATE_DIR
 cleanup() { rm -rf "$TDD_STATE_DIR"; }

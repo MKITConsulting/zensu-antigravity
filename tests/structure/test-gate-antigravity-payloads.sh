@@ -29,7 +29,7 @@ SBSHIM="$SBX/hooks/antigravity/antigravity-shim.sh"
 chmod +x "$SBSHIM" "$SBX/hooks/"*.sh 2>/dev/null
 
 # An Antigravity run_command payload: toolCall.name + args.CommandLine + a
-# workspace root (the shim exports it as CLAUDE_PROJECT_DIR).
+# workspace root (the shim exports it as ZENSU_PROJECT_DIR).
 ag_payload() { # $1=command
   printf '{"toolCall":{"name":"run_command","args":{"CommandLine":"%s","Cwd":"%s"}},"workspacePaths":["%s"],"session_id":"agpay"}' "$1" "$WS" "$WS"
 }

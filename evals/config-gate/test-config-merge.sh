@@ -35,7 +35,7 @@ source "$HELPER"
 # ---- (b) THE BUG: global sets the flag, project omits it -> must fall through ----
 unset ZENSU_CONFIG
 export HOME="$HOME_DIR"
-export CLAUDE_PROJECT_DIR="$PROJECT_DIR"
+export ZENSU_PROJECT_DIR="$PROJECT_DIR"
 printf '{"hooks":{"autoFixIncludeSuggestions":true}}' > "$HOME_CFG"
 printf '{"logging":{"timestampStyle":"none"}}' > "$PROJECT_CFG"
 

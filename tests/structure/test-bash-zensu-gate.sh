@@ -82,7 +82,7 @@ classify() {
 run() {
   local label="$1" cmd="$2" at="$3" exp="$4" sd="${5:-}"
   local out
-  out="$(payload "$cmd" "$at" gate-test | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" ${sd:+TDD_STATE_DIR=$sd} bash "$HOOK" 2>/dev/null | classify)"
+  out="$(payload "$cmd" "$at" gate-test | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" ${sd:+TDD_STATE_DIR=$sd} bash "$HOOK" 2>/dev/null | classify)"
   [ "$out" = "$exp" ] && check "$label -> $exp" PASS || check "$label (got '$out' want '$exp')" FAIL
 }
 
@@ -104,9 +104,9 @@ run "B25 compound: read && mutation"        "zensu features get f1 && zensu secu
 
 # B8 workflow-active (skill running) -> mutation in declared set ALLOW
 SDF="$(mktemp -d -t bashgate-wf-XXXXXX)"
-CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" TDD_STATE_DIR="$SDF" bash -c '
-  source "$CLAUDE_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
-  source "$CLAUDE_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" TDD_STATE_DIR="$SDF" bash -c '
+  source "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+  source "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
   sid="$(zensu_resolve_session_id gate-test)"
   tdd_workflow_begin "$sid" "set_security_classification" "$(( $(date +%s) + 3600 ))"
 ' 2>/dev/null
@@ -115,17 +115,17 @@ run "B27b out-of-scope mutation -> DENY"    "zensu link test f1 --test-type unit
 rm -rf "$SDF"
 
 # B9 env escape; B10 default-on; B11 explicit false
-OUT="$(payload 'zensu security classify f1' '' gate-test | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" ZENSU_MCP_GATE=off bash "$HOOK" 2>/dev/null | classify)"
+OUT="$(payload 'zensu security classify f1' '' gate-test | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" ZENSU_MCP_GATE=off bash "$HOOK" 2>/dev/null | classify)"
 [ "$OUT" = "ALLOW" ] && check "B9 mutation + ZENSU_MCP_GATE=off -> ALLOW" PASS || check "B9 env escape (got '$OUT')" FAIL
-OUT="$(payload 'zensu security classify f1' '' gate-test | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_OFF" bash "$HOOK" 2>/dev/null | classify)"
+OUT="$(payload 'zensu security classify f1' '' gate-test | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_OFF" bash "$HOOK" 2>/dev/null | classify)"
 [ "$OUT" = "DENY" ] && check "B10 mutation, gate default-on (mcpGate absent) -> DENY" PASS || check "B10 default-on (got '$OUT')" FAIL
-OUT="$(payload 'zensu security classify f1' '' gate-test | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_FALSE" bash "$HOOK" 2>/dev/null | classify)"
+OUT="$(payload 'zensu security classify f1' '' gate-test | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_FALSE" bash "$HOOK" 2>/dev/null | classify)"
 [ "$OUT" = "ALLOW" ] && check "B11 mutation, mcpGate:false -> ALLOW" PASS || check "B11 explicit false (got '$OUT')" FAIL
 
 # B20 fail-open: empty + non-JSON + non-zensu command -> ALLOW
-OUT="$(printf '' | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
-OUT2="$(printf '%s' 'not json at all' | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
-OUT3="$(payload 'git status' '' gate-test | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
+OUT="$(printf '' | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
+OUT2="$(printf '%s' 'not json at all' | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
+OUT3="$(payload 'git status' '' gate-test | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
 if [ "$OUT" = "ALLOW" ] && [ "$OUT2" = "ALLOW" ] && [ "$OUT3" = "ALLOW" ]; then
   check "B20 fail-open: empty + non-JSON + non-zensu -> ALLOW" PASS
 else
@@ -140,7 +140,7 @@ for c in \
   "zensu link test f1 --test-type unit --file a" \
   "zensu ghost apply s1" \
   "zensu wiki create --product p --title T --content X"; do
-  O="$(payload "$c" '' gate-test | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
+  O="$(payload "$c" '' gate-test | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
   [ "$O" = "DENY" ] || { M_FAIL=$((M_FAIL+1)); echo "      '$c' -> $O (expected DENY)"; }
 done
 [ "$M_FAIL" -eq 0 ] && check "B23 representative mutations freelance -> DENY" PASS || check "B23 mutation coverage ($M_FAIL)" FAIL
@@ -153,7 +153,7 @@ for c in \
   "zensu security posture --product p" \
   "zensu ghost candidates s1" \
   "zensu pulse summary s1"; do
-  O="$(payload "$c" '' gate-test | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
+  O="$(payload "$c" '' gate-test | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$CFG_ON" bash "$HOOK" 2>/dev/null | classify)"
   [ "$O" = "ALLOW" ] || { R_FAIL=$((R_FAIL+1)); echo "      '$c' -> $O (expected ALLOW)"; }
 done
 [ "$R_FAIL" -eq 0 ] && check "B24 representative reads + telemetry -> ALLOW" PASS || check "B24 read coverage ($R_FAIL)" FAIL

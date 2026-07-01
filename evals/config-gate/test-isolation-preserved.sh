@@ -25,9 +25,9 @@ if [ ! -x "$SCRIPT_POSTREVIEW" ]; then
 fi
 check "post-review-tdd-delegate.sh exists and is executable" PASS
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
-export CLAUDE_PLUGIN_DATA_OVERRIDE="$(mktemp -d)"
-cleanup() { rm -rf "$CLAUDE_PLUGIN_DATA_OVERRIDE"; }
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_DATA_OVERRIDE="$(mktemp -d)"
+cleanup() { rm -rf "$ZENSU_PLUGIN_DATA_OVERRIDE"; }
 trap cleanup EXIT
 
 TMP_CFG="/tmp/zensu-isolation-allenabled-$$.json"

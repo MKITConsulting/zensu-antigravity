@@ -95,7 +95,7 @@ function main() {
   if (!cmd) return "";
 
   const HOME = process.env.HOME || "";
-  const projectRoot = stripSlash(process.env.CLAUDE_PROJECT_DIR || cwd0 || process.cwd());
+  const projectRoot = stripSlash(process.env.ZENSU_PROJECT_DIR || cwd0 || process.cwd());
   let curdir = cwd0 || projectRoot;
 
   // Temp roots are exempt from the (B) escape rule. ZENSU_BSWGATE_TEMP_DIRS (a

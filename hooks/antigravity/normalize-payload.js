@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // normalize-payload.js — translate an Antigravity hook payload (camelCase,
 // nested `toolCall.*`) into the flat snake_case shape the engine-neutral zensu
-// hook scripts read (the Claude Code schema). This is the ONE place that knows
+// hook scripts read (a flat snake_case schema). This is the ONE place that knows
 // Antigravity's stdin envelope; every wrapped script stays byte-comparable to CC.
 //
 // Output (two lines on stdout):
 //   line 1: the workspace root (workspacePaths[0]) — the shim exports it as
-//           CLAUDE_PROJECT_DIR so project-scoped state has a stable anchor that
+//           ZENSU_PROJECT_DIR so project-scoped state has a stable anchor that
 //           is NOT the command cwd (the source-write-gate's cross-worktree escape
 //           check depends on projectRoot != curdir).
-//   line 2: the normalized CC-shape payload as single-line JSON.
+//   line 2: the normalized flat payload as single-line JSON.
 //
 // Fail-open: any parse error yields an empty workspace line + "{}" so wrapped
 // scripts simply find empty fields and no-op (never a hard error).

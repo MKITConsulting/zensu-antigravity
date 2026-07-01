@@ -19,9 +19,9 @@ if [ ! -x "$SCRIPT" ]; then
   exit 1
 fi
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
-export CLAUDE_PLUGIN_DATA_OVERRIDE="$(mktemp -d)"
-cleanup() { rm -rf "$CLAUDE_PLUGIN_DATA_OVERRIDE"; }
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_DATA_OVERRIDE="$(mktemp -d)"
+cleanup() { rm -rf "$ZENSU_PLUGIN_DATA_OVERRIDE"; }
 trap cleanup EXIT
 
 TMP_CFG="/tmp/zensu-gate-postreview-disabled-$$.json"

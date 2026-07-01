@@ -1,8 +1,8 @@
 #!/bin/bash
 set -u
 export ZENSU_BASH_START="${ZENSU_BASH_START:-}"
-: "${CLAUDE_PLUGIN_ROOT:=$(cd "$(dirname "$0")/../.." && pwd)}"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+: "${ZENSU_PLUGIN_ROOT:=$(cd "$(dirname "$0")/../.." && pwd)}"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 
 case "${1:-}" in
   --phase)
@@ -25,10 +25,10 @@ case "${1:-}" in
     fi
     if [ -z "$session_val" ]; then
       export ZENSU_OWN_CMD="${ZENSU_OWN_CMD:-bash $0 --phase $phase_val --step $step_val}"
-      source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
-      session_val="$(zensu_resolve_session_id "${CLAUDE_SESSION_ID:-}")"
+      source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+      session_val="$(zensu_resolve_session_id "${ZENSU_SESSION_ID:-}")"
     fi
-    source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+    source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
     tdd_write_phase "$session_val" "$step_val" "$phase_val" "$reason_val"
     exit $?
     ;;
@@ -42,10 +42,10 @@ case "${1:-}" in
     done
     if [ -z "$session_val" ]; then
       export ZENSU_OWN_CMD="${ZENSU_OWN_CMD:-bash $0 --mode}"
-      source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
-      session_val="$(zensu_resolve_session_id "${CLAUDE_SESSION_ID:-}")"
+      source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+      session_val="$(zensu_resolve_session_id "${ZENSU_SESSION_ID:-}")"
     fi
-    source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+    source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
     if [ "$(tdd_vanilla_mode "$(tdd_state_file "$session_val")")" = "true" ]; then
       echo "vanilla"
     else
@@ -64,7 +64,7 @@ case "${1:-}" in
         *) shift ;;
       esac
     done
-    source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+    source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
     case "$verb" in
       --pending-review)      tdd_write_pending_review "$files_val" "$summary_val" ;;
       --pending-review-done) tdd_clear_pending_review ;;
@@ -84,10 +84,10 @@ case "${1:-}" in
     done
     if [ -z "$session_val" ]; then
       export ZENSU_OWN_CMD="${ZENSU_OWN_CMD:-bash $0 $verb}"
-      source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
-      session_val="$(zensu_resolve_session_id "${CLAUDE_SESSION_ID:-}")"
+      source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+      session_val="$(zensu_resolve_session_id "${ZENSU_SESSION_ID:-}")"
     fi
-    source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+    source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
     case "$verb" in
       --tdd-begin)
         tdd_set_flag "$session_val" active true
@@ -110,7 +110,7 @@ case "${1:-}" in
         else
           echo "zensu-log --tdd-begin: active flag write failed — session NOT activated" >&2
         fi
-        rounds_state_dir="${CLAUDE_PLUGIN_DATA_OVERRIDE:-${CLAUDE_PROJECT_DIR:-.}/.zensu/state}"
+        rounds_state_dir="${ZENSU_PLUGIN_DATA_OVERRIDE:-${ZENSU_PROJECT_DIR:-.}/.zensu/state}"
         rounds_counter_file="${rounds_state_dir}/rounds-${session_val}.json"
         if [ -L "$rounds_counter_file" ]; then
           echo "zensu-log --tdd-begin: refusing to delete through symlink at $rounds_counter_file — rounds counter NOT reset" >&2

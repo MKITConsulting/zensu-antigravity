@@ -18,17 +18,17 @@ if [ ! -x "$SCRIPT" ]; then
 fi
 check "hook script exists and is executable" PASS
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 TDD_STATE_DIR="$(mktemp -d)"
 export TDD_STATE_DIR
 cleanup() { rm -rf "$TDD_STATE_DIR"; }
 trap cleanup EXIT
 
-unset CLAUDE_AGENT_TYPE
+unset ZENSU_AGENT_TYPE
 unset ZENSU_TDD_GATE
 
 PAYLOAD_REVIEWER='{"tool_name":"write_to_file","tool_input":{"file_path":"src/foo.ts"},"session_id":"s-iso-1"}'
-OUT_REV=$(echo "$PAYLOAD_REVIEWER" | CLAUDE_AGENT_TYPE="zensu:code-reviewer" "$SCRIPT" 2>/dev/null)
+OUT_REV=$(echo "$PAYLOAD_REVIEWER" | ZENSU_AGENT_TYPE="zensu:code-reviewer" "$SCRIPT" 2>/dev/null)
 EXIT_REV=$?
 if [ -z "$OUT_REV" ] && [ "$EXIT_REV" = "0" ]; then
   check "non-tdd-manager subagent (code-reviewer via env): empty stdout + exit 0" PASS
@@ -37,7 +37,7 @@ else
 fi
 
 PAYLOAD_PLM='{"tool_name":"write_to_file","tool_input":{"file_path":"src/foo.ts"},"session_id":"s-iso-2"}'
-OUT_PLM=$(echo "$PAYLOAD_PLM" | CLAUDE_AGENT_TYPE="zensu:zensu-plm" "$SCRIPT" 2>/dev/null)
+OUT_PLM=$(echo "$PAYLOAD_PLM" | ZENSU_AGENT_TYPE="zensu:zensu-plm" "$SCRIPT" 2>/dev/null)
 EXIT_PLM=$?
 if [ -z "$OUT_PLM" ] && [ "$EXIT_PLM" = "0" ]; then
   check "non-tdd-manager subagent (zensu-plm via env): empty stdout + exit 0" PASS
@@ -46,7 +46,7 @@ else
 fi
 
 PAYLOAD_BASH='{"tool_name":"Bash","tool_input":{"command":"ls"},"session_id":"s-iso-3"}'
-OUT_BASH=$(echo "$PAYLOAD_BASH" | CLAUDE_AGENT_TYPE="zensu:tdd-manager" "$SCRIPT" 2>/dev/null)
+OUT_BASH=$(echo "$PAYLOAD_BASH" | ZENSU_AGENT_TYPE="zensu:tdd-manager" "$SCRIPT" 2>/dev/null)
 EXIT_BASH=$?
 if [ -z "$OUT_BASH" ] && [ "$EXIT_BASH" = "0" ]; then
   check "Bash + benign read-only command (ls): empty stdout + exit 0" PASS
@@ -55,7 +55,7 @@ else
 fi
 
 PAYLOAD_READ='{"tool_name":"Read","tool_input":{"file_path":"src/foo.ts"},"session_id":"s-iso-4"}'
-OUT_READ=$(echo "$PAYLOAD_READ" | CLAUDE_AGENT_TYPE="zensu:tdd-manager" "$SCRIPT" 2>/dev/null)
+OUT_READ=$(echo "$PAYLOAD_READ" | ZENSU_AGENT_TYPE="zensu:tdd-manager" "$SCRIPT" 2>/dev/null)
 EXIT_READ=$?
 if [ -z "$OUT_READ" ] && [ "$EXIT_READ" = "0" ]; then
   check "non-Edit tool (Read): empty stdout + exit 0" PASS

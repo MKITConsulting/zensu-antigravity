@@ -2,16 +2,16 @@
 # antigravity-shim.sh — the single engine-translation layer between Antigravity
 # hooks and the engine-neutral zensu hook scripts. hooks.json registers every
 # hook as `bash <ZENSU_HOME>/hooks/antigravity/antigravity-shim.sh <script>.sh`;
-# the wrapped script stays byte-comparable to its Claude Code counterpart.
+# the wrapped scripts read a flat, normalized payload and stay engine-neutral.
 #
 # Pipeline:
-#   1. resolve plugin root from $0; export CLAUDE_PLUGIN_ROOT / ZENSU_PLUGIN_ROOT
-#   2. normalize-payload.js : Antigravity toolCall.* (camelCase) -> CC flat
-#      snake_case; line 1 = workspace root -> exported as CLAUDE_PROJECT_DIR so
+#   1. resolve plugin root from $0; export ZENSU_PLUGIN_ROOT / ANTIGRAVITY_PLUGIN_ROOT
+#   2. normalize-payload.js : Antigravity toolCall.* (camelCase) -> flat
+#      snake_case; line 1 = workspace root -> exported as ZENSU_PROJECT_DIR so
 #      project state anchors on the workspace, NOT the command cwd
 #   3. lazy-init.sh (pre-* only) : SessionStart replacement (pin plugin-root,
 #      capture session id)
-#   4. run the wrapped CC-schema script on the normalized payload
+#   4. run the wrapped script on the normalized payload
 #   5. classify its stdout -> deny | context | block | raw
 #   6. emit-verdict.js : top-level Antigravity JSON; always exit 0 (exit 2 only
 #      when ZENSU_AG_HOOK_CONTRACT=exit on a deny)
@@ -20,14 +20,13 @@
 # error must never break the host session, and a CRASHED wrapped script (rc!=0
 # with partial output) is classified RAW -> allowed (the shim never surfaces the
 # wrapped exit code, so a syntax error can't become an accidental deny). This is
-# the CC/kiro convention-nudge posture: the gates are not a security boundary.
+# a convention-nudge posture: the gates are not a security boundary.
 set -u
 
 SHIM_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SHIM_DIR/../.." && pwd)"
 export ZENSU_PLUGIN_ROOT="$ROOT"
 export ANTIGRAVITY_PLUGIN_ROOT="$ROOT"
-export CLAUDE_PLUGIN_ROOT="$ROOT"
 
 SCRIPT_NAME="${1:-}"
 [ -z "$SCRIPT_NAME" ] && exit 0
@@ -51,7 +50,7 @@ PAYLOAD="$(printf '%s\n' "$NORM" | sed -n '2p')"
 # cross-worktree escape check needs projectRoot (workspace) != curdir (command
 # cwd). zensu_runtime_apply_project_dir is a no-op once this is set.
 if [ -n "$WS_ROOT" ] && [ -d "$WS_ROOT" ]; then
-  export CLAUDE_PROJECT_DIR="$WS_ROOT"
+  export ZENSU_PROJECT_DIR="$WS_ROOT"
 fi
 
 # --- 3. lazy-init (SessionStart replacement; pre-* hooks only) -------------
@@ -61,7 +60,7 @@ case "$SCRIPT_NAME" in
     ;;
 esac
 
-# --- 4. run the wrapped CC-schema script ----------------------------------
+# --- 4. run the wrapped script ----------------------------------
 CAP_DIR="$(mktemp -d 2>/dev/null)" || exit 0
 OUT_FILE="$CAP_DIR/out"
 ERR_FILE="$CAP_DIR/err"
@@ -116,7 +115,7 @@ shim_context_first_this_turn() {
     try{const j=JSON.parse(s||"{}");process.stdout.write(typeof j.prompt==="string"?j.prompt:"");}catch(_){}});' 2>/dev/null)"
   turn="$(printf '%s' "$prompt" | cksum 2>/dev/null | cut -d' ' -f1)"
   sig="$(printf '%s\x1f%s' "$script" "$text" | cksum 2>/dev/null | cut -d' ' -f1)"
-  f="${CLAUDE_PROJECT_DIR:-.}/.zensu/state/preinv-${sid}.txt"
+  f="${ZENSU_PROJECT_DIR:-.}/.zensu/state/preinv-${sid}.txt"
   mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
   stored="$(sed -n '1p' "$f" 2>/dev/null || true)"
   if [ "$stored" != "turn:$turn" ]; then

@@ -7,23 +7,23 @@
 #      run_command-launched `zensu-log.sh` calls and the hooks agree on ONE sid.
 #
 # Idempotent and cheap: safe to run on every pre-* call. Reads the (normalized)
-# payload on stdin. CLAUDE_PROJECT_DIR is already exported by the shim from the
+# payload on stdin. ZENSU_PROJECT_DIR is already exported by the shim from the
 # workspace root. Fail-open everywhere — never breaks the host session.
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
 
 # 1. pin the plugin-root pointer
 mkdir -p "$HOME/.zensu" 2>/dev/null || true
 _cur="$(cat "$HOME/.zensu/plugin-root" 2>/dev/null || true)"
-if [ "$_cur" != "$CLAUDE_PLUGIN_ROOT" ]; then
-  printf '%s\n' "$CLAUDE_PLUGIN_ROOT" > "$HOME/.zensu/plugin-root" 2>/dev/null || true
+if [ "$_cur" != "$ZENSU_PLUGIN_ROOT" ]; then
+  printf '%s\n' "$ZENSU_PLUGIN_ROOT" > "$HOME/.zensu/plugin-root" 2>/dev/null || true
 fi
 
 PAYLOAD="$(cat 2>/dev/null || true)"
 command -v node >/dev/null 2>&1 || exit 0
-[ -f "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh" ] || exit 0
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh" 2>/dev/null || exit 0
+[ -f "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh" ] || exit 0
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh" 2>/dev/null || exit 0
 
 SID="$(printf '%s' "$PAYLOAD" | node -e '
   let s = "";
@@ -44,7 +44,7 @@ if [ -z "$SID" ]; then
   SID="ag-$(zensu_session_key)"
 fi
 
-CACHE_DIR="${CLAUDE_PROJECT_DIR:-.}/.zensu/state"
+CACHE_DIR="${ZENSU_PROJECT_DIR:-.}/.zensu/state"
 mkdir -p "$CACHE_DIR" 2>/dev/null || exit 0
 
 _write_atomic() {

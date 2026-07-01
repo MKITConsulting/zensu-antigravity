@@ -17,7 +17,7 @@ if [ ! -x "$SCRIPT" ]; then
   exit 1
 fi
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 TDD_STATE_DIR="$(mktemp -d)"
 export TDD_STATE_DIR
 unset ZENSU_TDD_GATE
@@ -25,7 +25,7 @@ unset ZENSU_TDD_GATE
 cleanup() { rm -rf "$TDD_STATE_DIR"; }
 trap cleanup EXIT
 
-# 0.4.0+: the gate activates on chain-state (active=true), not CLAUDE_AGENT_TYPE.
+# 0.4.0+: the gate activates on chain-state (active=true), not ZENSU_AGENT_TYPE.
 # Mark the session active with no phase written (UNINITIALIZED), as /zensu:tdd
 # --tdd-begin would before any RED test exists.
 source "$PLUGIN_DIR/hooks/lib/zensu-tdd-phase.sh"

@@ -6,9 +6,9 @@ set -u
 # classified via zensu-mcp-tools.sh) must be wrapped in --workflow-begin /
 # --workflow-end markers. Engine-neutral SoT — ported wholesale from CC; the libs
 # are byte-identical and the test self-resolves the plugin root.
-: "${CLAUDE_PLUGIN_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh" 2>/dev/null || true
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh" 2>/dev/null || true
+: "${ZENSU_PLUGIN_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh" 2>/dev/null || true
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh" 2>/dev/null || true
 
 skill_unwrapped_mutation() {
   local f="$1" tok line noun verb tool
@@ -95,7 +95,7 @@ ALI="$(skill_unwrapped_mutation "$FXA/alias/SKILL.md" 2>/dev/null)"
 rm -rf "$FXA"
 
 SKILL_FAIL=0
-for d in "${CLAUDE_PLUGIN_ROOT}"/skills/*/; do
+for d in "${ZENSU_PLUGIN_ROOT}"/skills/*/; do
   F="${d}SKILL.md"
   [ -f "$F" ] || continue
   off="$(skill_unwrapped_mutation "$F")"

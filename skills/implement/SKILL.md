@@ -147,7 +147,7 @@ Present a completion summary:
 - `zensu features update` does NOT change status. Status transitions (planned -> in-progress -> testing -> released) go through `zensu features status <feature-id> <new-status>`.
 - Always reference the feature ID in commit messages: `feat(component): description [KEY-N]`
 - Security classification should be set BEFORE implementation (use `/zensu-security-review` if not yet set)
-- The /zensu-tdd workflow creates a plan at `.zensu/plans/{timestamp}_tdd-{feature-slug}.md` and a progress log at `${CLAUDE_PROJECT_DIR:-.}/.zensu/logs/{timestamp}_tdd-{feature-slug}.log`
+- The /zensu-tdd workflow creates a plan at `.zensu/plans/{timestamp}_tdd-{feature-slug}.md` and a progress log at `${ZENSU_PROJECT_DIR:-.}/.zensu/logs/{timestamp}_tdd-{feature-slug}.log`
 
 ## CLI Commands Used
 

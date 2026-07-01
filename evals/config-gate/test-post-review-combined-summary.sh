@@ -23,9 +23,9 @@ TMP_CFG="$TMP_DIR/config.json"
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
-export CLAUDE_PLUGIN_DATA_OVERRIDE="$TMP_DIR/state"
-mkdir -p "$CLAUDE_PLUGIN_DATA_OVERRIDE"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_DATA_OVERRIDE="$TMP_DIR/state"
+mkdir -p "$ZENSU_PLUGIN_DATA_OVERRIDE"
 export ZENSU_CONFIG="$TMP_CFG"
 
 # selfReview:false routes the CHAIN-END SUMMARY inline through this hook
@@ -174,7 +174,7 @@ cat > "$TMP_CFG" <<'EOF'
 {"hooks": {"autoFix": true, "autoFixMaxRounds": 5, "selfReview": false}}
 EOF
 SID_MR_ON="sess-summary-mr-on-001"
-printf '{"count":5,"ts":"2026-01-01T00:00:00Z"}\n' > "$CLAUDE_PLUGIN_DATA_OVERRIDE/rounds-${SID_MR_ON}.json"
+printf '{"count":5,"ts":"2026-01-01T00:00:00Z"}\n' > "$ZENSU_PLUGIN_DATA_OVERRIDE/rounds-${SID_MR_ON}.json"
 STDIN_MR_ON="{\"tool_name\":\"Task\",\"tool_input\":{\"subagent_type\":\"zensu:code-reviewer\",\"prompt\":\"x\"},\"session_id\":\"${SID_MR_ON}\"}"
 OUT="$(printf '%s' "$STDIN_MR_ON" | "$SCRIPT" 2>/dev/null)"
 
@@ -203,7 +203,7 @@ cat > "$TMP_CFG" <<'EOF'
 {"hooks": {"autoFix": true, "autoFixMaxRounds": 5, "combinedSummary": false, "selfReview": false}}
 EOF
 SID_MR_OFF="sess-summary-mr-off-001"
-printf '{"count":5,"ts":"2026-01-01T00:00:00Z"}\n' > "$CLAUDE_PLUGIN_DATA_OVERRIDE/rounds-${SID_MR_OFF}.json"
+printf '{"count":5,"ts":"2026-01-01T00:00:00Z"}\n' > "$ZENSU_PLUGIN_DATA_OVERRIDE/rounds-${SID_MR_OFF}.json"
 STDIN_MR_OFF="{\"tool_name\":\"Task\",\"tool_input\":{\"subagent_type\":\"zensu:code-reviewer\",\"prompt\":\"x\"},\"session_id\":\"${SID_MR_OFF}\"}"
 OUT="$(printf '%s' "$STDIN_MR_OFF" | "$SCRIPT" 2>/dev/null)"
 

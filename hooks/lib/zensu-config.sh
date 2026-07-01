@@ -5,7 +5,7 @@
 #
 # Precedence, lowest to highest:
 #   1. $HOME/.zensu/config.json              (global base)
-#   2. $CLAUDE_PROJECT_DIR/.zensu/config.json (project overlay — wins per key;
+#   2. $ZENSU_PROJECT_DIR/.zensu/config.json (project overlay — wins per key;
 #                                             keys it omits fall through to global)
 #   3. $ZENSU_CONFIG                          (full override — used verbatim, NOT
 #                                             merged; the explicit escape hatch)
@@ -19,7 +19,7 @@
 # double-quoted JS string literals so each getter can embed it inside a
 # single-quoted extraction snippet and keep a single `node -e` spawn:
 #   node -e "$_ZENSU_CFG_JS"' <extraction reading the cfg() object> '
-_ZENSU_CFG_JS='function rd(p){try{return JSON.parse(require("fs").readFileSync(p,"utf8"))}catch(e){return {}}}function dm(b,o){if(o===null||typeof o!=="object"||Array.isArray(o))return o;var r=(b&&typeof b==="object"&&!Array.isArray(b))?Object.assign({},b):{};for(var k of Object.keys(o)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;r[k]=Object.prototype.hasOwnProperty.call(r,k)?dm(r[k],o[k]):o[k]}return r}function cfg(){var e=process.env.ZENSU_CONFIG;if(e)return rd(e);var g=rd((process.env.HOME||"")+"/.zensu/config.json");var pd=process.env.CLAUDE_PROJECT_DIR;var p=pd?rd(pd+"/.zensu/config.json"):{};return dm(g,p)}'
+_ZENSU_CFG_JS='function rd(p){try{return JSON.parse(require("fs").readFileSync(p,"utf8"))}catch(e){return {}}}function dm(b,o){if(o===null||typeof o!=="object"||Array.isArray(o))return o;var r=(b&&typeof b==="object"&&!Array.isArray(b))?Object.assign({},b):{};for(var k of Object.keys(o)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;r[k]=Object.prototype.hasOwnProperty.call(r,k)?dm(r[k],o[k]):o[k]}return r}function cfg(){var e=process.env.ZENSU_CONFIG;if(e)return rd(e);var g=rd((process.env.HOME||"")+"/.zensu/config.json");var pd=process.env.ZENSU_PROJECT_DIR;var p=pd?rd(pd+"/.zensu/config.json"):{};return dm(g,p)}'
 
 # Emit the effective (merged) config as a JSON string. Testable seam + handy for
 # debugging "what config does a hook actually see here?".

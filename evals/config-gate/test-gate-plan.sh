@@ -25,7 +25,7 @@ if [ ! -f "$SCRIPT" ]; then
   exit 1
 fi
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 
 export ZENSU_CONFIG="$EVAL_DIR/fixtures/config-only-tdd.json"
 OUT_DISABLED="$(bash "$SCRIPT" < "$EVAL_DIR/fixtures/stdin-exitplanmode.json" 2>/dev/null)"

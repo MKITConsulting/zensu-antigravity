@@ -19,8 +19,8 @@
 # prompt, and re-arms after a compaction shrinks the context back down.
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}}}"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_context_nudge_enabled || exit 0
 command -v node >/dev/null 2>&1 || exit 0
 
@@ -41,13 +41,13 @@ TRANSCRIPT="$(read_field transcript_path)"
 [ -f "$TRANSCRIPT" ] || exit 0
 
 SESSION_ID="$(read_field session_id)"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
 SESSION_ID="$(zensu_resolve_session_id "$SESSION_ID")"
 
 THRESHOLD="$(zensu_context_nudge_threshold)"
 WINDOW="$(zensu_context_window_size)"
 
-STATE_DIR="${CLAUDE_PROJECT_DIR:-.}/.zensu/state"
+STATE_DIR="${ZENSU_PROJECT_DIR:-.}/.zensu/state"
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 STATE_FILE="${STATE_DIR}/context-nudge-${SESSION_ID}.txt"
 

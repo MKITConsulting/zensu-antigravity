@@ -24,7 +24,7 @@
 # replaces (the env/config knob name is kept for backward compatibility).
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}}}"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
 
 command -v node >/dev/null 2>&1 || exit 0
 
@@ -118,13 +118,13 @@ field() {
   ' 2>/dev/null
 }
 
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh"
 
 # Global escapes (apply regardless of which tool) — checked before per-tool work.
 [ "${ZENSU_MCP_GATE:-}" = "off" ] && exit 0
 
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_hook_enabled mcpGate || exit 0
 
 AGENT_TYPE="$(field agent_type)"
@@ -132,10 +132,10 @@ case "$AGENT_TYPE" in
   *zensu-plm*) exit 0 ;;
 esac
 
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
 SID_PRIMARY="$(zensu_resolve_session_id "$(field session_id)")"
-SID_FALLBACK="$(zensu_resolve_session_id "${CLAUDE_SESSION_ID:-}")"
+SID_FALLBACK="$(zensu_resolve_session_id "${ZENSU_SESSION_ID:-}")"
 
 # Returns 0 (allowed) if a workflow declaring $1 is active in either session.
 tool_allowed_by_workflow() {

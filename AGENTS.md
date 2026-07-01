@@ -61,7 +61,7 @@ three together; for a manual hotfix follow the invariant by hand.
   `hooks.json.template` (replacing `__ZENSU_HOME__` with absolute paths); the generated
   `hooks.json` is gitignored — edit `hooks.json.template` instead.
 - **Plugin-root resolution chain.** Top-level `hooks/*.sh` and `zensu-runtime.sh` resolve the
-  root via `CLAUDE_PLUGIN_ROOT | CODEX_PLUGIN_ROOT | ANTIGRAVITY_PLUGIN_ROOT | ZENSU_PLUGIN_ROOT`,
+  root via `ZENSU_PLUGIN_ROOT | CODEX_PLUGIN_ROOT | ANTIGRAVITY_PLUGIN_ROOT | ZENSU_PLUGIN_ROOT`,
   falling back to the `~/.zensu/plugin-root` pointer written at install. `hooks/lib/*.sh`
   headers stay **byte-identical to upstream CC** (the shim exports the root before sourcing,
   so the libs self-resolve) — never widen a lib header, or the upstream-sync diff base breaks.

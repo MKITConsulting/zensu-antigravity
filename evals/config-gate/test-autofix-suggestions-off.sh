@@ -28,8 +28,8 @@ cat > "$TMP_CFG" <<'EOF'
 {"hooks": {"autoFix": true}}
 EOF
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
-export CLAUDE_PLUGIN_DATA_OVERRIDE="$TMP_DIR/state"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_DATA_OVERRIDE="$TMP_DIR/state"
 export ZENSU_CONFIG="$TMP_CFG"
 
 STDIN_FLAG_ABSENT='{"tool_name":"Task","tool_input":{"subagent_type":"zensu:code-reviewer","prompt":"x"},"session_id":"sess-off-001"}'

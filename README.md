@@ -170,11 +170,11 @@ agent's discretion — but the evidence audits and the review chain stay enforce
 | TDD phase-gate (PreToolUse deny) | deny verdict via the shim's verdict contract | **FULL** |
 | Zensu CLI write-gate | `run_command` gate + CLI-map classification | **FULL** |
 | Source-write gate (tracked-file clobber) | `run_command` gate on `tool_input.command` + `cwd` | **FULL** |
-| Source-write gate (cross-worktree escape) | shim exports `CLAUDE_PROJECT_DIR` from the workspace root | **FULL** |
+| Source-write gate (cross-worktree escape) | shim exports `ZENSU_PROJECT_DIR` from the workspace root | **FULL** |
 | Review auto-fix loop + Stop chain enforcement | Stop hook via the shim | **FULL** |
 | 3 subagents | `agents/zensu-*.md` (native subagent format, or orchestrator prose) | **FULL → DEGRADED** if no first-class plugin subagent format (sequential persona adoption; findings parity kept) |
 | `marketplace.json` version sync | **N/A** — no marketplace; version lives in `plugin.json` + README badge + CHANGELOG (D8) | **N/A** |
-| `${CLAUDE_PLUGIN_ROOT}` hook wiring | `install.sh` renders absolute paths into `hooks.json`; libs resolve via `~/.zensu/plugin-root` | **FULL** |
+| `${ZENSU_PLUGIN_ROOT}` hook wiring | `install.sh` renders absolute paths into `hooks.json`; libs resolve via `~/.zensu/plugin-root` | **FULL** |
 | SessionStart banner / primer | migrated to always-on `rules/` | **DEGRADED** (always-on prose, not a per-start event) |
 | SessionStart pulse / session-id capture | lazy first-call init (no SessionStart event) | **DEGRADED** (lazy, not at start) |
 | UserPromptSubmit intent-router / TDD-reminder | PreInvocation hooks via the shim (de-bounced per turn) | **FULL** (pending PreInvocation host verification) |

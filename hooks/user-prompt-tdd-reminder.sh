@@ -18,8 +18,8 @@
 # toward the reminder). Advisory steering only — it never blocks an edit.
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}}}"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_hook_enabled tddReminder || exit 0
 command -v node >/dev/null 2>&1 || exit 0
 
@@ -40,9 +40,9 @@ SESSION_ID="$(PAYLOAD="$INPUT" node -e '
     process.stdout.write(typeof j.session_id === "string" ? j.session_id : "");
   } catch (_) { process.stdout.write(""); }
 ' 2>/dev/null)"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
 SESSION_ID="$(zensu_resolve_session_id "$SESSION_ID")"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
 STATE_FILE="$(tdd_state_file "$SESSION_ID")"
 [ "$(tdd_session_active "$STATE_FILE")" = "true" ] && exit 0
 

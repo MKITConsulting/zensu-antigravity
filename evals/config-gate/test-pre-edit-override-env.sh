@@ -11,13 +11,13 @@ check() {
   else echo "  FAIL  $label"; FAIL=$((FAIL+1)); fi
 }
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 TDD_STATE_DIR="$(mktemp -d)"
 export TDD_STATE_DIR
 cleanup() { rm -rf "$TDD_STATE_DIR"; }
 trap cleanup EXIT
 
-# 0.4.0+: the gate activates on chain-state (active=true), not CLAUDE_AGENT_TYPE.
+# 0.4.0+: the gate activates on chain-state (active=true), not ZENSU_AGENT_TYPE.
 # Mark the session active (UNINITIALIZED phase) so the ZENSU_TDD_GATE override
 # cases below exercise a genuinely-active gate — as /zensu:tdd --tdd-begin would.
 source "$PLUGIN_DIR/hooks/lib/zensu-tdd-phase.sh"

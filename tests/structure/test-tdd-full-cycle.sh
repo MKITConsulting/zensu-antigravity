@@ -23,10 +23,10 @@ check() {
   else echo "  FAIL  $label"; FAIL=$((FAIL+1)); fi
 }
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 TDD_STATE_DIR="$(mktemp -d)"; export TDD_STATE_DIR
-PROJ="$(mktemp -d)"; export CLAUDE_PROJECT_DIR="$PROJ"
-export CLAUDE_PLUGIN_DATA_OVERRIDE="$PROJ/state"
+PROJ="$(mktemp -d)"; export ZENSU_PROJECT_DIR="$PROJ"
+export ZENSU_PLUGIN_DATA_OVERRIDE="$PROJ/state"
 export ZENSU_CONFIG="$TDD_STATE_DIR/strict-config.json"
 printf '%s' '{"hooks":{"tddImplementation":true}}' > "$ZENSU_CONFIG"
 unset ZENSU_TDD_GATE ZENSU_TEST_WITNESS ZENSU_CHAIN 2>/dev/null || true

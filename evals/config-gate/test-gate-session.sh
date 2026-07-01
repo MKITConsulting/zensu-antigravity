@@ -32,7 +32,7 @@ else
   check "lazy-init.sh (SessionStart replacement) exists" FAIL
 fi
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 
 # pulseSession=false: helper reports disabled (the banner would skip).
 TMP_CFG="/tmp/zensu-gate-session-$$.json"
@@ -71,7 +71,7 @@ fi
 # in a sandbox HOME so the real ~/.zensu pointer is never touched.
 if [ -f "$LAZY" ]; then
   SBX_HOME="$(mktemp -d)"
-  printf '{"session_id":"gate-session-lazy"}' | env HOME="$SBX_HOME" CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" CLAUDE_PROJECT_DIR="$SBX_HOME" bash "$LAZY" >/dev/null 2>&1
+  printf '{"session_id":"gate-session-lazy"}' | env HOME="$SBX_HOME" ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_PROJECT_DIR="$SBX_HOME" bash "$LAZY" >/dev/null 2>&1
   RC=$?
   [ "$RC" -eq 0 ] && check "lazy-init exits 0 on a minimal payload (fail-open)" PASS || check "lazy-init exits 0 (got $RC)" FAIL
   rm -rf "$SBX_HOME"

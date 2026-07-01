@@ -41,7 +41,7 @@ node -e '
 ' "$TPL" 2>/dev/null \
   && check "C-wire pre-edit wired under the exact writer matcher [BK4]" PASS || check "C-wire writer matcher wiring" FAIL
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 TDD_STATE_DIR="$(mktemp -d)"; export TDD_STATE_DIR
 unset ZENSU_TDD_GATE 2>/dev/null || true
 cleanup() { rm -rf "$TDD_STATE_DIR"; }

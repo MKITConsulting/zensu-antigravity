@@ -20,7 +20,7 @@
 # reads only the state flag, never live config.
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}}}"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
 
 PAYLOAD="$(cat)"
 
@@ -28,7 +28,7 @@ if ! command -v node >/dev/null 2>&1; then
   exit 0
 fi
 
-source "$CLAUDE_PLUGIN_ROOT/hooks/lib/zensu-runtime.sh" 2>/dev/null || true
+source "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-runtime.sh" 2>/dev/null || true
 zensu_runtime_apply_project_dir "$PAYLOAD" 2>/dev/null || true
 
 # Extract tool name, session id, and the list of edited file paths in one pass.
@@ -78,13 +78,13 @@ if [ "${ZENSU_TDD_GATE:-}" = "off" ]; then
 fi
 
 SESSION_ID="$(printf '%s' "$EXTRACT" | sed -n '2p')"
-source "$CLAUDE_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+source "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
 SESSION_ID="$(zensu_resolve_session_id "$SESSION_ID")"
 
 # The edited paths are everything after line 2.
 FILES="$(printf '%s' "$EXTRACT" | sed -n '3,$p')"
 
-source "$CLAUDE_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+source "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
 
 STATE_FILE=$(tdd_state_file "$SESSION_ID")
 
@@ -205,7 +205,7 @@ $CLASSES
 EOF
 
 if [ -n "$STATE_HIT" ]; then
-  PAYLOAD_FILE="$STATE_HIT" PAYLOAD_TOOL="$TOOL_NAME" PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT" node -e '
+  PAYLOAD_FILE="$STATE_HIT" PAYLOAD_TOOL="$TOOL_NAME" PLUGIN_ROOT="$ZENSU_PLUGIN_ROOT" node -e '
     const root = process.env.PLUGIN_ROOT || "";
     const file = process.env.PAYLOAD_FILE || "(unknown)";
     const tool = process.env.PAYLOAD_TOOL || "write_to_file";
@@ -276,7 +276,7 @@ if [ -z "$DENIED_FILE" ]; then
   exit 0
 fi
 
-PAYLOAD_PHASE="$PHASE" PAYLOAD_STEP="$STEP" PAYLOAD_FILE="$DENIED_FILE" PAYLOAD_TOOL="$TOOL_NAME" PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT" node -e '
+PAYLOAD_PHASE="$PHASE" PAYLOAD_STEP="$STEP" PAYLOAD_FILE="$DENIED_FILE" PAYLOAD_TOOL="$TOOL_NAME" PLUGIN_ROOT="$ZENSU_PLUGIN_ROOT" node -e '
   const phase = process.env.PAYLOAD_PHASE || "UNINITIALIZED";
   const step  = process.env.PAYLOAD_STEP || "(none)";
   const file  = process.env.PAYLOAD_FILE || "(unknown)";

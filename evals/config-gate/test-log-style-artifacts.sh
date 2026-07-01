@@ -27,10 +27,10 @@ fi
 # ---- Witness log: none suppresses the [HH:MM:SS] prefix ----------------------
 WPROJ="$(mktemp -d)"
 SID="wt-none-$$"
-env CLAUDE_PROJECT_DIR="$WPROJ" TDD_STATE_DIR="$WPROJ/.zensu/state" ZENSU_CONFIG="$CFG_NONE" \
+env ZENSU_PROJECT_DIR="$WPROJ" TDD_STATE_DIR="$WPROJ/.zensu/state" ZENSU_CONFIG="$CFG_NONE" \
   bash "$LOG" --tdd-begin --session "$SID" >/dev/null 2>&1
 PAY=$(printf '{"tool_input":{"command":"go test ./..."},"tool_response":{"exit_code":0,"stdout":"ok"},"session_id":"%s"}' "$SID")
-echo "$PAY" | env CLAUDE_PROJECT_DIR="$WPROJ" TDD_STATE_DIR="$WPROJ/.zensu/state" ZENSU_CONFIG="$CFG_NONE" \
+echo "$PAY" | env ZENSU_PROJECT_DIR="$WPROJ" TDD_STATE_DIR="$WPROJ/.zensu/state" ZENSU_CONFIG="$CFG_NONE" \
   bash "$WITNESS_HOOK" >/dev/null 2>&1
 WLINE="$(head -n1 "$WPROJ/.zensu/logs/witness-${SID}.log" 2>/dev/null)"
 case "$WLINE" in
@@ -47,10 +47,10 @@ rm -rf "$WPROJ"
 # ---- Witness log: wall keeps the [HH:MM:SS] prefix (unchanged behavior) ------
 WPROJ2="$(mktemp -d)"
 SID2="wt-wall-$$"
-env CLAUDE_PROJECT_DIR="$WPROJ2" TDD_STATE_DIR="$WPROJ2/.zensu/state" ZENSU_CONFIG="$CFG_WALL" \
+env ZENSU_PROJECT_DIR="$WPROJ2" TDD_STATE_DIR="$WPROJ2/.zensu/state" ZENSU_CONFIG="$CFG_WALL" \
   bash "$LOG" --tdd-begin --session "$SID2" >/dev/null 2>&1
 PAY2=$(printf '{"tool_input":{"command":"npm test"},"tool_response":{"exit_code":0,"stdout":"ok"},"session_id":"%s"}' "$SID2")
-echo "$PAY2" | env CLAUDE_PROJECT_DIR="$WPROJ2" TDD_STATE_DIR="$WPROJ2/.zensu/state" ZENSU_CONFIG="$CFG_WALL" \
+echo "$PAY2" | env ZENSU_PROJECT_DIR="$WPROJ2" TDD_STATE_DIR="$WPROJ2/.zensu/state" ZENSU_CONFIG="$CFG_WALL" \
   bash "$WITNESS_HOOK" >/dev/null 2>&1
 WLINE2="$(head -n1 "$WPROJ2/.zensu/logs/witness-${SID2}.log" 2>/dev/null)"
 if printf '%s' "$WLINE2" | grep -qE '^\[[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\] BASH cmd='; then
@@ -100,7 +100,7 @@ rm -rf "$PSTATE"
 RSTATE="$(mktemp -d)"
 SIDR="rd-none-$$"
 STDINR="{\"tool_name\":\"Task\",\"tool_input\":{\"subagent_type\":\"zensu:code-reviewer\",\"prompt\":\"x\"},\"session_id\":\"${SIDR}\"}"
-printf '%s' "$STDINR" | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" CLAUDE_PLUGIN_DATA_OVERRIDE="$RSTATE" ZENSU_CONFIG="$CFG_NONE" \
+printf '%s' "$STDINR" | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_PLUGIN_DATA_OVERRIDE="$RSTATE" ZENSU_CONFIG="$CFG_NONE" \
   bash "$ROUNDS_HOOK" >/dev/null 2>&1
 R_N=$(node -e '
   const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
@@ -113,7 +113,7 @@ rm -rf "$RSTATE"
 RSTATE2="$(mktemp -d)"
 SIDR2="rd-wall-$$"
 STDINR2="{\"tool_name\":\"Task\",\"tool_input\":{\"subagent_type\":\"zensu:code-reviewer\",\"prompt\":\"x\"},\"session_id\":\"${SIDR2}\"}"
-printf '%s' "$STDINR2" | env CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" CLAUDE_PLUGIN_DATA_OVERRIDE="$RSTATE2" ZENSU_CONFIG="$CFG_WALL" \
+printf '%s' "$STDINR2" | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_PLUGIN_DATA_OVERRIDE="$RSTATE2" ZENSU_CONFIG="$CFG_WALL" \
   bash "$ROUNDS_HOOK" >/dev/null 2>&1
 R_W=$(node -e '
   const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));

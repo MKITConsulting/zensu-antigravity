@@ -30,12 +30,12 @@ SAN="$(printf '%s' "$PROJ" | sed 's|[^A-Za-z0-9_-]|-|g')"
 PDIR="$PROJECTS/$SAN"
 mkdir -p "$PDIR"
 
-run() { CLAUDE_PROJECT_DIR="$PROJ" ZENSU_PROJECTS_DIR="$PROJECTS" node "$JS" "$@" 2>/dev/null; }
+run() { ZENSU_PROJECT_DIR="$PROJ" ZENSU_PROJECTS_DIR="$PROJECTS" node "$JS" "$@" 2>/dev/null; }
 
 # 1) ZENSU_TRANSCRIPT_PATH fast-path: the basename (minus .jsonl) wins.
 TP="$TMP/some/path/explicit-transcript-id.jsonl"
 mkdir -p "$(dirname "$TP")"; printf '{}\n' > "$TP"
-GOT="$(CLAUDE_PROJECT_DIR="$PROJ" ZENSU_PROJECTS_DIR="$PROJECTS" ZENSU_TRANSCRIPT_PATH="$TP" node "$JS" 2>/dev/null)"
+GOT="$(ZENSU_PROJECT_DIR="$PROJ" ZENSU_PROJECTS_DIR="$PROJECTS" ZENSU_TRANSCRIPT_PATH="$TP" node "$JS" 2>/dev/null)"
 [ "$GOT" = "explicit-transcript-id" ] && check "R1 ZENSU_TRANSCRIPT_PATH fast-path -> basename id" PASS || check "R1 transcript fast-path (got '$GOT')" FAIL
 
 # 2) project-scoped newest transcript is picked.
@@ -58,7 +58,7 @@ GOT="$(run)"              # no cutoff -> the file resolves
 rm -f "$PDIR"/*.jsonl
 printf '{}\n' > "$PDIR/sess-aaa.jsonl"; printf '{}\n' > "$PDIR/sess-bbb.jsonl"
 # touch both to the same recent time so order is ambiguous, then bias via OWN_CMD
-GOT="$(CLAUDE_PROJECT_DIR="$PROJ" ZENSU_PROJECTS_DIR="$PROJECTS" ZENSU_OWN_CMD="sess-bbb" node "$JS" 2>/dev/null)"
+GOT="$(ZENSU_PROJECT_DIR="$PROJ" ZENSU_PROJECTS_DIR="$PROJECTS" ZENSU_OWN_CMD="sess-bbb" node "$JS" 2>/dev/null)"
 [ "$GOT" = "sess-bbb" ] && check "R4 Layer-2 ZENSU_OWN_CMD tail-match disambiguates" PASS || check "R4 cmdline match (got '$GOT')" FAIL
 
 # 5) nothing resolvable -> empty output (no crash).
@@ -71,7 +71,7 @@ GOT="$(run)"
 PROJ2="$TMP/pro ject (x)"; mkdir -p "$PROJ2"
 SAN2="$(printf '%s' "$PROJ2" | sed 's|[^A-Za-z0-9_-]|-|g')"
 mkdir -p "$PROJECTS/$SAN2"; printf '{}\n' > "$PROJECTS/$SAN2/sanitized-hit.jsonl"
-GOT="$(CLAUDE_PROJECT_DIR="$PROJ2" ZENSU_PROJECTS_DIR="$PROJECTS" node "$JS" 2>/dev/null)"
+GOT="$(ZENSU_PROJECT_DIR="$PROJ2" ZENSU_PROJECTS_DIR="$PROJECTS" node "$JS" 2>/dev/null)"
 [ "$GOT" = "sanitized-hit" ] && check "R6 project-dir path sanitization derives the projects subdir" PASS || check "R6 sanitization (got '$GOT')" FAIL
 
 echo "----"

@@ -38,27 +38,27 @@ None. No MCP connection, no API key, no network. Pure local file removal under t
 
 ## What This Skill Does
 
-Deletes round-counter JSON files written by `hooks/post-review-tdd-delegate.sh`. The counter path resolves to `${CLAUDE_PLUGIN_DATA_OVERRIDE:-${CLAUDE_PROJECT_DIR:-.}/.zensu/state}/rounds-<session_id>.json` (since 0.3.23). Removing the file makes the hook's first read at the next `zensu-code-reviewer` completion return `0`, so `NEXT=1` and the chain resumes from round 1.
+Deletes round-counter JSON files written by `hooks/post-review-tdd-delegate.sh`. The counter path resolves to `${ZENSU_PLUGIN_DATA_OVERRIDE:-${ZENSU_PROJECT_DIR:-.}/.zensu/state}/rounds-<session_id>.json` (since 0.3.23). Removing the file makes the hook's first read at the next `zensu-code-reviewer` completion return `0`, so `NEXT=1` and the chain resumes from round 1.
 
 ## Phase 1: Locate
 
 Resolve the state directory in the same order the hook does:
 
-1. If `$CLAUDE_PLUGIN_DATA_OVERRIDE` is set -> that path.
-2. Otherwise `${CLAUDE_PROJECT_DIR:-.}/.zensu/state`.
+1. If `$ZENSU_PLUGIN_DATA_OVERRIDE` is set -> that path.
+2. Otherwise `${ZENSU_PROJECT_DIR:-.}/.zensu/state`.
 
 Refuse to operate when the state directory itself is a symlink (mirrors the hook's symlink-traversal guard at `hooks/post-review-tdd-delegate.sh:53`).
 
-When the state directory is empty or absent AND `STATE_DIR` was resolved via the project-local default (no `CLAUDE_PLUGIN_DATA_OVERRIDE`), the skill additionally probes for a fresh git worktree and surfaces a hint so the user understands whether the counter was reset or simply never existed in this worktree.
+When the state directory is empty or absent AND `STATE_DIR` was resolved via the project-local default (no `ZENSU_PLUGIN_DATA_OVERRIDE`), the skill additionally probes for a fresh git worktree and surfaces a hint so the user understands whether the counter was reset or simply never existed in this worktree.
 
 ## Phase 2: Delete
 
-Run the following POSIX shell recipe verbatim (works in bash, zsh, dash, and sh — no `shopt`, no glob-in-for-loop). It honors the override, refuses symlinks, lists what it removed, and is idempotent (exits 0 with a clear message when nothing matches). When `STATE_DIR` resolves via the project-local default and the worktree root contains a `.git` *file* — not directory — the skill appends a fresh-worktree hint to the no-op message; the populated-deletion path is unaffected and the override path skips the probe entirely (parent of `CLAUDE_PLUGIN_DATA_OVERRIDE` has no worktree semantics).
+Run the following POSIX shell recipe verbatim (works in bash, zsh, dash, and sh — no `shopt`, no glob-in-for-loop). It honors the override, refuses symlinks, lists what it removed, and is idempotent (exits 0 with a clear message when nothing matches). When `STATE_DIR` resolves via the project-local default and the worktree root contains a `.git` *file* — not directory — the skill appends a fresh-worktree hint to the no-op message; the populated-deletion path is unaffected and the override path skips the probe entirely (parent of `ZENSU_PLUGIN_DATA_OVERRIDE` has no worktree semantics).
 
 ```sh
-STATE_DIR="${CLAUDE_PLUGIN_DATA_OVERRIDE:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.zensu/state}"
+STATE_DIR="${ZENSU_PLUGIN_DATA_OVERRIDE:-${ZENSU_PROJECT_DIR:-$(pwd)}/.zensu/state}"
 WORKTREE_HINT=""
-if [ -z "${CLAUDE_PLUGIN_DATA_OVERRIDE:-}" ]; then
+if [ -z "${ZENSU_PLUGIN_DATA_OVERRIDE:-}" ]; then
   WORKTREE_ROOT="${STATE_DIR%/.zensu/state}"
   if [ -f "$WORKTREE_ROOT/.git" ]; then
     WORKTREE_HINT=" Fresh git worktree detected — counter effectively at 0, no prior rounds recorded in this worktree."
@@ -85,7 +85,7 @@ else
 fi
 ```
 
-If `CLAUDE_PLUGIN_DATA_OVERRIDE` is NOT set, the recipe targets the project-local default. If the user reports a stale legacy counter (pre-0.3.23) at `~/.gemini/plugins/data/zensu-inline/`, mention that the fix in 0.3.23 made that path inert — those files no longer affect the running hook, so manual cleanup is cosmetic and OPTIONAL.
+If `ZENSU_PLUGIN_DATA_OVERRIDE` is NOT set, the recipe targets the project-local default. If the user reports a stale legacy counter (pre-0.3.23) at `~/.gemini/plugins/data/zensu-inline/`, mention that the fix in 0.3.23 made that path inert — those files no longer affect the running hook, so manual cleanup is cosmetic and OPTIONAL.
 
 ### Re-arm the main-thread review chain (0.4.0+)
 

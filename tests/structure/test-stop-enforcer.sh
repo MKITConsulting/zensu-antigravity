@@ -23,7 +23,7 @@ check() {
 check "S0 hook exists" PASS
 bash -n "$STOP" 2>/dev/null && check "S1 bash -n syntax check passes" PASS || check "S1 bash -n syntax check passes" FAIL
 
-export CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR"
+export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
 TMP="$(mktemp -d)"; export TDD_STATE_DIR="$TMP/state"; mkdir -p "$TDD_STATE_DIR"
 export HOME="$TMP/home"; mkdir -p "$HOME"
 cleanup() { rm -rf "$TMP"; }

@@ -97,7 +97,7 @@ function main() {
   }
 
   const helperStartMs = Date.now();
-  const projectDir = process.env.CLAUDE_PROJECT_DIR || gitToplevel() || process.cwd();
+  const projectDir = process.env.ZENSU_PROJECT_DIR || gitToplevel() || process.cwd();
   const subdir = sanitizeProjectDir(projectDir);
   const projectsDir = path.join(projectsBase(), subdir);
 

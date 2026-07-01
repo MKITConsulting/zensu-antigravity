@@ -12,12 +12,12 @@
 #   hooks.autoFixIncludeSuggestions=false -> route Critical+Important only (default, backward-compat)
 #   hooks.autoFixMaxRounds=<int 1..99>    -> loop guard (default 5)
 #
-# Counter state lives at ${CLAUDE_PLUGIN_DATA_OVERRIDE:-${CLAUDE_PROJECT_DIR:-.}/.zensu/state}/rounds-<session_id>.json. claude-code's auto-set CLAUDE_PLUGIN_DATA is intentionally IGNORED (use CLAUDE_PLUGIN_DATA_OVERRIDE to relocate).
+# Counter state lives at ${ZENSU_PLUGIN_DATA_OVERRIDE:-${ZENSU_PROJECT_DIR:-.}/.zensu/state}/rounds-<session_id>.json. claude-code's auto-set ZENSU_PLUGIN_DATA is intentionally IGNORED (use ZENSU_PLUGIN_DATA_OVERRIDE to relocate).
 
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}}}"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_hook_enabled autoFix || exit 0
 
 INPUT="$(cat)"
@@ -62,13 +62,13 @@ if [ -z "$SESSION_ID" ]; then
     });
   ' <<<"$INPUT" 2>/dev/null)"
 fi
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
 SESSION_ID="$(ZENSU_TRANSCRIPT_PATH="$TRANSCRIPT_PATH" zensu_resolve_session_id "$SESSION_ID")"
 
 # Mode-aware fix discipline: the per-session `vanilla` flag was frozen into the
 # state file by `--tdd-begin`. Read the STATE flag (never live config) so the
 # fix-round directive matches the discipline the session actually runs under.
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
 if [ "$(tdd_vanilla_mode "$(tdd_state_file "$SESSION_ID")")" = "true" ]; then
   FIX_DISCIPLINE_ALL="in vanilla mode by re-entering the /zensu-tdd workflow's vanilla implementation loop (fix each finding directly — no RED→GREEN cycle required, tests at your discretion; keep the structured CHECKPOINT/AUDIT evidence discipline; the phase-gate passes through in this session)"
   FIX_DISCIPLINE_CI="$FIX_DISCIPLINE_ALL"
@@ -80,7 +80,7 @@ else
 fi
 
 MAX_ROUNDS="$(zensu_autofix_max_rounds)"
-STATE_DIR="${CLAUDE_PLUGIN_DATA_OVERRIDE:-${CLAUDE_PROJECT_DIR:-.}/.zensu/state}"
+STATE_DIR="${ZENSU_PLUGIN_DATA_OVERRIDE:-${ZENSU_PROJECT_DIR:-.}/.zensu/state}"
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 COUNTER_FILE="$STATE_DIR/rounds-${SESSION_ID}.json"
 if [ -L "$COUNTER_FILE" ]; then
@@ -152,10 +152,10 @@ if [ "$NEXT" -gt "$MAX_ROUNDS" ]; then
   # the terminal self-review stage, which owns --chain-done. With self-review
   # disabled, terminate as before (chainDone) so the Stop-hook backstop releases.
   if [ "$SELF_REVIEW_ON" = "1" ]; then
-    bash "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-log.sh" --code-review-done --session "$SESSION_ID" >/dev/null 2>&1 || true
+    bash "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-log.sh" --code-review-done --session "$SESSION_ID" >/dev/null 2>&1 || true
     CONV_MSG="Auto-fix convergence: max ${MAX_ROUNDS} rounds reached. The code-reviewer chain is marked converged (codeReviewDone). Do NOT spawn zensu:code-reviewer again and do NOT keep fixing its findings. Your VERY NEXT action MUST be the Skill tool with skill='zensu:self-review' — the terminal self-review stage. Carry the remaining reviewer findings forward for it under '### Findings (max rounds reached, manual fix required)' so they land in the final report. /zensu-self-review owns the chain terminus and renders the final summary — do NOT close the chain yourself. To grant another reviewer budget instead of finalizing, the user can invoke the /zensu-reset-review-limit skill."
   else
-    bash "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-log.sh" --chain-done --session "$SESSION_ID" >/dev/null 2>&1 || true
+    bash "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-log.sh" --chain-done --session "$SESSION_ID" >/dev/null 2>&1 || true
     CONV_MSG="Auto-fix convergence: max ${MAX_ROUNDS} rounds reached. The review chain is now marked complete (chainDone) so you MAY end your turn. Do NOT spawn zensu:code-reviewer again and do NOT keep fixing. Reply with the remaining findings under '### Findings (max rounds reached, manual fix required)' and stop. To grant another budget and resume the review/fix cycle in this same session, the user can invoke the /zensu-reset-review-limit skill — surface this hint at the end of your reply so the user knows the escape hatch exists.${COMBINED_SUMMARY_DIRECTIVE}"
   fi
   node -e '

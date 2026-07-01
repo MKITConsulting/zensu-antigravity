@@ -23,8 +23,8 @@
 
 set -u
 
-: "${CLAUDE_PLUGIN_ROOT:=${ZENSU_PLUGIN_ROOT:-${ANTIGRAVITY_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}}}"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
+: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_hook_enabled chainEnforcer || exit 0
 
 if [ "${ZENSU_CHAIN:-}" = "off" ]; then exit 0; fi
@@ -32,7 +32,7 @@ command -v node >/dev/null 2>&1 || exit 0
 
 INPUT="$(cat)"
 
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-runtime.sh" 2>/dev/null || true
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-runtime.sh" 2>/dev/null || true
 zensu_runtime_apply_project_dir "$INPUT" 2>/dev/null || true
 
 read_field() {
@@ -46,9 +46,9 @@ read_field() {
 }
 
 SESSION_ID="$(read_field session_id)"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
 SESSION_ID="$(zensu_resolve_session_id "$SESSION_ID")"
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
 STATE_FILE="$(tdd_state_file "$SESSION_ID")"
 
 # Not a main-thread TDD session -> let the agent stop.
@@ -96,9 +96,9 @@ else
 fi
 CODE_REVIEW_DONE="$(tdd_code_review_done "$STATE_FILE")"
 if zensu_hook_enabled selfReview && [ "$CODE_REVIEW_DONE" = "true" ]; then
-  REASON="STOP intercepted by zensu chain-enforcer. The code-reviewer chain has converged (codeReviewDone) but the terminal self-review stage has not run. Your VERY NEXT action MUST be to invoke the \/zensu-self-review skill — it performs a final critical self-reflection over this session's changes, ${SELF_FIX_PHRASE}, and OWNS the chain terminus (it runs 'bash ${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-log.sh --chain-done'). Do NOT end your turn, do NOT re-run the reviewer agent, and do NOT run --chain-done yourself — let \/zensu-self-review finalize the chain."
+  REASON="STOP intercepted by zensu chain-enforcer. The code-reviewer chain has converged (codeReviewDone) but the terminal self-review stage has not run. Your VERY NEXT action MUST be to invoke the \/zensu-self-review skill — it performs a final critical self-reflection over this session's changes, ${SELF_FIX_PHRASE}, and OWNS the chain terminus (it runs 'bash ${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-log.sh --chain-done'). Do NOT end your turn, do NOT re-run the reviewer agent, and do NOT run --chain-done yourself — let \/zensu-self-review finalize the chain."
 else
-  REASON="STOP intercepted by zensu chain-enforcer. A main-thread TDD session finished implementation (or a fix round) but the zensu-code-reviewer chain has not completed. Your VERY NEXT action MUST be to spawn the zensu-code-reviewer subagent (via the Antigravity /agents subagent dashboard), passing as the prompt a one-paragraph summary of what was implemented/fixed PLUS the list of changed files (use 'git diff --name-only HEAD' to enumerate). Do NOT end your turn, and do NOT fix anything inline first — review the report, fix any Critical/Important findings ${FIX_PHRASE}, then re-run the reviewer until it PASSes or you hit the round cap. Only valid exception: if implementation produced ZERO file changes, run 'bash ${CLAUDE_PLUGIN_ROOT}/hooks/lib/zensu-log.sh --chain-done' and then stop."
+  REASON="STOP intercepted by zensu chain-enforcer. A main-thread TDD session finished implementation (or a fix round) but the zensu-code-reviewer chain has not completed. Your VERY NEXT action MUST be to spawn the zensu-code-reviewer subagent (via the Antigravity /agents subagent dashboard), passing as the prompt a one-paragraph summary of what was implemented/fixed PLUS the list of changed files (use 'git diff --name-only HEAD' to enumerate). Do NOT end your turn, and do NOT fix anything inline first — review the report, fix any Critical/Important findings ${FIX_PHRASE}, then re-run the reviewer until it PASSes or you hit the round cap. Only valid exception: if implementation produced ZERO file changes, run 'bash ${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-log.sh --chain-done' and then stop."
 fi
 
 node -e 'process.stdout.write(JSON.stringify({ decision: "block", reason: process.argv[1] }))' "$REASON"
