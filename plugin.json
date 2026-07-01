@@ -1,0 +1,50 @@
+{
+  "name": "zensu",
+  "version": "0.1.0",
+  "description": "Product Lifecycle Manager — Features as First-Class Citizens (Google Antigravity port)",
+  "author": { "name": "Zensu", "email": "hello@zensu.dev" },
+  "repository": "https://github.com/MKITConsulting/zensu-antigravity",
+  "license": "FSL-1.1-Apache-2.0",
+  "keywords": ["product-lifecycle", "features", "security", "tdd", "code-review", "antigravity", "gemini"],
+  "agents": [
+    "./agents/zensu-plm.md",
+    "./agents/zensu-code-reviewer.md",
+    "./agents/zensu-review-aspect.md"
+  ],
+  "skills": [
+    "./skills/autopilot",
+    "./skills/bootstrap",
+    "./skills/ghost-scan",
+    "./skills/implement",
+    "./skills/plan-review",
+    "./skills/pr-fix-findings",
+    "./skills/pr-team-review",
+    "./skills/pulse",
+    "./skills/reset-review-limit",
+    "./skills/self-review",
+    "./skills/security-review",
+    "./skills/tdd",
+    "./skills/zensu-help"
+  ],
+  "rules": [
+    "./rules/zensu-conventions.md",
+    "./rules/zensu-tdd.md",
+    "./rules/zensu-write-gate.md"
+  ],
+  "workflows": [
+    "./workflows/zensu-autopilot.md",
+    "./workflows/zensu-bootstrap.md",
+    "./workflows/zensu-ghost-scan.md",
+    "./workflows/zensu-implement.md",
+    "./workflows/zensu-plan-review.md",
+    "./workflows/zensu-pr-fix-findings.md",
+    "./workflows/zensu-pr-team-review.md",
+    "./workflows/zensu-pulse.md",
+    "./workflows/zensu-reset-review-limit.md",
+    "./workflows/zensu-self-review.md",
+    "./workflows/zensu-security-review.md",
+    "./workflows/zensu-tdd.md",
+    "./workflows/zensu-help.md"
+  ],
+  "hooks": "./hooks.json"
+}
