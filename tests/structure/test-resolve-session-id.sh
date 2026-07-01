@@ -55,9 +55,14 @@ GOT="$(run)"              # no cutoff -> the file resolves
 [ "$GOT" = "recent" ] && check "R3b no cutoff -> transcript resolves" PASS || check "R3b no-cutoff (got '$GOT')" FAIL
 
 # 4) Layer-2 cmdline tail-match (ZENSU_OWN_CMD) disambiguates >1 candidate.
+# The needle must be found in a transcript's CONTENT (tail), not its filename.
+# Make sess-aaa the strictly NEWEST (so the newest-first fallback would pick it)
+# and embed the needle only in sess-bbb's body — a correct tail-match must
+# override mtime and return sess-bbb. Deterministic on any filesystem (no
+# reliance on equal/ambiguous mtimes).
 rm -f "$PDIR"/*.jsonl
-printf '{}\n' > "$PDIR/sess-aaa.jsonl"; printf '{}\n' > "$PDIR/sess-bbb.jsonl"
-# touch both to the same recent time so order is ambiguous, then bias via OWN_CMD
+printf '{"prompt":"run sess-bbb now"}\n' > "$PDIR/sess-bbb.jsonl"; sleep 1
+printf '{"prompt":"unrelated"}\n' > "$PDIR/sess-aaa.jsonl"
 GOT="$(ZENSU_PROJECT_DIR="$PROJ" ZENSU_PROJECTS_DIR="$PROJECTS" ZENSU_OWN_CMD="sess-bbb" node "$JS" 2>/dev/null)"
 [ "$GOT" = "sess-bbb" ] && check "R4 Layer-2 ZENSU_OWN_CMD tail-match disambiguates" PASS || check "R4 cmdline match (got '$GOT')" FAIL
 
