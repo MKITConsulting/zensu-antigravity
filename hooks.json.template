@@ -1,0 +1,52 @@
+{
+  "zensu-pre-edit": {
+    "PreToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-edit-tdd-reminder.sh", "timeout": 30 }
+        ]
+      }
+    ]
+  },
+  "zensu-pre-bash": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-bash-zensu-gate.sh", "timeout": 30 },
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-bash-source-write-gate.sh", "timeout": 30 }
+        ]
+      }
+    ]
+  },
+  "zensu-pre-invocation": {
+    "PreInvocation": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh user-prompt-intent-router.sh", "timeout": 10 },
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh user-prompt-tdd-reminder.sh", "timeout": 10 }
+        ]
+      }
+    ]
+  },
+  "zensu-post-bash": {
+    "PostToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh post-bash-witness.sh", "timeout": 10 }
+        ]
+      }
+    ]
+  },
+  "zensu-stop": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh stop-chain-enforcer.sh", "timeout": 15 }
+        ]
+      }
+    ]
+  }
+}
