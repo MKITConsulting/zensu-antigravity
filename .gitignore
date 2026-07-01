@@ -1,0 +1,43 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+/.idea/
+.vscode/
+
+# Environment & secrets
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Dependencies
+node_modules/
+vendor/
+
+# Generated at install time (machine-absolute hook paths) — never committed
+/hooks.json
+
+# Zensu runtime artifacts — local-only per-session traces.
+# Track only config.json; everything else under .zensu/ (state/, logs/, plans/)
+# is ephemeral. State + witness logs are NEVER committed (per repo convention).
+.zensu/*
+!.zensu/config.json
+.zensu/state/
+.zensu/logs/witness-*.log
+**/.zensu/state/
+**/.zensu/logs/witness-*.log
+
+# Test / eval outputs
+tests/results/
+**/results/
+
+# Installer backups
+*.zensu-backup.*
+
+# Logs
+*.log
