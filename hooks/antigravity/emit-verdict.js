@@ -33,8 +33,20 @@ function denyObj() {
 }
 
 function allowContextObj() {
-  // Allow the action AND inject context. The injection field name is
-  // host-dependent; emit the CC name plus an alias (extra keys are ignored).
+  // Allow the action AND inject context. Honor the pinned dialect so the context
+  // path narrows to one shape too (the injection field name is host-dependent;
+  // superset emits the CC name plus an alias). Extra keys are ignored by lenient
+  // parsers; a strict parser is satisfied once the dialect is pinned.
+  if (contract === "allow_tool") {
+    var a = { allow_tool: true };
+    if (text) a.context = text;
+    return a;
+  }
+  if (contract === "decision" || contract === "exit") {
+    var d = { decision: "allow" };
+    if (text) d.additionalContext = text;
+    return d;
+  }
   var o = { decision: "allow", allow_tool: true };
   if (text) { o.additionalContext = text; o.context = text; }
   return o;

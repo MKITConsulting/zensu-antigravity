@@ -3,13 +3,15 @@
 # edits based on the per-session TDD FSM phase (RED_WRITE → RED_FAIL → IMPL →
 # GREEN_PASS → REFACTOR) so production code cannot be written before a failing
 # test exists. Emits the host's deny schema (hookSpecificOutput.permissionDecision
-# = "deny") — identical on Codex and Claude Code.
+# = "deny"), which the antigravity-shim re-emits as the host verdict.
 #
-# Engine portability: matches BOTH the Codex edit tool (`apply_patch`, a freeform
-# tool whose patch envelope names target files on `*** Update/Add/Delete File:`
-# lines — a single patch may touch several files, and the gate denies the whole
-# patch if ANY touched file violates the current phase) AND the Claude Code edit
-# tools (`Edit`/`Write`/`MultiEdit`, whose target is `tool_input.file_path`).
+# Engine portability: the wrapped script stays byte-comparable to Claude Code /
+# Codex; on Antigravity the shim normalizes the payload so the gate reads
+# `tool_name` + `tool_input.file_path`. The matcher gates the three Antigravity
+# file writers (`write_to_file` / `replace_file_content` /
+# `multi_replace_file_content`); the retained multi-file patch-envelope fallback
+# (`*** Update/Add/Delete File:` scanning) is inert here — Antigravity has no
+# `apply_patch` — but is kept so the script stays diff-comparable to Codex.
 #
 # While a session is active, edits to the session-state files (.zensu/state/)
 # are denied in BOTH modes (normalized-path classification, no spelling evasion).
@@ -206,7 +208,7 @@ if [ -n "$STATE_HIT" ]; then
   PAYLOAD_FILE="$STATE_HIT" PAYLOAD_TOOL="$TOOL_NAME" PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT" node -e '
     const root = process.env.PLUGIN_ROOT || "";
     const file = process.env.PAYLOAD_FILE || "(unknown)";
-    const tool = process.env.PAYLOAD_TOOL || "apply_patch";
+    const tool = process.env.PAYLOAD_TOOL || "write_to_file";
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -278,7 +280,7 @@ PAYLOAD_PHASE="$PHASE" PAYLOAD_STEP="$STEP" PAYLOAD_FILE="$DENIED_FILE" PAYLOAD_
   const phase = process.env.PAYLOAD_PHASE || "UNINITIALIZED";
   const step  = process.env.PAYLOAD_STEP || "(none)";
   const file  = process.env.PAYLOAD_FILE || "(unknown)";
-  const tool  = process.env.PAYLOAD_TOOL || "apply_patch";
+  const tool  = process.env.PAYLOAD_TOOL || "write_to_file";
   const root  = process.env.PLUGIN_ROOT || "";
   const header =
     "TDD-Phase-Gate: " + tool + " on " + file + " blocked.\n" +

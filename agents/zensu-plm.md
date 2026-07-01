@@ -8,7 +8,7 @@ description: >
   Covers: feature tracking, security reviews, product bootstrapping, ghost scans,
   implementation, release readiness, tier management, user journeys, pulse sessions,
   wiki pages, doc generation, and any Zensu-related task.
-tools: read, run_command, grep, glob
+tools: read, run_command, write_to_file, replace_file_content, multi_replace_file_content, grep, glob
 ---
 
 > **Antigravity fidelity note.** If Antigravity exposes a first-class plugin subagent

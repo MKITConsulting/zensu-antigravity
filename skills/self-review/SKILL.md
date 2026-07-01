@@ -17,10 +17,10 @@ edited, created, or deleted in this session. Use that knowledge directly.
 
 ## When to Use
 
-- Invoked automatically as the terminal review-chain stage: the
-  `post-review-tdd-delegate.sh` hook hands off here once the code-reviewer chain
-  converges, and the `stop-chain-enforcer.sh` Stop hook forces this skill while
-  `codeReviewDone` is set but `chainDone` is not.
+- Invoked as the terminal review-chain stage by the `/zensu-tdd` chain prose once
+  the code-reviewer chain converges (no hook fires on reviewer completion on
+  Antigravity — Scenario B), and the wired `stop-chain-enforcer.sh` Stop hook
+  forces this skill while `codeReviewDone` is set but `chainDone` is not.
 - You should normally NOT run this by hand — it is the chain's final gate.
 
 ## Do NOT Use For
