@@ -223,6 +223,10 @@ Seeded from [`config.example.json`](config.example.json). `hooks.*` toggles
 hatches: `ZENSU_TDD_GATE=off`, `ZENSU_MCP_GATE=off`, `ZENSU_BASH_WRITE_GATE=off`,
 `ZENSU_CHAIN=off`, `ZENSU_TEST_WITNESS=off`.
 
+The server-side Pulse privacy setting is authoritative. Local Antigravity
+initialization only pins plugin and host-session context; a disabled Pulse start
+is a successful no-op, stores no Pulse session ID, and triggers no end or summary.
+
 `hooks.tddImplementation:false` (the **default — vanilla**) switches `/zensu-tdd` to vanilla
 implementation mode: no RED→GREEN ceremony, the edit gate passes through, tests at the
 agent's discretion — but the evidence audits and the review chain stay enforced. Set
@@ -246,7 +250,7 @@ tool call); steering is **advisory** (it injects context, never blocks). See
 | 3 subagents | `agents/zensu-*.md`; run as isolated subagents where the host spawns them, else as inline orchestrator prose (same findings, no context isolation) | — |
 | Hook wiring & root resolution | `install.sh` renders absolute paths into `hooks.json`; the libs resolve the root via `ZENSU_PLUGIN_ROOT` > `ANTIGRAVITY_PLUGIN_ROOT` > the `~/.zensu/plugin-root` pointer | — |
 | Session banner / primer | always-on prose in `rules/zensu-conventions.md` (Antigravity has no SessionStart event) | advisory |
-| Session-id / pulse capture | lazy first-call init via `lazy-init.sh` on the first hook of a session (no SessionStart event) | — |
+| Host session-id capture | lazy first-call init via `lazy-init.sh` on the first hook of a session (no SessionStart event); it does not create a server-side Pulse session | — |
 | Intent router / TDD reminder | `PreInvocation` hooks via the shim, de-bounced once per user turn | advisory |
 | Plan → TDD decision | steered by `rules/zensu-tdd.md` + the per-turn TDD reminder — plan first, then ask whether to run `/zensu-tdd` before the first edit (Antigravity has no plan-approval event) | advisory |
 | Context-compaction nudge | folded into `rules/zensu-conventions.md`, which proposes `/compact` when context grows large (unwired as a hook) | advisory |

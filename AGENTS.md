@@ -48,8 +48,9 @@ manual hotfix follow the invariant by hand.
   scripts read, and maps their verdict back to Antigravity shape. It makes no policy
   decisions.
 - **Rules, not hooks, for missing events.** Steering that has no Antigravity hook event (the
-  session banner/primer, the per-prompt advisories) lives in `rules/`, not hooks. Session-id
-  and pulse capture are lazy first-call init via `lazy-init.sh`.
+  session banner/primer, the per-prompt advisories) lives in `rules/`, not hooks. Plugin-root
+  and host session-id initialization are lazy first-call setup via `lazy-init.sh`; it never
+  creates or captures a server-side Pulse session.
 - **`hooks.json` is generated at install and gitignored.** `install.sh` renders `hooks.json`
   from the tracked `hooks.json.template` (replacing `__ZENSU_HOME__` with absolute paths);
   the generated `hooks.json` is gitignored — edit `hooks.json.template` instead.
