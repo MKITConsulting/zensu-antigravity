@@ -128,21 +128,49 @@ autopilot_stage() {
 # costs far more than waiting.
 _AUTOPILOT_LOCK_TIMEOUT_STEPS=1200
 _AUTOPILOT_LOCK_STALE_SECONDS=30
+# Hard ceiling for a lock whose owner still looks alive. It exists only for the
+# pathological case where `$$` names a long-lived parent rather than the holder
+# itself (the lib sourced, then called from a background subshell), so a crashed
+# holder cannot wedge the run forever. It must stay far above any legitimate
+# hold.
+_AUTOPILOT_LOCK_ABANDON_SECONDS=600
 
 _autopilot_sleep_tick() {
   sleep 0.02 2>/dev/null || sleep 1
 }
 
+# Reaping needs BOTH conditions, per the design note above: an untouched-for-a-
+# while directory AND an owner that is dead or unrecorded. Dropping either one
+# is unsafe — age alone deletes a lock whose owner is legitimately still working,
+# and a dead pid alone deletes the SUCCESSOR's lock when a waiter happens to read
+# an owner file from a lock that was just released.
+#
+# The one case both conditions still miss is an owner that reads as alive
+# forever: `$$` names the sourcing shell rather than the holder when the lib is
+# sourced and then driven from a background subshell, so a crashed holder would
+# wedge the run. The abandon ceiling bounds that, far above any legitimate hold.
 _autopilot_lock_stale() {
-  local lock_dir="$1" owner_pid mtime now
+  local lock_dir="$1" owner_pid mtime now age
   mtime="$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || echo "")"
   [ -n "$mtime" ] || return 1
   now="$(date +%s 2>/dev/null || echo "")"
   [ -n "$now" ] || return 1
-  [ "$((now - mtime))" -gt "$_AUTOPILOT_LOCK_STALE_SECONDS" ] || return 1
-  owner_pid="$(tr -d '[:space:]' < "$lock_dir/owner" 2>/dev/null)"
-  [ -n "$owner_pid" ] || return 0
-  kill -0 "$owner_pid" 2>/dev/null && return 1
+  age="$((now - mtime))"
+
+  # The whole redirection is silenced, not just `tr`: the lock can be released
+  # between the stat above and this read, and a bare `< file` failure is the
+  # SHELL's error, which `tr 2>/dev/null` would not suppress. Left unsilenced it
+  # prints on every contended acquire and pollutes hook stderr.
+  owner_pid="$( { tr -d '[:space:]' < "$lock_dir/owner"; } 2>/dev/null )"
+  if [ -n "$owner_pid" ] && kill -0 "$owner_pid" 2>/dev/null; then
+    # Owner alive: never stale on age alone, only past the abandon ceiling.
+    [ "$age" -gt "$_AUTOPILOT_LOCK_ABANDON_SECONDS" ] && return 0
+    return 1
+  fi
+
+  # Owner dead or not yet recorded: reclaim only once the lock has also sat
+  # untouched past the stale threshold.
+  [ "$age" -gt "$_AUTOPILOT_LOCK_STALE_SECONDS" ] || return 1
   return 0
 }
 
@@ -175,6 +203,29 @@ _autopilot_locked_run() {
   local rc=$?
   rm -rf "$lock_dir" 2>/dev/null || true
   return $rc
+}
+
+# Bounded retry around a locked critical section.
+#
+# A failed critical section is indistinguishable at this level from a policy
+# refusal (terminal stage, corrupt document) and from a transient one (lock
+# contention, a read that lost a race). Losing a durable-state write silently is
+# the expensive outcome — a repeated irreversible pipeline step — while retrying
+# a genuine refusal costs a few milliseconds and still ends in the same rc 1.
+# So: retry a few times, then give up and let the caller fail open.
+_AUTOPILOT_WRITE_ATTEMPTS=5
+
+_autopilot_retry_run() {
+  local state_file="$1"; shift
+  local attempt=1 rc=1
+  while [ "$attempt" -le "$_AUTOPILOT_WRITE_ATTEMPTS" ]; do
+    _autopilot_locked_run "$state_file" "$@"
+    rc=$?
+    [ "$rc" -eq 0 ] && return 0
+    attempt=$((attempt + 1))
+    [ "$attempt" -le "$_AUTOPILOT_WRITE_ATTEMPTS" ] && _autopilot_sleep_tick
+  done
+  return "$rc"
 }
 
 _autopilot_write_json() {
@@ -274,7 +325,7 @@ autopilot_apply_event() {
   state_file="$(autopilot_state_file "$session_id")"
   [ -f "$state_file" ] || return 1
   [ -L "$state_file" ] && return 1
-  _autopilot_locked_run "$state_file" _autopilot_event_critical "$state_file" "$stage" "$note"
+  _autopilot_retry_run "$state_file" _autopilot_event_critical "$state_file" "$stage" "$note"
 }
 
 _autopilot_artifact_critical() {
@@ -302,7 +353,7 @@ autopilot_set_artifact() {
   state_file="$(autopilot_state_file "$session_id")"
   [ -f "$state_file" ] || return 1
   [ -L "$state_file" ] && return 1
-  _autopilot_locked_run "$state_file" _autopilot_artifact_critical "$state_file" "$key" "$value"
+  _autopilot_retry_run "$state_file" _autopilot_artifact_critical "$state_file" "$key" "$value"
 }
 
 _autopilot_requirements_critical() {
@@ -333,7 +384,7 @@ autopilot_add_requirements() {
   state_file="$(autopilot_state_file "$session_id")"
   [ -f "$state_file" ] || return 1
   [ -L "$state_file" ] && return 1
-  _autopilot_locked_run "$state_file" _autopilot_requirements_critical "$state_file" "$ids"
+  _autopilot_retry_run "$state_file" _autopilot_requirements_critical "$state_file" "$ids"
 }
 
 # Retire the durable run (delivered or abandoned).

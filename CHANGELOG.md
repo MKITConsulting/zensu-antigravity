@@ -57,6 +57,14 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   terminal's cwd and could deadlock the Stop-hook review chain. A cwd-independent resolver
   (`hooks/lib/resolve-project-dir.js`) recovers it at one choke point.
 - **tdd**: The review-chain Stop backstop is re-armed for every session chain.
+- **autopilot**: A durable-state write could be lost under concurrency. Each mutation now
+  retries its locked critical section a bounded number of times instead of silently
+  dropping the write on a transient failure — a lost stage write means a repeated
+  irreversible pipeline step. The lock's reaping rule is documented and pinned by test:
+  a lock is reclaimed only when its owner is dead or unrecorded AND it has sat untouched
+  past the stale threshold, with an abandon ceiling for the case where the recorded pid
+  outlives the actual holder. A contended acquire no longer prints a shell redirection
+  error to stderr on every retry.
 - **tests**: The skill-frontmatter check read only the first line of a `description`, so
   folded YAML descriptions skipped the length and prefix assertions entirely and three
   over-long descriptions had passed. The extractor now understands folded and literal

@@ -166,6 +166,75 @@
       contains: ["rc="]
       not_contains: ["Traceback", "syntax error"]
 
+- description: "autopilot state: concurrent writers all land, none lost, none doubled"
+  vars:
+    scenario_id: autopilot-state-concurrent-writes-all-land
+    kind: shell
+    env: { TDD_STATE_DIR: "__DATA__/tdd" }
+    script: |
+      LIB="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
+      mkdir -p "$TDD_STATE_DIR"
+      SID=pf-concurrent
+      bash "$LIB" begin --session "$SID" --feature "fan out" >/dev/null 2>&1
+      SF="$(bash "$LIB" file --session "$SID" 2>/dev/null)"
+      for i in $(seq 1 16); do
+        bash "$LIB" event --session "$SID" --stage GATES --note "writer-$i" >/dev/null 2>&1 &
+      done
+      wait
+      node -e '
+        const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+        const n = j.events.map(e => e.note).filter(x => /^writer-[0-9]+$/.test(x));
+        const uniq = new Set(n);
+        process.stdout.write("landed=" + uniq.size + " duplicates=" + (n.length - uniq.size));
+      ' "$SF"
+    expect:
+      exit_code: 0
+      contains: ["landed=16 duplicates=0"]
+
+- description: "autopilot state: a lock is reaped only when its owner is gone AND it has gone stale"
+  vars:
+    scenario_id: autopilot-state-lock-reaping-needs-both
+    kind: shell
+    env: { TDD_STATE_DIR: "__DATA__/tdd" }
+    script: |
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
+      mkdir -p "$TDD_STATE_DIR"
+      L="$TDD_STATE_DIR/probe.lockd"
+      _AUTOPILOT_LOCK_STALE_SECONDS=0
+      rm -rf "$L"; mkdir -p "$L"; printf '%s\n' "$$" > "$L/owner"; sleep 1
+      _autopilot_lock_stale "$L" && echo "LIVE_OWNER_REAPED" || echo "LIVE_OWNER_KEPT"
+      rm -rf "$L"; mkdir -p "$L"
+      DEAD=999000; while kill -0 "$DEAD" 2>/dev/null; do DEAD=$((DEAD - 1)); done
+      printf '%s\n' "$DEAD" > "$L/owner"; sleep 1
+      _autopilot_lock_stale "$L" && echo "DEAD_OWNER_REAPED" || echo "DEAD_OWNER_KEPT"
+      _AUTOPILOT_LOCK_STALE_SECONDS=30
+      rm -rf "$L"; mkdir -p "$L"
+      _autopilot_lock_stale "$L" && echo "YOUNG_REAPED" || echo "YOUNG_KEPT"
+      rm -rf "$L"
+    expect:
+      exit_code: 0
+      contains: ["LIVE_OWNER_KEPT", "DEAD_OWNER_REAPED", "YOUNG_KEPT"]
+
+- description: "autopilot state: a contended acquire prints nothing to stderr"
+  vars:
+    scenario_id: autopilot-state-quiet-under-contention
+    kind: shell
+    env: { TDD_STATE_DIR: "__DATA__/tdd" }
+    script: |
+      LIB="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
+      mkdir -p "$TDD_STATE_DIR"
+      SID=pf-quiet
+      bash "$LIB" begin --session "$SID" --feature quiet >/dev/null 2>&1
+      ERR="$TDD_STATE_DIR/stderr.txt"
+      for i in $(seq 1 12); do
+        bash "$LIB" event --session "$SID" --stage GATES --note "w-$i" >/dev/null 2>>"$ERR" &
+      done
+      wait
+      [ -s "$ERR" ] && { echo "STDERR_NOISE:"; head -2 "$ERR"; } || echo "STDERR_CLEAN"
+    expect:
+      exit_code: 0
+      contains: ["STDERR_CLEAN"]
+
 - description: "bypass ledger: a clean session records no opt-out"
   vars:
     scenario_id: ledger-clean-session-empty

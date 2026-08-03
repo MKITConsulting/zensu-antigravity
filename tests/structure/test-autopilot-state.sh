@@ -141,6 +141,44 @@ DUPES="$(node -e '
   const n = j.events.map(e => e.note).filter(x => /^writer-[0-9]+$/.test(x));
   process.stdout.write(String(n.length - new Set(n).size));' "$CSF" 2>/dev/null)"
 [ "$DUPES" = "0" ] && check "A35 no write was recorded twice" PASS || check "A35 $DUPES duplicated writes" FAIL
+
+# Reaping a lock requires BOTH a dead/unrecorded owner AND an age past the stale
+# threshold. Dropping either condition loses a write: age alone deletes a lock
+# whose owner is still working, a dead pid alone deletes the successor's lock.
+# These assertions pin both halves directly, without racing anything.
+(
+  . "$LIB"
+  LOCKD="$TDD_STATE_DIR/lockprobe.lockd"
+  # Threshold 0 plus a one-second age puts every probe lock PAST the stale
+  # threshold without touching mtime, so the checks stay portable across the
+  # GNU/BSD `touch` split — and well under the abandon ceiling, which is what
+  # separates "held a long time" from "owner is gone".
+  _AUTOPILOT_LOCK_STALE_SECONDS=0
+
+  # A live owner past the stale threshold is NOT reclaimable.
+  rm -rf "$LOCKD"; mkdir -p "$LOCKD"
+  printf '%s\n' "$$" > "$LOCKD/owner"
+  sleep 1
+  if _autopilot_lock_stale "$LOCKD"; then echo "A34a-FAIL"; else echo "A34a-PASS"; fi
+
+  # A dead owner IS reclaimable — a crashed holder must not wedge the run.
+  rm -rf "$LOCKD"; mkdir -p "$LOCKD"
+  DEAD=999000
+  while kill -0 "$DEAD" 2>/dev/null; do DEAD=$((DEAD - 1)); done
+  printf '%s\n' "$DEAD" > "$LOCKD/owner"
+  sleep 1
+  if _autopilot_lock_stale "$LOCKD"; then echo "A34b-PASS"; else echo "A34b-FAIL"; fi
+
+  # A just-created lock that has not written its owner yet is NOT reclaimable.
+  _AUTOPILOT_LOCK_STALE_SECONDS=30
+  rm -rf "$LOCKD"; mkdir -p "$LOCKD"
+  if _autopilot_lock_stale "$LOCKD"; then echo "A34c-FAIL"; else echo "A34c-PASS"; fi
+
+  rm -rf "$LOCKD"
+) > "$TMP/lockprobe.out" 2>/dev/null
+grep -q 'A34a-PASS' "$TMP/lockprobe.out" && check "A34a a live owner's lock is never reclaimed, however old" PASS || check "A34a a live owner's lock was wrongly reclaimed" FAIL
+grep -q 'A34b-PASS' "$TMP/lockprobe.out" && check "A34b a dead owner's lock is reclaimable" PASS || check "A34b a dead owner's lock was not reclaimable" FAIL
+grep -q 'A34c-PASS' "$TMP/lockprobe.out" && check "A34c a young ownerless lock is left alone" PASS || check "A34c a young ownerless lock was reclaimed" FAIL
 find "$TDD_STATE_DIR" -maxdepth 1 -name "autopilot-${SID}.json.*" 2>/dev/null | grep -q . \
   && check "A36 no lock or temp residue left behind" FAIL || check "A36 no lock or temp residue left behind" PASS
 
