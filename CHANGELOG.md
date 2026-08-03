@@ -57,17 +57,26 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   terminal's cwd and could deadlock the Stop-hook review chain. A cwd-independent resolver
   (`hooks/lib/resolve-project-dir.js`) recovers it at one choke point.
 - **tdd**: The review-chain Stop backstop is re-armed for every session chain.
-- **autopilot**: A durable-state write could be lost under concurrency — a repeated
-  irreversible pipeline step. Reclaiming a stale lock deleted it in place, which is
-  several syscalls, so two waiters could both judge the same lock stale, the first
-  delete it and take a fresh one, and the second then delete *that* fresh lock and take
-  one too: two writers in the critical section. Reclamation is now an atomic rename, so
-  exactly one waiter can ever claim a lock (pinned by test: eight racing waiters yield
-  one winner, where the previous behavior yielded eight). The stale threshold also moves
-  30s → 300s, because a starved host makes a working lock look abandoned, and each
-  mutation retries its critical section a bounded number of times rather than dropping
-  the write. A contended acquire no longer leaks a shell redirection error to stderr:
-  the owner-file read is a redirection, so `tr 2>/dev/null` never suppressed it.
+- **state locks**: A state write could be lost under concurrency on Linux — for autopilot
+  a repeated irreversible pipeline step, and the same defect sat in the TDD chain's lock.
+  Both selected between the GNU and BSD `stat` dialects by exit status. GNU
+  `stat -f %m DIR` does not fail cleanly the way BSD's does: on an existing directory it
+  prints a filesystem report to stdout and exits 1, so the `||` chain handed that text on
+  as a timestamp, `$((now - mtime))` evaluated a bare word from the report as a variable
+  name, and under `set -u` the whole writer process died mid-critical-section — its write
+  simply never happened. Only reachable under contention, where the lock directory is
+  replaced between the two stat calls, which is why it surfaced on a loaded CI runner and
+  never on a fast laptop. Both locks now pick the dialect by output shape and validate the
+  result is numeric.
+- **autopilot**: Reclaiming a stale lock deleted it in place, which is several syscalls,
+  so two waiters could both judge the same lock stale, the first delete it and take a
+  fresh one, and the second then delete *that* fresh lock and take one too. Reclamation is
+  now an atomic rename — eight racing waiters yield one winner where the previous behavior
+  yielded eight. The stale threshold also moves 30s → 300s, because a starved host makes a
+  working lock look abandoned, and each mutation retries its critical section a bounded
+  number of times rather than dropping the write. A contended acquire no longer leaks a
+  shell redirection error to stderr: the owner-file read is a redirection, so
+  `tr 2>/dev/null` never suppressed it.
 - **tests**: The skill-frontmatter check read only the first line of a `description`, so
   folded YAML descriptions skipped the length and prefix assertions entirely and three
   over-long descriptions had passed. The extractor now understands folded and literal

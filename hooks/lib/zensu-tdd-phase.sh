@@ -137,10 +137,19 @@ _tdd_locked_run() {
   while ! mkdir "$lock_dir" 2>/dev/null; do
     local dead=0
     local mtime
-    mtime=$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || echo "")
+    # Select the stat dialect by the SHAPE of its output, never by exit status.
+    # GNU `stat -f %m DIR` does not fail cleanly the way BSD's does: on an
+    # existing directory it prints a filesystem report to STDOUT and exits 1, so
+    # an `||` chain hands that text on as if it were a timestamp. `$((now -
+    # mtime))` then evaluates a bare word from the report as a variable name,
+    # and under `set -u` that kills the whole process mid-critical-section.
+    mtime=$(stat -c %Y "$lock_dir" 2>/dev/null)
+    case "$mtime" in ''|*[!0-9]*) mtime=$(stat -f %m "$lock_dir" 2>/dev/null) ;; esac
+    case "$mtime" in ''|*[!0-9]*) mtime="" ;; esac
     if [ -n "$mtime" ]; then
       local now
-      now=$(date +%s 2>/dev/null || echo "")
+      now=$(date +%s 2>/dev/null)
+      case "$now" in ''|*[!0-9]*) now="" ;; esac
       if [ -n "$now" ] && [ "$((now - mtime))" -gt 30 ]; then
         dead=1
       fi

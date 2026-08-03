@@ -191,6 +191,25 @@ grep -q 'A34a-PASS' "$TMP/lockprobe.out" && check "A34a a live owner's lock is n
 grep -q 'A34b-PASS' "$TMP/lockprobe.out" && check "A34b a dead owner's lock is reclaimable" PASS || check "A34b a dead owner's lock was not reclaimable" FAIL
 grep -q 'A34c-PASS' "$TMP/lockprobe.out" && check "A34c a young ownerless lock is left alone" PASS || check "A34c a young ownerless lock was reclaimed" FAIL
 grep -q 'A34d-PASS' "$TMP/lockprobe.out" && check "A34d exactly one of many waiters reaps a stale lock" PASS || check "A34d more than one waiter reaped the same lock" FAIL
+
+# The stat dialects must be chosen by OUTPUT SHAPE, never by exit status. GNU
+# `stat -f %m DIR` prints a filesystem report to stdout and exits 1 on an
+# existing directory, so an `||` chain hands that text on as a timestamp;
+# `$((now - mtime))` then evaluates a word from the report as a variable name
+# and `set -u` kills the writer mid-critical-section. Guarded two ways: the
+# helper must always yield a number or rc 1, and the dangerous chain must not
+# reappear in any lock implementation.
+MT="$( . "$LIB"; _autopilot_mtime "$TDD_STATE_DIR" 2>/dev/null )"
+case "$MT" in
+  ''|*[!0-9]*) check "A34e mtime helper returns a bare epoch (got '$MT')" FAIL ;;
+  *) check "A34e mtime helper returns a bare epoch" PASS ;;
+esac
+( . "$LIB"; _autopilot_mtime "$TDD_STATE_DIR/definitely-not-here" >/dev/null 2>&1 ) \
+  && check "A34f mtime helper accepted an unstattable path" FAIL \
+  || check "A34f mtime helper reports rc 1 for an unstattable path" PASS
+CHAIN="$(grep -rn 'stat -c %Y[^|]*|| *stat -f' "$PLUGIN_DIR/hooks" 2>/dev/null || true)"
+[ -z "$CHAIN" ] && check "A34g no lock reads mtime through an exit-status stat chain" PASS \
+  || { check "A34g an exit-status stat chain reappeared" FAIL; printf '%s\n' "$CHAIN" | head -3; }
 find "$TDD_STATE_DIR" -maxdepth 1 -name "autopilot-${SID}.json.*" 2>/dev/null | grep -q . \
   && check "A36 no lock or temp residue left behind" FAIL || check "A36 no lock or temp residue left behind" PASS
 

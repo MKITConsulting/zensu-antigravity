@@ -154,12 +154,30 @@ _autopilot_sleep_tick() {
 # forever: `$$` names the sourcing shell rather than the holder when the lib is
 # sourced and then driven from a background subshell, so a crashed holder would
 # wedge the run. The abandon ceiling bounds that, far above any legitimate hold.
+# Modification time as epoch seconds, or rc 1 when it cannot be determined.
+#
+# The two stat dialects must be selected by the SHAPE of their output, never by
+# exit status. GNU `stat -f %m DIR` does not fail cleanly the way BSD's does: on
+# an existing directory it prints a whole filesystem report to STDOUT (starting
+# `  File: "..."`) and exits 1. Chaining the dialects with `||` therefore feeds
+# that report into the caller, and `$((now - mtime))` then evaluates the bare
+# word `File` as a variable name — under `set -u` that kills the entire writer
+# process, so its state write silently never happens. Reachable only under
+# contention, where the lock directory is replaced between the two stat calls,
+# which is why it showed up on a loaded CI runner and never on a fast laptop.
+_autopilot_mtime() {
+  local path="$1" value
+  value="$(stat -c %Y "$path" 2>/dev/null)"
+  case "$value" in ''|*[!0-9]*) value="$(stat -f %m "$path" 2>/dev/null)" ;; esac
+  case "$value" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s' "$value"
+}
+
 _autopilot_lock_stale() {
   local lock_dir="$1" owner_pid mtime now age
-  mtime="$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || echo "")"
-  [ -n "$mtime" ] || return 1
-  now="$(date +%s 2>/dev/null || echo "")"
-  [ -n "$now" ] || return 1
+  mtime="$(_autopilot_mtime "$lock_dir")" || return 1
+  now="$(date +%s 2>/dev/null)"
+  case "$now" in ''|*[!0-9]*) return 1 ;; esac
   age="$((now - mtime))"
 
   # The whole redirection is silenced, not just `tr`: the lock can be released
