@@ -174,11 +174,23 @@ DUPES="$(node -e '
   rm -rf "$LOCKD"; mkdir -p "$LOCKD"
   if _autopilot_lock_stale "$LOCKD"; then echo "A34c-FAIL"; else echo "A34c-PASS"; fi
 
-  rm -rf "$LOCKD"
+  # Reclaiming is an ATOMIC CLAIM: of many waiters that all judged the same lock
+  # stale, exactly one may reap it. An in-place `rm -rf` cannot promise that —
+  # the losers' deletes land on the winner's fresh lock and two writers proceed.
+  rm -rf "$LOCKD"; mkdir -p "$LOCKD"
+  WON="$TDD_STATE_DIR/won"; : > "$WON"
+  for _r in 1 2 3 4 5 6 7 8; do
+    ( _autopilot_reap_lock "$LOCKD" && echo won >> "$WON" ) &
+  done
+  wait
+  if [ "$(wc -l < "$WON" | tr -d ' ')" = "1" ]; then echo "A34d-PASS"; else echo "A34d-FAIL"; fi
+
+  rm -rf "$LOCKD" "$WON"
 ) > "$TMP/lockprobe.out" 2>/dev/null
 grep -q 'A34a-PASS' "$TMP/lockprobe.out" && check "A34a a live owner's lock is never reclaimed, however old" PASS || check "A34a a live owner's lock was wrongly reclaimed" FAIL
 grep -q 'A34b-PASS' "$TMP/lockprobe.out" && check "A34b a dead owner's lock is reclaimable" PASS || check "A34b a dead owner's lock was not reclaimable" FAIL
 grep -q 'A34c-PASS' "$TMP/lockprobe.out" && check "A34c a young ownerless lock is left alone" PASS || check "A34c a young ownerless lock was reclaimed" FAIL
+grep -q 'A34d-PASS' "$TMP/lockprobe.out" && check "A34d exactly one of many waiters reaps a stale lock" PASS || check "A34d more than one waiter reaped the same lock" FAIL
 find "$TDD_STATE_DIR" -maxdepth 1 -name "autopilot-${SID}.json.*" 2>/dev/null | grep -q . \
   && check "A36 no lock or temp residue left behind" FAIL || check "A36 no lock or temp residue left behind" PASS
 

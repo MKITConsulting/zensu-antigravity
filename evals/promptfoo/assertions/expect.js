@@ -99,7 +99,20 @@ module.exports = (output, context) => {
     return { pass: false, score: 0, reason: 'scenario declared no expectation' };
   }
   if (failures.length) {
-    return { pass: false, score: 0, reason: failures.join('; ') };
+    // Carry a slice of what the scenario actually produced. Without it a
+    // failure on a host you cannot reach — a CI runner — reports only which
+    // expectation missed, never why, and every diagnosis costs a full push.
+    const clip = (label, text) => {
+      const trimmed = String(text || '').trim();
+      if (!trimmed) return '';
+      const shown = trimmed.length > 400 ? `${trimmed.slice(0, 400)}…` : trimmed;
+      return ` | ${label}: ${shown.replace(/\s+/g, ' ')}`;
+    };
+    return {
+      pass: false,
+      score: 0,
+      reason: `${failures.join('; ')}${clip('stdout', stdout)}${clip('stderr', stderr)}`,
+    };
   }
   return { pass: true, score: 1, reason: `${checks} expectation(s) held` };
 };

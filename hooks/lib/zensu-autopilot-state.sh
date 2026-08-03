@@ -127,13 +127,18 @@ autopilot_stage() {
 # harmless. The wait budget is generous because losing a durable-state write
 # costs far more than waiting.
 _AUTOPILOT_LOCK_TIMEOUT_STEPS=1200
-_AUTOPILOT_LOCK_STALE_SECONDS=30
+# The stale threshold must sit far above the slowest legitimate critical section
+# — one `node` startup — or a starved host makes a working lock LOOK abandoned.
+# A 2-core CI runner with a dozen contending writers reached that point at 30s.
+# Reclamation is a last-resort repair for a crashed holder, not a fast path, so
+# it costs nothing to be generous here and everything to be tight.
+_AUTOPILOT_LOCK_STALE_SECONDS=300
 # Hard ceiling for a lock whose owner still looks alive. It exists only for the
 # pathological case where `$$` names a long-lived parent rather than the holder
 # itself (the lib sourced, then called from a background subshell), so a crashed
 # holder cannot wedge the run forever. It must stay far above any legitimate
 # hold.
-_AUTOPILOT_LOCK_ABANDON_SECONDS=600
+_AUTOPILOT_LOCK_ABANDON_SECONDS=900
 
 _autopilot_sleep_tick() {
   sleep 0.02 2>/dev/null || sleep 1
@@ -174,6 +179,18 @@ _autopilot_lock_stale() {
   return 0
 }
 
+# Move the stale lock aside, then delete the moved copy. rc 0 when this caller
+# won the claim, rc 1 when someone else got there first.
+_autopilot_reap_lock() {
+  local lock_dir="$1" reaped
+  reaped="${lock_dir}.reaped.$$.${RANDOM:-0}"
+  if mv "$lock_dir" "$reaped" 2>/dev/null; then
+    rm -rf "$reaped" 2>/dev/null || true
+    return 0
+  fi
+  return 1
+}
+
 _autopilot_lock_acquire() {
   local lock_dir="$1" attempts=0
   while : ; do
@@ -182,7 +199,16 @@ _autopilot_lock_acquire() {
       return 0
     fi
     if _autopilot_lock_stale "$lock_dir"; then
-      rm -rf "$lock_dir" 2>/dev/null
+      # Reclaim by ATOMIC RENAME, never by `rm -rf` in place.
+      #
+      # `rm -rf` is several syscalls, and two waiters can both decide "stale"
+      # before either acts. The first deletes and immediately takes a fresh
+      # lock; the second then executes its already-decided delete against that
+      # brand-new lock and takes one too — two writers in the critical section,
+      # one update silently lost. Renaming makes the claim atomic: exactly one
+      # waiter can move the directory it observed, and a loser's rename simply
+      # fails and re-enters the loop.
+      _autopilot_reap_lock "$lock_dir"
       continue
     fi
     attempts=$((attempts + 1))
