@@ -1,0 +1,139 @@
+- description: "manifest: every skill directory on disk is registered in plugin.json"
+  vars:
+    scenario_id: manifest-skills-registered
+    kind: shell
+    script: |
+      node -e '
+        const fs=require("fs"),p=require("path");
+        const root=process.env.ZENSU_PLUGIN_ROOT;
+        const m=JSON.parse(fs.readFileSync(p.join(root,"plugin.json"),"utf8"));
+        const listed=new Set((m.skills||[]).map(s=>p.basename(s)));
+        const onDisk=fs.readdirSync(p.join(root,"skills"),{withFileTypes:true})
+          .filter(d=>d.isDirectory()).map(d=>d.name);
+        const missing=onDisk.filter(n=>!listed.has(n));
+        const ghost=[...listed].filter(n=>!onDisk.includes(n));
+        if(missing.length||ghost.length){
+          console.log("UNREGISTERED="+missing.join(",")+" GHOST="+ghost.join(","));
+          process.exit(1);
+        }
+        console.log("SKILLS_IN_SYNC count="+onDisk.length);
+      '
+    expect:
+      exit_code: 0
+      contains: ["SKILLS_IN_SYNC"]
+
+- description: "manifest: every skill has the matching /zensu-<verb> workflow shim"
+  vars:
+    scenario_id: manifest-workflow-pairing
+    kind: shell
+    script: |
+      node -e '
+        const fs=require("fs"),p=require("path");
+        const root=process.env.ZENSU_PLUGIN_ROOT;
+        const skills=fs.readdirSync(p.join(root,"skills"),{withFileTypes:true})
+          .filter(d=>d.isDirectory()).map(d=>d.name);
+        const flows=new Set(fs.readdirSync(p.join(root,"workflows"))
+          .filter(f=>f.endsWith(".md")).map(f=>f.replace(/\.md$/,"")));
+        const orphans=skills.filter(s=>!flows.has("zensu-"+s)&&!flows.has(s));
+        if(orphans.length){console.log("ORPHAN_SKILLS="+orphans.join(","));process.exit(1);}
+        console.log("PAIRING_COMPLETE count="+skills.length);
+      '
+    expect:
+      exit_code: 0
+      contains: ["PAIRING_COMPLETE"]
+
+- description: "manifest: every workflow shim on disk is registered in plugin.json"
+  vars:
+    scenario_id: manifest-workflows-registered
+    kind: shell
+    script: |
+      node -e '
+        const fs=require("fs"),p=require("path");
+        const root=process.env.ZENSU_PLUGIN_ROOT;
+        const m=JSON.parse(fs.readFileSync(p.join(root,"plugin.json"),"utf8"));
+        const listed=new Set((m.workflows||[]).map(s=>p.basename(s)));
+        const onDisk=fs.readdirSync(p.join(root,"workflows")).filter(f=>f.endsWith(".md"));
+        const missing=onDisk.filter(n=>!listed.has(n));
+        if(missing.length){console.log("UNREGISTERED="+missing.join(","));process.exit(1);}
+        console.log("WORKFLOWS_IN_SYNC count="+onDisk.length);
+      '
+    expect:
+      exit_code: 0
+      contains: ["WORKFLOWS_IN_SYNC"]
+
+- description: "manifest: every agent file on disk is registered in plugin.json"
+  vars:
+    scenario_id: manifest-agents-registered
+    kind: shell
+    script: |
+      node -e '
+        const fs=require("fs"),p=require("path");
+        const root=process.env.ZENSU_PLUGIN_ROOT;
+        const m=JSON.parse(fs.readFileSync(p.join(root,"plugin.json"),"utf8"));
+        const listed=new Set((m.agents||[]).map(s=>p.basename(s)));
+        const onDisk=fs.readdirSync(p.join(root,"agents")).filter(f=>f.endsWith(".md"));
+        const missing=onDisk.filter(n=>!listed.has(n));
+        if(missing.length){console.log("UNREGISTERED="+missing.join(","));process.exit(1);}
+        console.log("AGENTS_IN_SYNC count="+onDisk.length);
+      '
+    expect:
+      exit_code: 0
+      contains: ["AGENTS_IN_SYNC"]
+
+- description: "manifest: the plugin ships no MCP configuration of any kind"
+  vars:
+    scenario_id: manifest-no-mcp-config
+    kind: shell
+    script: |
+      node -e '
+        const fs=require("fs"),p=require("path");
+        const root=process.env.ZENSU_PLUGIN_ROOT;
+        const m=JSON.parse(fs.readFileSync(p.join(root,"plugin.json"),"utf8"));
+        const keys=Object.keys(m).filter(k=>/mcp/i.test(k));
+        const files=fs.readdirSync(root).filter(f=>/mcp/i.test(f));
+        if(keys.length||files.length){
+          console.log("MCP_LEAK keys="+keys.join(",")+" files="+files.join(","));
+          process.exit(1);
+        }
+        console.log("NO_MCP_CONFIG");
+      '
+    expect:
+      exit_code: 0
+      contains: ["NO_MCP_CONFIG"]
+
+- description: "manifest: every registered hook command points at a file that exists"
+  vars:
+    scenario_id: manifest-hooks-resolve
+    kind: shell
+    script: |
+      node -e '
+        const fs=require("fs"),p=require("path");
+        const root=process.env.ZENSU_PLUGIN_ROOT;
+        const raw=fs.readFileSync(p.join(root,"hooks.json.template"),"utf8");
+        const scripts=[...raw.matchAll(/antigravity-shim\.sh ([A-Za-z0-9._-]+\.sh)/g)].map(m=>m[1]);
+        if(!scripts.length){console.log("NO_HOOKS_FOUND");process.exit(1);}
+        const missing=[...new Set(scripts)].filter(s=>!fs.existsSync(p.join(root,"hooks",s)));
+        if(missing.length){console.log("MISSING_HOOKS="+missing.join(","));process.exit(1);}
+        console.log("HOOKS_RESOLVE count="+new Set(scripts).size);
+      '
+    expect:
+      exit_code: 0
+      contains: ["HOOKS_RESOLVE"]
+
+- description: "manifest: no artifact refers to a foreign host or its environment prefix"
+  vars:
+    scenario_id: manifest-standalone
+    kind: shell
+    script: |
+      cd "$ZENSU_PLUGIN_ROOT" || exit 1
+      # The bracket classes keep this pattern from matching its own source file
+      # while still matching every real occurrence, so the scan stays honest and
+      # needs no self-exclusion.
+      PATTERN='Cl[a]ude Code|CL[A]UDE_(PLUGIN|PROJECT|CODE)_|[.]cla[u]de/'
+      HITS="$(grep -rIl -E "$PATTERN" \
+        --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=results . 2>/dev/null || true)"
+      if [ -n "$HITS" ]; then printf 'HOST_LEAK=%s\n' "$HITS"; exit 1; fi
+      printf 'STANDALONE_CLEAN\n'
+    expect:
+      exit_code: 0
+      contains: ["STANDALONE_CLEAN"]

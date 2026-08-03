@@ -1,23 +1,24 @@
 ---
 name: pr-fix-findings
 description: >
-  Fix every open review comment / finding on a GitHub pull request end-to-end:
-  locate the PR for the current branch (or a given number), pull the unresolved
-  review threads, triage them into independent vs dependent work, implement each
-  fix through the Zensu workflow (vanilla `/zensu-tdd` + review chain), fan
-  independent fixes out across parallel subagents where sensible, push, resolve
-  the corresponding threads on the PR, and report a summary back. Use whenever the
-  user wants to address, fix, or resolve PR review feedback / review comments /
-  reviewer findings, "work through the review", "fix the review notes", "resolve
-  the review threads", or the slash command /zensu-pr-fix-findings. Built to run
-  standalone or repeatedly until no unresolved threads remain.
+  [Zensu] Fix every open review comment / finding on a GitHub or GitLab pull/merge request
+  end-to-end: locate the PR/MR for the current branch (or a given URL/number), pull
+  the unresolved review threads, triage them into independent vs dependent work,
+  implement each fix through the Zensu workflow (vanilla `/zensu-tdd` + review
+  chain), fan independent fixes out across parallel subagents where sensible, push,
+  resolve the corresponding threads on the PR/MR, and report a summary back. Use
+  whenever the user wants to address, fix, or resolve PR review feedback / review
+  comments / reviewer findings, "work through the review", "fix the review notes",
+  "resolve the review threads", or the slash command /zensu-pr-fix-findings. Built
+  to run standalone or repeatedly until no unresolved threads remain.
 ---
 
 # /zensu-pr-fix-findings
 
-Resolve **every open review comment** on a pull request: implement each fix through
-the Zensu workflow, parallelize independent fixes, push, resolve the threads on the
-PR, and report back.
+Resolve **every open review comment** on a pull/merge request: implement each fix
+through the Zensu workflow, parallelize independent fixes, push, resolve the threads
+on the PR/MR, and report back. Works on **GitHub or GitLab** — the forge is detected
+via the VCS driver (`hooks/lib/zensu-vcs.sh`) and every git-host call goes through it.
 
 ## When to Use
 
@@ -30,27 +31,52 @@ work (use `/zensu-bootstrap`).
 
 ## Prerequisites
 
-- `gh` CLI authenticated (`gh auth status`).
+- The detected forge's CLI authenticated — `gh` (GitHub) or `glab` (GitLab). The
+  driver's `--detect` reports `cliReady`; install the missing one if needed
+  (e.g. `brew install glab`).
 - Zensu CLI installed and authenticated (`zensu auth status`; `zensu auth login` if needed).
-- The current branch has an open PR, or a PR number is supplied as an argument.
+- The current branch has an open PR, or a PR/MR number is supplied as an argument.
 
 ## Arguments
 
-- `$ARGUMENTS` (optional): a PR number to target. Omitted → the PR for the current branch.
+- `$ARGUMENTS` (optional): a PR/MR URL or number to target. Omitted → the PR/MR for the
+  current branch.
 
 ## Procedure
 
-1. **Locate the PR.**
-   - With an argument: `gh pr view $ARGUMENTS --json number,url,state,headRefName,baseRefName`.
-   - Otherwise: `gh pr view --json number,url,state,headRefName,baseRefName` (current branch).
-   - If no PR exists or `state != OPEN`: stop and report. Never push to a closed/merged PR.
+0. **Resolve the driver and detect the forge (GitHub or GitLab).**
+
+   ```bash
+   PLUGIN_ROOT="$(cat "$HOME/.zensu/plugin-root" 2>/dev/null)"
+   [ -n "$PLUGIN_ROOT" ] || { echo "FATAL: plugin root unresolvable — reinstall the plugin (the install step writes ~/.zensu/plugin-root)" >&2; exit 1; }
+
+   VCS="$PLUGIN_ROOT/hooks/lib/zensu-vcs.sh"
+   [ -f "$VCS" ] || { echo "FATAL: VCS driver missing — reinstall the plugin" >&2; exit 1; }
+
+   DETECT="$(bash "$VCS" --detect)"
+   PROVIDER="$(printf '%s\n' "$DETECT" | sed -n 's/^provider=//p')"
+   REPOID="$(printf '%s\n'  "$DETECT" | sed -n 's/^repo=//p')"
+   CLIREADY="$(printf '%s\n' "$DETECT" | sed -n 's/^cliReady=//p')"
+   ```
+
+   - `CLIREADY=false` → stop and ask the user to install/authenticate the detected
+     forge CLI (GitHub: `gh auth login`; GitLab: `glab auth login`, installing `glab`
+     first if missing). Do **not** fall back to the other forge.
+   - `PROVIDER=unknown` → ask the user which forge / remote to target.
+   - Otherwise carry `PROVIDER` and `REPOID` forward; pass `--provider "$PROVIDER"` and
+     `--repo-id "$REPOID"` to every driver op below so detection runs only once.
+
+1. **Locate the PR/MR.**
+   - `bash "$VCS" --locate-pr --provider "$PROVIDER" [$ARGUMENTS]` → JSON
+     `{id,url,state,base,head}` (omit the argument to use the current branch's PR/MR).
+   - If none exists or `state != OPEN`: stop and report. Never push to a closed/merged PR/MR.
 
 2. **Collect unresolved feedback.**
-   - Inline review comments: `gh api repos/{owner}/{repo}/pulls/<n>/comments --paginate`.
-   - Unresolved review threads (authoritative for resolution state) via GraphQL —
-     `reviewThreads { isResolved, isOutdated, comments { body, path, line, author } }`;
-     keep only `isResolved == false`.
-   - Top-level review bodies: `gh api repos/{owner}/{repo}/pulls/<n>/reviews`.
+   - `bash "$VCS" --fetch-threads --provider "$PROVIDER" --repo-id "$REPOID" <id>` → a
+     normalized JSON array of UNRESOLVED threads
+     `[{threadId, replyTo, path, line, body, author}]`. GitHub review threads and GitLab
+     discussions map to the same shape, already filtered (`isResolved==false` /
+     `resolvable && !resolved`).
    - Build a worklist of actionable items. Skip pure praise, already-addressed, and outdated-and-moot threads.
 
 3. **Triage for parallelism.**
@@ -70,13 +96,16 @@ work (use `/zensu-bootstrap`).
    - After edits: run the relevant type-check / tests. Fix what you broke.
 
 5. **Land the changes.**
-   - Re-verify the PR is still OPEN (`gh pr view --json state`) before pushing.
+   - Re-verify the PR/MR is still OPEN
+     (`bash "$VCS" --pr-state --provider "$PROVIDER" <id>` → `OPEN`) before pushing.
    - Commit with a Conventional Commit message referencing the addressed comments,
      push to the PR branch. Clean commit messages — no watermark / co-author lines.
 
 6. **Resolve the threads.**
-   - For each addressed thread: reply to the comment with a one-line note on the fix
-     (commit SHA), then resolve it via GraphQL `resolveReviewThread`.
+   - For each addressed thread:
+     `bash "$VCS" --resolve-thread --provider "$PROVIDER" --repo-id "$REPOID" --reply "<one-line note + commit SHA>" <id> <threadId> <replyTo>`
+     — this replies to the thread and resolves it (GitHub: reply to the `replyTo`
+     comment + resolve the `threadId`; GitLab: the single discussion id serves as both).
    - Leave threads you could NOT resolve open, with a reply explaining why or what
      decision you need.
 

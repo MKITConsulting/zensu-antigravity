@@ -4,6 +4,28 @@ export ZENSU_BASH_START="${ZENSU_BASH_START:-}"
 : "${ZENSU_PLUGIN_ROOT:=$(cd "$(dirname "$0")/../.." && pwd)}"
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 
+# Project-dir choke point for the state verbs.
+#
+# Antigravity exports ZENSU_PROJECT_DIR to HOOKS only (the shim derives it from
+# the tool payload's workspace root). A state verb launched through the shell
+# tool inherits nothing, so `${ZENSU_PROJECT_DIR:-.}` used to resolve to the
+# terminal's cwd — and from a subdirectory or a worktree that anchored the chain
+# state to the WRONG directory, leaving the Stop-hook enforcer waiting on a flag
+# written somewhere else. Recover it once, here, before any session id or state
+# path is derived. No-op when the variable is already set.
+case "${1:-}" in
+  --*)
+    if [ -z "${ZENSU_PROJECT_DIR:-}" ]; then
+      source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+      _zensu_pd="$(zensu_resolve_project_dir 2>/dev/null || true)"
+      if [ -n "${_zensu_pd:-}" ] && [ -d "$_zensu_pd" ]; then
+        export ZENSU_PROJECT_DIR="$_zensu_pd"
+      fi
+      unset _zensu_pd
+    fi
+    ;;
+esac
+
 case "${1:-}" in
   --phase)
     phase_val=""
@@ -53,6 +75,56 @@ case "${1:-}" in
     fi
     exit 0
     ;;
+  --bypass-note)
+    # Write verb of the bypass ledger: record that a gate was deliberately opted
+    # out of. Gate names only, closed allowlist, scoped to an active session.
+    gate_val=""
+    session_val=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --bypass-note) gate_val="${2:-}";    shift 2 || break ;;
+        --session)     session_val="${2:-}"; shift 2 || break ;;
+        *) shift ;;
+      esac
+    done
+    source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-bypass-ledger.sh"
+    if ! zensu_bypass_shape_ok "$gate_val"; then
+      echo "zensu-log.sh --bypass-note requires a known gate name (one of: $ZENSU_BYPASS_GATE_ALLOWLIST)" >&2
+      exit 2
+    fi
+    if [ -z "$session_val" ]; then
+      export ZENSU_OWN_CMD="${ZENSU_OWN_CMD:-bash $0 --bypass-note $gate_val}"
+      source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+      session_val="$(zensu_resolve_session_id "${ZENSU_SESSION_ID:-}")"
+    fi
+    zensu_bypass_record "$session_val" "$gate_val"
+    exit $?
+    ;;
+  --bypass-list)
+    # Read verb of the bypass ledger — the surface the chain-end summary renders.
+    # Prints the recorded gates (comma separated) or the literal `none`.
+    session_val=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --session) session_val="${2:-}"; shift 2 || break ;;
+        *) shift ;;
+      esac
+    done
+    if [ -z "$session_val" ]; then
+      export ZENSU_OWN_CMD="${ZENSU_OWN_CMD:-bash $0 --bypass-list}"
+      source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+      session_val="$(zensu_resolve_session_id "${ZENSU_SESSION_ID:-}")"
+    fi
+    source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+    source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-bypass-ledger.sh"
+    bypass_list="$(zensu_bypass_list "$(tdd_state_file "$session_val")")"
+    if [ -n "$bypass_list" ]; then
+      echo "Gates bypassed during this session: $bypass_list"
+    else
+      echo "none"
+    fi
+    exit 0
+    ;;
   --pending-review|--pending-review-done)
     verb="$1"
     files_val=""
@@ -88,8 +160,16 @@ case "${1:-}" in
       session_val="$(zensu_resolve_session_id "${ZENSU_SESSION_ID:-}")"
     fi
     source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+    source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-bypass-ledger.sh"
     case "$verb" in
       --tdd-begin)
+        # The bypass ledger is per run: report anything the outgoing run opted
+        # out of (so a multi-run union keeps a durable trace) and start clean.
+        outgoing_bypasses="$(zensu_bypass_list "$(tdd_state_file "$session_val")" 2>/dev/null)"
+        if [ -n "$outgoing_bypasses" ]; then
+          echo "previous-run bypasses (cleared now): $outgoing_bypasses"
+        fi
+        zensu_bypass_clear "$session_val" 2>/dev/null || true
         tdd_set_flag "$session_val" active true
         tdd_begin_rc=$?
         if [ "$tdd_begin_rc" -eq 0 ]; then
@@ -129,7 +209,12 @@ case "${1:-}" in
         tdd_workflow_begin "$session_val" "$tools_val"
         ;;
       --workflow-end)   tdd_set_flag "$session_val" workflowActive false ;;
-      --tdd-reset)    tdd_clear_session "$session_val" ;;
+      --tdd-reset)
+        tdd_clear_session "$session_val"
+        tdd_reset_rc=$?
+        zensu_bypass_clear "$session_val" 2>/dev/null || true
+        exit "$tdd_reset_rc"
+        ;;
     esac
     exit $?
     ;;

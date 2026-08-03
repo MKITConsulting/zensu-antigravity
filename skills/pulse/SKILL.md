@@ -1,6 +1,6 @@
 ---
 name: pulse
-description: Your developer journal — privacy-first session tracking that records session boundaries and which features you touch (never code content). Use at the start and end of a coding session, or when the user asks to track a session, start/end pulse, or invokes /zensu-pulse.
+description: '[Zensu] Your developer journal — privacy-first session tracking that records session boundaries and which features you touch (never code content). Use at the start and end of a coding session, or when the user asks to track a session, start/end pulse, or invokes /zensu-pulse.'
 ---
 
 # /zensu-pulse

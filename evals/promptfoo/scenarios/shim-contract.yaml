@@ -1,0 +1,103 @@
+- description: "shim: superset contract emits both verdict shapes so either host dialect is satisfied"
+  vars:
+    scenario_id: shim-superset-emits-both-shapes
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args:
+          CommandLine: "zensu security classify f1 --classification confidential"
+          Cwd: "__PROJECT__"
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-shim
+    expect:
+      exit_code: 0
+      stdout_json: { allow_tool: false, decision: deny }
+
+- description: "shim: allow_tool dialect emits only the allow_tool shape"
+  vars:
+    scenario_id: shim-allow-tool-dialect
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: allow_tool }
+    payload:
+      toolCall:
+        name: run_command
+        args:
+          CommandLine: "zensu security classify f1 --classification confidential"
+          Cwd: "__PROJECT__"
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-shim
+    expect:
+      exit_code: 0
+      stdout_json: { allow_tool: false }
+      stdout_not_contains: ['"decision"']
+
+- description: "shim: decision dialect emits only the decision shape"
+  vars:
+    scenario_id: shim-decision-dialect
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: decision }
+    payload:
+      toolCall:
+        name: run_command
+        args:
+          CommandLine: "zensu security classify f1 --classification confidential"
+          Cwd: "__PROJECT__"
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-shim
+    expect:
+      exit_code: 0
+      stdout_json: { decision: deny }
+      stdout_not_contains: ['"allow_tool"']
+
+- description: "shim: the shim always exits 0 so the host never sees a hook crash"
+  vars:
+    scenario_id: shim-always-exit-zero
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload: "not json at all"
+    expect:
+      exit_code: 0
+
+- description: "shim: an empty payload fails open rather than blocking the host"
+  vars:
+    scenario_id: shim-empty-payload-fails-open
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload: ""
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["deny_reason"]
+
+- description: "shim: an unknown tool name is passed through untouched"
+  vars:
+    scenario_id: shim-unknown-tool-passthrough
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: some_future_tool
+        args: { Whatever: "zensu features create --product p" }
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-shim
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["deny_reason"]
+
+- description: "shim: the workspace root reaches the gate as the project dir"
+  vars:
+    scenario_id: shim-workspace-root-propagates
+    kind: shell
+    script: |
+      printf '{"toolCall":{"name":"run_command","args":{"CommandLine":"echo hi","Cwd":"__PROJECT__"}},"workspacePaths":["__PROJECT__"],"session_id":"pf"}' \
+        | node "$ZENSU_PLUGIN_ROOT/hooks/antigravity/normalize-payload.js"
+    expect:
+      exit_code: 0
+      contains: ["run_command", "echo hi"]

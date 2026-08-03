@@ -1,0 +1,33 @@
+description: "Zensu Antigravity plugin — offline capability proof suite"
+
+providers:
+  - id: "exec: node ./lib/zensu-provider.js"
+
+prompts:
+  - id: zensu-scenario
+    label: "scenario runner"
+    raw: "{{scenario_id}}"
+
+defaultTest:
+  options:
+    transform: |
+      return typeof output === 'string' ? output : JSON.stringify(output);
+  assert:
+    - type: javascript
+      value: file://assertions/expect.js
+
+tests:
+  - file://scenarios/write-gate.yaml
+  - file://scenarios/shim-contract.yaml
+  - file://scenarios/tdd-phase-gate.yaml
+  - file://scenarios/stop-chain.yaml
+  - file://scenarios/secret-scan.yaml
+  - file://scenarios/vcs-driver.yaml
+  - file://scenarios/review-anchors.yaml
+  - file://scenarios/doctor.yaml
+  - file://scenarios/orchestration.yaml
+  - file://scenarios/manifest.yaml
+
+evaluateOptions:
+  maxConcurrency: 4
+  repeat: 1

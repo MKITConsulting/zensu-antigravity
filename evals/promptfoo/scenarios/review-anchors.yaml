@@ -1,0 +1,106 @@
+- description: "anchors: a line inside an added hunk validates"
+  vars:
+    scenario_id: anchor-added-line-valid
+    kind: shell
+    script: &anchor_diff |
+      printf '%s\n' \
+        'diff --git a/src/app.ts b/src/app.ts' \
+        'index 111..222 100644' \
+        '--- a/src/app.ts' \
+        '+++ b/src/app.ts' \
+        '@@ -1,3 +1,5 @@' \
+        ' const a = 1;' \
+        '+const b = 2;' \
+        '+const c = 3;' \
+        ' const d = 4;' \
+        ' const e = 5;' \
+        | node "$ZENSU_PLUGIN_ROOT/hooks/lib/valid-diff-lines.js" src/app.ts 2 RIGHT
+    expect:
+      exit_code: 0
+      contains: ["valid"]
+
+- description: "anchors: a line far outside every hunk is refused"
+  vars:
+    scenario_id: anchor-out-of-range-refused
+    kind: shell
+    script: |
+      printf '%s\n' \
+        'diff --git a/src/app.ts b/src/app.ts' \
+        'index 111..222 100644' \
+        '--- a/src/app.ts' \
+        '+++ b/src/app.ts' \
+        '@@ -1,3 +1,5 @@' \
+        ' const a = 1;' \
+        '+const b = 2;' \
+        ' const d = 4;' \
+        | node "$ZENSU_PLUGIN_ROOT/hooks/lib/valid-diff-lines.js" src/app.ts 900 RIGHT
+    expect:
+      exit_code: 0
+      contains: ["none"]
+
+- description: "anchors: a path absent from the diff anchors nowhere"
+  vars:
+    scenario_id: anchor-unknown-path-refused
+    kind: shell
+    script: |
+      printf '%s\n' \
+        'diff --git a/src/app.ts b/src/app.ts' \
+        '--- a/src/app.ts' \
+        '+++ b/src/app.ts' \
+        '@@ -1,1 +1,2 @@' \
+        ' const a = 1;' \
+        '+const b = 2;' \
+        | node "$ZENSU_PLUGIN_ROOT/hooks/lib/valid-diff-lines.js" src/other.ts 2 RIGHT
+    expect:
+      exit_code: 0
+      contains: ["none"]
+
+- description: "anchors: a renamed file validates against its new path"
+  vars:
+    scenario_id: anchor-renamed-path-valid
+    kind: shell
+    script: |
+      printf '%s\n' \
+        'diff --git a/src/old.ts b/src/new.ts' \
+        'similarity index 90%' \
+        'rename from src/old.ts' \
+        'rename to src/new.ts' \
+        '--- a/src/old.ts' \
+        '+++ b/src/new.ts' \
+        '@@ -1,2 +1,3 @@' \
+        ' const a = 1;' \
+        '+const b = 2;' \
+        ' const c = 3;' \
+        | node "$ZENSU_PLUGIN_ROOT/hooks/lib/valid-diff-lines.js" src/new.ts 2 RIGHT
+    expect:
+      exit_code: 0
+      contains: ["valid"]
+
+- description: "anchors: an empty diff anchors nothing and does not crash"
+  vars:
+    scenario_id: anchor-empty-diff-refused
+    kind: shell
+    script: |
+      printf '' | node "$ZENSU_PLUGIN_ROOT/hooks/lib/valid-diff-lines.js" src/app.ts 1 RIGHT
+    expect:
+      exit_code: 0
+      contains: ["none"]
+
+- description: "anchors: a malformed diff fails closed instead of validating everything"
+  vars:
+    scenario_id: anchor-malformed-diff-fails-closed
+    kind: shell
+    script: |
+      printf '%s\n' 'this is not a diff at all' '@@ garbage @@' \
+        | node "$ZENSU_PLUGIN_ROOT/hooks/lib/valid-diff-lines.js" src/app.ts 1 RIGHT
+    expect:
+      exit_code: 0
+      contains: ["none"]
+
+- description: "anchors: the validator always exits 0 so a review is never aborted by it"
+  vars:
+    scenario_id: anchor-validator-never-aborts
+    kind: shell
+    script: *anchor_diff
+    expect:
+      exit_code: 0

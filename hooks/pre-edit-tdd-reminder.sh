@@ -72,7 +72,11 @@ case "$TOOL_NAME" in
   *) exit 0 ;;
 esac
 
+# Bypass ledger: the escape stays free, but while a Zensu session is active the
+# opt-out is recorded to chain state so the chain-end summary can surface it
+# (`zensu-log.sh --bypass-list`). Fail-open — gate name only, never a payload.
 if [ "${ZENSU_TDD_GATE:-}" = "off" ]; then
+  source "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-bypass-ledger.sh" 2>/dev/null && zensu_bypass_record_payload "$PAYLOAD" ZENSU_TDD_GATE 2>/dev/null || true
   exit 0
 fi
 

@@ -146,13 +146,14 @@ every tool round. The shim suppresses an identical `(script, context)` pair
 within the same user turn — keyed on a hash of the prompt — so the reminder
 appears once per turn and re-arms on the next prompt.
 
-### The seven wrapped hooks
+### The eight wrapped hooks
 
 | Hook script | Event | Matcher / scope | Role |
 |---|---|---|---|
 | `pre-edit-tdd-reminder.sh` | `PreToolUse` | `write_to_file` · `replace_file_content` · `multi_replace_file_content` | TDD phase-gate — denies edits that violate the RED→IMPL→GREEN FSM while a session is armed. |
 | `pre-bash-zensu-gate.sh` | `PreToolUse` | `run_command` | Zensu CLI write-gate — default-denies state-mutating `zensu` commands outside a workflow window or the `zensu-plm` agent; reads pass. |
-| `pre-bash-source-write-gate.sh` | `PreToolUse` | `run_command` | Source-write integrity gate — denies raw shell writes that clobber a tracked source file or escape the session root into a sibling checkout. |
+| `pre-write-secret-scan.sh` | `PreToolUse` | `write_to_file` · `replace_file_content` · `multi_replace_file_content` | Secret-scan gate — denies a write whose body carries a real-looking credential, naming the matched rules. Placeholders and vendor example values pass. |
+| `pre-bash-source-write-gate.sh` | `PreToolUse` | `run_command` | Source-write integrity gate — denies raw shell writes that clobber a tracked source file or escape the session root into a sibling checkout, and scans the same raw write content for credentials so a heredoc cannot smuggle one past the writer gate. |
 | `user-prompt-intent-router.sh` | `PreInvocation` | — | Product-planning intent router — steers keyword-bearing prompts to the `zensu-plm` triage instead of raw CLI calls. |
 | `user-prompt-tdd-reminder.sh` | `PreInvocation` | — | Per-turn TDD reminder — asks whether to run `/zensu-tdd` before the first edit on a direct code request (honors a prior stated preference). |
 | `post-bash-witness.sh` | `PostToolUse` | `run_command` | Test-run witness — records each command (exit code, stdout tail) as the evidence channel the completeness audit cross-checks. |
@@ -268,22 +269,35 @@ chain, and the `Stop` backstop.
 
 ## The review chain
 
-At the end of a TDD run the skill marks `--tdd-complete` and spawns
-`zensu-code-reviewer`. The `Stop` backstop (`stop-chain-enforcer.sh`) guarantees
-the chain even if that spawn is skipped: it holds the turn open while
-`implComplete && !chainDone`. Reviewer findings are routed back into the main
-thread to be fixed in-thread under the still-active phase-gate, then the reviewer
-is re-spawned — looping until PASS or `autoFixMaxRounds`, after which the terminal
-`/zensu-self-review` stage runs.
+At the end of a TDD run the skill marks `--tdd-complete` and fans out five
+read-only `zensu-review-aspect` agents in one parallel batch, merges their
+findings in the main thread, runs one `zensu-review-judge` second pass over the
+merge, and only then spawns the consolidating `zensu-code-reviewer`. The `Stop`
+backstop (`stop-chain-enforcer.sh`) guarantees the chain even if that spawn is
+skipped: it holds the turn open while `implComplete && !chainDone`. Findings are
+routed back into the main thread to be fixed in-thread under the still-active
+phase-gate, then the chain re-runs — looping until PASS or `autoFixMaxRounds`,
+after which the terminal `/zensu-self-review` stage runs.
+
+The judge exists because an aspect panel has systematic blind spots: each aspect
+sees one lens, so cross-cutting integration, drift from the plan's `AC-###` /
+`FR-###` requirements, and edge cases that fall between lenses go unclaimed. The
+judge also grades the panel — a finding it marks `Panel-FP:` is neutralized
+rather than deleted: it stays visible, is retitled, downgraded to a suggestion,
+and exempted from fix routing in every severity mode. Repo-local personas
+discovered by `persona-activation.js` join the same parallel batch. The stage is
+config-gated by `hooks.reviewJudge` (default on).
 
 ```mermaid
 flowchart LR
-    P6["TDD complete<br/>--tdd-complete"] --> Spawn["skill spawns<br/>zensu-code-reviewer"]
-    Stop[/"Stop backstop:<br/>hold until chainDone"/] -.guarantees.-> Spawn
-    Spawn --> Reviewer["zensu-code-reviewer<br/>5 perspectives:<br/>conventions, bugs,<br/>architecture, tests, security"]
-    Reviewer --> Findings{"Critical or<br/>Important?"}
+    P6["TDD complete<br/>--tdd-complete"] --> Fan["fan out 5 parallel<br/>zensu-review-aspect<br/>+ repo personas"]
+    Stop[/"Stop backstop:<br/>hold until chainDone"/] -.guarantees.-> Fan
+    Fan --> Merge["merge findings<br/>in main thread"]
+    Merge --> Judge["zensu-review-judge<br/>integration · requirement drift<br/>· missed edges · Panel-FP"]
+    Judge --> Spawn["zensu-code-reviewer<br/>consume mode"]
+    Spawn --> Findings{"Critical or<br/>Important?"}
     Findings -->|"Yes"| Fix["main agent fixes<br/>in-thread RED→GREEN<br/>gate active"]
-    Fix --> Spawn
+    Fix --> Fan
     Findings -->|"None or<br/>max rounds"| CRD["--code-review-done"]
     CRD --> SelfRev["/zensu-self-review<br/>terminal stage:<br/>7-dim self-reflection"]
     SelfRev --> MustFix{"must-fix and<br/>not yet fixed?"}
@@ -291,7 +305,8 @@ flowchart LR
     SRFix --> SelfRev
     MustFix -->|"no / latch set"| Done(["chainDone · Final report"])
 
-    style Reviewer fill:#fef3c7,stroke:#92400e,color:#1e293b
+    style Fan fill:#fef3c7,stroke:#92400e,color:#1e293b
+    style Judge fill:#ede9fe,stroke:#5b21b6,color:#1e293b
     style SelfRev fill:#dcfce7,stroke:#166534,color:#1e293b
     style Fix fill:#dbeafe,stroke:#1e40af,color:#1e293b
     style Stop fill:#fee2e2,stroke:#991b1b,color:#1e293b
@@ -337,16 +352,23 @@ state cannot cross-bind.
 zensu-antigravity/
 ├── plugin.json              # native manifest (root)
 ├── hooks.json.template      # tracked; install.sh renders → hooks.json (gitignored, abs paths)
-├── agents/                  # zensu-plm, zensu-code-reviewer, zensu-review-aspect
+├── agents/                  # plm, code-reviewer, review-aspect, review-judge,
+│                            #   plan-review-worker, pr-review-worker
 ├── rules/                   # always-on steering (conventions, tdd, write-gate)
 ├── skills/                  # skills/<verb>/SKILL.md
 ├── workflows/               # /zensu-<name>.md shims
+├── templates/               # artifact skeletons (tdd-plan, autopilot-spec, autopilot-pr-body);
+│                            #   a repo may override each under .zensu/templates/
 ├── hooks/
 │   ├── *.sh                 # engine-neutral wrapped scripts
-│   ├── lib/*.sh             # engine-neutral helpers (log, config, session, cli-map, mcp-tools)
+│   ├── lib/*.sh             # engine-neutral helpers: log, config, session, cli-map, mcp-tools,
+│   │                        #   vcs (forge driver), doctor, overlay (+ template resolver),
+│   │                        #   bypass-ledger, autopilot-state, host-version
+│   ├── lib/*.js             # secret-patterns + secret-scan-decide, valid-diff-lines,
+│   │                        #   persona-activation, resolve-session-id, resolve-project-dir
 │   └── antigravity/         # antigravity-shim.sh + normalize-payload.js + emit-verdict.js + lazy-init.sh
 ├── tests/                   # structure/ + run-all.sh
-├── evals/                   # config-gate offline matrix
+├── evals/                   # config-gate offline matrix + promptfoo capability proof suite
 └── install.sh               # stage plugin, render hooks.json, seed config + pointer
 ```
 

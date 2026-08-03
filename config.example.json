@@ -8,12 +8,14 @@
     "autoFixMaxRounds": 5,
     "combinedSummary": true,
     "selfReview": true,
+    "reviewJudge": true,
     "pulseSession": true,
     "sessionBanner": true,
     "intentRouter": true,
     "tddReminder": true,
     "mcpGate": true,
-    "bashWriteGate": true
+    "bashWriteGate": true,
+    "secretScan": true
   },
   "context": {
     "compactionNudge": true,

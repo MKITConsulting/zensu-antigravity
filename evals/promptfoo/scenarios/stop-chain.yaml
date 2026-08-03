@@ -1,0 +1,89 @@
+- description: "stop chain: an idle session is allowed to end its turn"
+  vars:
+    scenario_id: stop-chain-idle-session-passes
+    kind: hook
+    hook: stop-chain-enforcer.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset, ZENSU_AG_STOP_BLOCKS: "1" }
+    payload:
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-stop
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["block"]
+
+- description: "stop chain: finishing implementation without the review chain blocks the stop"
+  vars:
+    scenario_id: stop-chain-unreviewed-implementation-blocks
+    kind: hook
+    hook: stop-chain-enforcer.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset, ZENSU_AG_STOP_BLOCKS: "1" }
+    setup: &arm_pending_review |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      bash "$LOG" --tdd-begin --session pf-stop >/dev/null 2>&1 || true
+      bash "$LOG" --tdd-complete --session pf-stop >/dev/null 2>&1 || true
+    payload:
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-stop
+    expect:
+      exit_code: 0
+      stdout_json: { decision: block }
+      contains: ["zensu-code-reviewer"]
+
+- description: "stop chain: the block names the Antigravity subagent surface, not a foreign host's"
+  vars:
+    scenario_id: stop-chain-block-names-antigravity
+    kind: hook
+    hook: stop-chain-enforcer.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset, ZENSU_AG_STOP_BLOCKS: "1" }
+    setup: *arm_pending_review
+    payload:
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-stop
+    expect:
+      exit_code: 0
+      contains: ["Antigravity"]
+      not_contains: ["Claude"]
+
+- description: "stop chain: a completed chain releases the stop"
+  vars:
+    scenario_id: stop-chain-completed-chain-releases
+    kind: hook
+    hook: stop-chain-enforcer.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset, ZENSU_AG_STOP_BLOCKS: "1" }
+    setup: |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      bash "$LOG" --tdd-begin --session pf-stop >/dev/null 2>&1 || true
+      bash "$LOG" --tdd-complete --session pf-stop >/dev/null 2>&1 || true
+      bash "$LOG" --code-review-done --session pf-stop >/dev/null 2>&1 || true
+      bash "$LOG" --self-review-fixed --session pf-stop >/dev/null 2>&1 || true
+      bash "$LOG" --chain-done --session pf-stop >/dev/null 2>&1 || true
+    payload:
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-stop
+    expect:
+      exit_code: 0
+      stdout_not_contains: ['"decision":"block"']
+
+- description: "stop chain: hosts that cannot honour a Stop block get advisory context instead"
+  vars:
+    scenario_id: stop-chain-advisory-when-blocks-unsupported
+    kind: hook
+    hook: stop-chain-enforcer.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset, ZENSU_AG_STOP_BLOCKS: "0" }
+    setup: *arm_pending_review
+    payload:
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-stop
+    expect:
+      exit_code: 0
+      stdout_not_contains: ['"decision":"block"']
+
+- description: "stop chain: the enforcer never crashes the host on a malformed payload"
+  vars:
+    scenario_id: stop-chain-malformed-payload-fails-open
+    kind: hook
+    hook: stop-chain-enforcer.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset, ZENSU_AG_STOP_BLOCKS: "1" }
+    payload: "}{ not json"
+    expect:
+      exit_code: 0

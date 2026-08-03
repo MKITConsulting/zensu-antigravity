@@ -174,8 +174,8 @@ say "zensu-antigravity installer -> target=$TARGET$([ "$DRY" -eq 1 ] && echo ' (
 INSTALL_FAILED=0
 
 # Stage list (relative to SRC). Plugin RUNTIME only — meta/test files excluded.
-#   plugin.json, skills/, rules/, workflows/, agents/, hooks/ (RECURSIVE incl.
-#   hooks/antigravity + hooks/lib), config.example.json
+#   plugin.json, skills/, rules/, workflows/, agents/, templates/, hooks/
+#   (RECURSIVE incl. hooks/antigravity + hooks/lib), config.example.json
 stage_into() { # $1=dest plugin root
   local DEST="$1" LIST f rel
   MANIFEST="$(manifest_path "$DEST")"
@@ -186,11 +186,13 @@ stage_into() { # $1=dest plugin root
     [ -f "$SRC/$f" ] && install_file "$SRC/$f" "$DEST/$f" "$LIST"
   done
 
-  # recursive subtrees: skills, rules, workflows, agents, hooks (incl. antigravity + lib)
+  # recursive subtrees: skills, rules, workflows, agents, templates, hooks
+  # (hooks incl. antigravity + lib). templates/ carries the artifact skeletons
+  # zensu-overlay.sh --template resolves at runtime, so it must ship.
   while IFS= read -r f; do
     rel="${f#"$SRC"/}"
     install_file "$f" "$DEST/$rel" "$LIST"
-  done < <(find "$SRC/skills" "$SRC/rules" "$SRC/workflows" "$SRC/agents" "$SRC/hooks" -type f 2>/dev/null | sort)
+  done < <(find "$SRC/skills" "$SRC/rules" "$SRC/workflows" "$SRC/agents" "$SRC/templates" "$SRC/hooks" -type f 2>/dev/null | sort)
 
   # generated hooks.json (absolute paths, rendered from the template into THIS dest)
   if [ -f "$SRC/hooks.json.template" ]; then

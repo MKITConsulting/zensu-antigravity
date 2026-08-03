@@ -42,10 +42,17 @@ SK="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1
 WF="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).workflows||[]).length)' "$M")"
 AG="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).agents||[]).length)' "$M")"
 RU="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).rules||[]).length)' "$M")"
-[ "$SK" = "13" ] && ok "13 skills declared" || bad "skills count = $SK (expected 13)"
-[ "$WF" = "13" ] && ok "13 workflows declared" || bad "workflows count = $WF (expected 13)"
-[ "$AG" = "3" ] && ok "3 agents declared" || bad "agents count = $AG (expected 3)"
-[ "$RU" = "3" ] && ok "3 rules declared" || bad "rules count = $RU (expected 3)"
+# Expected cardinalities come from the filesystem, not from frozen literals:
+# what matters is that the manifest declares exactly what ships, so a new skill
+# that nobody registered fails here instead of silently never loading.
+SK_DISK="$(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+WF_DISK="$(find "$ROOT/workflows" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
+AG_DISK="$(find "$ROOT/agents" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
+RU_DISK="$(find "$ROOT/rules" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
+[ "$SK" = "$SK_DISK" ] && ok "$SK skills declared, matching skills/ on disk" || bad "skills count = $SK (skills/ has $SK_DISK)"
+[ "$WF" = "$WF_DISK" ] && ok "$WF workflows declared, matching workflows/ on disk" || bad "workflows count = $WF (workflows/ has $WF_DISK)"
+[ "$AG" = "$AG_DISK" ] && ok "$AG agents declared, matching agents/ on disk" || bad "agents count = $AG (agents/ has $AG_DISK)"
+[ "$RU" = "$RU_DISK" ] && ok "$RU rules declared, matching rules/ on disk" || bad "rules count = $RU (rules/ has $RU_DISK)"
 
 # hooks ref points at ./hooks.json (string)
 HK="$(get hooks)"

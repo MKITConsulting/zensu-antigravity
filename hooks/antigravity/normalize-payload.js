@@ -49,12 +49,30 @@ function firstString() {
   // tool name
   out.tool_name = firstString(tc.name, j.tool_name, j.toolName, args.ToolName);
 
-  // tool_input.command (shell) + tool_input.file_path (writers)
+  // tool_input.command (shell) + tool_input.file_path / .content (writers)
   const toolInput = {};
   const cmd = firstString(args.CommandLine, args.command, ti.command);
   if (cmd) toolInput.command = cmd;
   const fp = firstString(args.TargetFile, args.AbsolutePath, args.FilePath, args.file_path, ti.file_path);
   if (fp) toolInput.file_path = fp;
+  // The write BODY — what the secret scan inspects. The arg name is
+  // host-version-dependent, so probe the plausible keys and fold in the
+  // replacement chunks of the replace-family writers. An unmatched shape simply
+  // leaves tool_input.content absent and the scan finds nothing (fail-open).
+  const bodies = [firstString(
+    args.CodeContent, args.Content, args.content, args.NewContent, args.CodeEdit, ti.content
+  )];
+  for (const arr of [args.ReplacementChunks, args.Chunks, args.Edits, ti.edits]) {
+    if (!Array.isArray(arr)) continue;
+    for (const c of arr) {
+      if (typeof c === "string") bodies.push(c);
+      else if (c && typeof c === "object") {
+        bodies.push(firstString(c.ReplacementContent, c.NewContent, c.Content, c.content, c.new_string));
+      }
+    }
+  }
+  const body = bodies.filter(Boolean).join("\n");
+  if (body) toolInput.content = body;
   out.tool_input = toolInput;
 
   // command cwd (DISTINCT from the workspace root / project dir)

@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Implement a tracked Zensu feature end-to-end — load feature context and security profile, run disciplined implementation via the `tdd` skill (strict RED-GREEN, phase-gate, guaranteed review chain), then link artifacts and create a revision. Use when starting/resuming work on a planned feature, or when the user invokes /zensu-implement.
+description: '[Zensu] Implement a tracked Zensu feature end-to-end — load feature context and security profile, run disciplined implementation via the `tdd` skill (strict RED-GREEN, phase-gate, guaranteed review chain), then link artifacts and create a revision. Use when starting/resuming work on a planned feature, or when the user invokes /zensu-implement.'
 ---
 
 # /zensu-implement
@@ -58,6 +58,8 @@ If the feature's security classification is confidential or restricted, emphasiz
 ### Step 3: Implement via the tdd skill
 
 Invoke the **`tdd` skill** (run the `/zensu-tdd` workflow, which loads `skills/tdd/SKILL.md`) with a feature specification built from Steps 1-2 as the input. Include the feature title, description, component, security classification, security constraints from Step 1, and the implementation plan from Step 2. End the spec with: "Reference this feature as [KEY-N] (the feature's actual id, e.g. [ZEN-42]) in all commit messages." You run the TDD workflow yourself in THIS main thread — do not spawn a subagent.
+
+**Give the spec's acceptance criteria and functional requirements stable IDs** — `AC-###` for acceptance criteria, `FR-###` for functional requirements, allocated monotonically and never recycled. The TDD skill adopts incoming IDs verbatim into its plan's `## Requirements` table (it only allocates new ones above the highest ID it receives), so every plan step's `Covers` cell, the review baseline, and the final audit trace back to the requirement the feature was written from.
 
 If the TDD workflow cannot proceed or all steps are blocked, continue manually from Step 4.
 

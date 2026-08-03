@@ -9,13 +9,21 @@
   "agents": [
     "./agents/zensu-plm.md",
     "./agents/zensu-code-reviewer.md",
-    "./agents/zensu-review-aspect.md"
+    "./agents/zensu-review-aspect.md",
+    "./agents/zensu-review-judge.md",
+    "./agents/zensu-plan-review-worker.md",
+    "./agents/zensu-pr-review-worker.md"
   ],
   "skills": [
     "./skills/autopilot",
     "./skills/bootstrap",
+    "./skills/converge",
+    "./skills/cover",
+    "./skills/docs",
+    "./skills/doctor",
     "./skills/ghost-scan",
     "./skills/implement",
+    "./skills/pilot",
     "./skills/plan-review",
     "./skills/pr-fix-findings",
     "./skills/pr-team-review",
@@ -23,7 +31,10 @@
     "./skills/reset-review-limit",
     "./skills/self-review",
     "./skills/security-review",
+    "./skills/setup",
     "./skills/tdd",
+    "./skills/verify-feature",
+    "./skills/wargame",
     "./skills/zensu-help"
   ],
   "rules": [
@@ -34,8 +45,13 @@
   "workflows": [
     "./workflows/zensu-autopilot.md",
     "./workflows/zensu-bootstrap.md",
+    "./workflows/zensu-converge.md",
+    "./workflows/zensu-cover.md",
+    "./workflows/zensu-docs.md",
+    "./workflows/zensu-doctor.md",
     "./workflows/zensu-ghost-scan.md",
     "./workflows/zensu-implement.md",
+    "./workflows/zensu-pilot.md",
     "./workflows/zensu-plan-review.md",
     "./workflows/zensu-pr-fix-findings.md",
     "./workflows/zensu-pr-team-review.md",
@@ -43,7 +59,10 @@
     "./workflows/zensu-reset-review-limit.md",
     "./workflows/zensu-self-review.md",
     "./workflows/zensu-security-review.md",
+    "./workflows/zensu-setup.md",
     "./workflows/zensu-tdd.md",
+    "./workflows/zensu-verify-feature.md",
+    "./workflows/zensu-wargame.md",
     "./workflows/zensu-help.md"
   ],
   "hooks": "./hooks.json"

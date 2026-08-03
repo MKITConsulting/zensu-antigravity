@@ -13,6 +13,70 @@ zensu_session_key() {
   fi
 }
 
+# Cwd-independent project-dir recovery, reusing the same project-scoped pointer
+# (`.zensu/state/session-id-current.txt`) that zensu_resolve_session_id consults.
+# Antigravity exports the project dir to HOOKS only, so a state writer launched
+# through the shell tool has to recover it or it anchors chain state to the
+# caller's cwd — the wrong directory whenever the shell sits in a subdirectory or
+# a worktree. Echoes ZENSU_PROJECT_DIR unchanged when it is already set, so
+# hook-side callers keep their exact current behavior.
+zensu_resolve_project_dir() {
+  local start="${1:-$PWD}"
+  if [ -n "${ZENSU_PROJECT_DIR:-}" ]; then
+    echo "$ZENSU_PROJECT_DIR"
+    return 0
+  fi
+
+  local helper_root="${ZENSU_PLUGIN_ROOT:-}"
+  if [ -z "$helper_root" ]; then
+    helper_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+  fi
+  local helper="${helper_root}/hooks/lib/resolve-project-dir.js"
+  if [ -f "$helper" ] && command -v node >/dev/null 2>&1; then
+    local out
+    out="$(node "$helper" "$start" 2>/dev/null)"
+    out="${out//$'\n'/}"
+    out="${out//$'\r'/}"
+    if [ -n "$out" ] && [ -d "$out" ]; then
+      echo "$out"
+      return 0
+    fi
+  fi
+
+  # Node-free fallback: the same nearest-ancestor pointer walk in pure shell, so
+  # a missing node degrades to the identical answer instead of the wrong dir.
+  local dir depth=0
+  dir="$(cd "$start" 2>/dev/null && pwd)" || dir="$start"
+  while [ "$depth" -lt 64 ]; do
+    if [ -f "${dir}/.zensu/state/session-id-current.txt" ]; then
+      echo "$dir"
+      return 0
+    fi
+    case "$dir" in
+      /|'') break ;;
+    esac
+    dir="$(dirname "$dir")"
+    depth=$((depth + 1))
+  done
+
+  dir="$(cd "$start" 2>/dev/null && pwd)" || dir="$start"
+  depth=0
+  while [ "$depth" -lt 64 ]; do
+    if [ -d "${dir}/.zensu/state" ]; then
+      echo "$dir"
+      return 0
+    fi
+    case "$dir" in
+      /|'') break ;;
+    esac
+    dir="$(dirname "$dir")"
+    depth=$((depth + 1))
+  done
+
+  cd "$start" 2>/dev/null && pwd && return 0
+  echo "$start"
+}
+
 zensu_resolve_session_via_helper() {
   local helper_root="${ZENSU_PLUGIN_ROOT:-}"
   if [ -z "$helper_root" ]; then
@@ -82,4 +146,4 @@ zensu_resolve_session_id() {
   echo "fallback_${key}"
 }
 
-export -f zensu_session_key zensu_resolve_session_via_helper zensu_resolve_session_id 2>/dev/null || true
+export -f zensu_session_key zensu_resolve_project_dir zensu_resolve_session_via_helper zensu_resolve_session_id 2>/dev/null || true

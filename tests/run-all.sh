@@ -58,6 +58,9 @@ log "▸ Offline evals"
 CG="$ROOT/evals/config-gate/run-eval.sh"
 [ -f "$CG" ] && run_suite "evals/config-gate (--self-check)" bash "$CG" --self-check
 
+PF="$ROOT/evals/promptfoo/run-eval.sh"
+[ -f "$PF" ] && run_suite "evals/promptfoo (capability proof suite)" bash "$PF"
+
 log ""
 log "════════════════════════════════════════════════════════════"
 log "  SUITES: $PASS passed / $FAIL failed"

@@ -1,6 +1,6 @@
 ---
 name: zensu-help
-description: Answer questions about how Zensu (the SaaS Product Lifecycle Manager) and the zensu-antigravity plugin itself work. Acts as an in-conversation glossary, architecture explainer, and config reference — does NOT execute workflows. Use when the user asks "what is X?", "how does Y work?", "where is Z configured?", about plugin internals, Zensu concepts, version changes, or invokes /zensu-help.
+description: '[Zensu] Answer questions about how Zensu (the SaaS Product Lifecycle Manager) and the zensu-antigravity plugin itself work. Acts as an in-conversation glossary, architecture explainer, and config reference — does NOT execute workflows. Use when the user asks "what is X?", "how does Y work?", "where is Z configured?", about plugin internals, Zensu concepts, version changes, or invokes /zensu-help.'
 ---
 
 # /zensu-help

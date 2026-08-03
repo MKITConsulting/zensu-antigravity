@@ -163,19 +163,30 @@ the workflow loads the matching skill):
 | Security review (classification, STRIDE, gate) | `/zensu-security-review` |
 | Self-review (chain terminus) | `/zensu-self-review` |
 | Plan review (multi-perspective, pre-code) | `/zensu-plan-review` |
-| PR team review (multi-agent, on a GitHub PR) | `/zensu-pr-team-review` |
+| PR team review (multi-agent, GitHub or GitLab) | `/zensu-pr-team-review` |
 | PR fix findings (resolve review threads) | `/zensu-pr-fix-findings` |
+| Backfill durable tests at the right level | `/zensu-cover` |
+| Verify a built feature live (worktree or preview) | `/zensu-verify-feature` |
+| Guided pipeline conductor (step-by-step delivery) | `/zensu-pilot` |
+| Code-grounded per-feature documentation | `/zensu-docs` |
+| Audit the code against the plan (flow-back) | `/zensu-converge` |
+| Wargame a mission into an executable-blind plan | `/zensu-wargame` |
+| Read-only setup diagnostics | `/zensu-doctor` |
+| Interactive first-run configuration | `/zensu-setup` |
 | Pulse (developer journal) | `/zensu-pulse` |
 | Reset the auto-fix round counter | `/zensu-reset-review-limit` |
 | Zensu Q&A / glossary | `/zensu-help` |
 
-### Subagents (3)
+### Subagents (6)
 
 | Agent | Role |
 |---|---|
 | **zensu-plm** | Product Lifecycle Manager — orchestrates all `zensu` CLI workflows (feature tracking, security reviews, release readiness, bootstrap, ghost scans). |
 | **zensu-code-reviewer** | Read-only quality review. Standalone: walks 5 specialist perspectives (conventions, bugs, architecture, tests, security). In the `/zensu-tdd` chain: runs in fan-out consume mode, surfacing the report merged from five parallel `zensu-review-aspect` agents. Write-free tool list. |
 | **zensu-review-aspect** | Single-perspective read-only reviewer. The `/zensu-tdd` chain spawns five in one parallel batch (one per perspective), then merges in the main thread. Runs zero build/test commands. |
+| **zensu-review-judge** | Independent second pass, slotted between the merged aspect findings and the consolidating reviewer. Covers what an aspect panel systematically misses — cross-cutting integration, requirement drift, missed edge cases — and grades the panel itself, flagging false positives with a `Panel-FP:` prefix. Read-only, runs zero build/test commands. |
+| **zensu-plan-review-worker** | Capability-confined read-only evidence worker for `/zensu-plan-review`; returns one structured verdict per assigned persona. |
+| **zensu-pr-review-worker** | The same worker shape for `/zensu-pr-team-review`; gathers review evidence and never touches the forge itself. |
 
 > **Subagent execution.** When Antigravity runs a plugin subagent as an isolated agent,
 > these run as isolated subagents. Where the host does not spawn an isolated subagent, each
@@ -194,7 +205,7 @@ steering lives in `rules/` (declared in `plugin.json`):
 | `rules/zensu-tdd.md` | Plan first, then ask whether to run `/zensu-tdd` before the first code edit; vanilla-vs-strict; finish the review chain. |
 | `rules/zensu-write-gate.md` | Why state-mutating `zensu` commands are default-denied outside a workflow (a convention nudge, not a security boundary); reads run free. |
 
-### Hooks (7)
+### Hooks (8)
 
 Engine-neutral hook scripts wired through the shim (`hooks/antigravity/antigravity-shim.sh`),
 which translates the Antigravity payload + verdict contract. Wrapped scripts:
@@ -203,7 +214,8 @@ which translates the Antigravity payload + verdict contract. Wrapped scripts:
 |---|---|---|
 | `pre-edit-tdd-reminder.sh` | PreToolUse (file-edit writers) | TDD phase-gate — blocks edits that violate the RED→IMPL→GREEN FSM while a session is armed. |
 | `pre-bash-zensu-gate.sh` | PreToolUse (`run_command`) | Zensu CLI write-gate — default-denies state-mutating `zensu` commands outside a workflow window or the `zensu-plm` agent; reads pass. |
-| `pre-bash-source-write-gate.sh` | PreToolUse (`run_command`) | Source-write integrity gate — denies raw shell writes that clobber a tracked source file or escape the session root into a sibling checkout. |
+| `pre-write-secret-scan.sh` | PreToolUse (file-edit writers) | Secret-scan gate — denies a write whose body carries a real-looking credential, naming the matched rules. Placeholders and vendor example values pass. |
+| `pre-bash-source-write-gate.sh` | PreToolUse (`run_command`) | Source-write integrity gate — denies raw shell writes that clobber a tracked source file or escape the session root into a sibling checkout, and scans the same raw writes for credentials. |
 | `user-prompt-intent-router.sh` | PreInvocation | Product-planning intent router — steers keyword-bearing prompts to the `zensu-plm` triage instead of raw CLI calls. |
 | `user-prompt-tdd-reminder.sh` | PreInvocation | Per-turn TDD reminder — asks whether to run `/zensu-tdd` before the first edit on a direct code request (honors prior preference, including the multilingual fast-path literals). |
 | `post-bash-witness.sh` | PostToolUse (`run_command`) | Test-run witness — records each command (exit code, stdout tail) as the evidence channel the Phase 6 audit cross-checks. |
@@ -217,11 +229,25 @@ context grows large.
 ## Configuration (`~/.zensu/config.json`)
 
 Seeded from [`config.example.json`](config.example.json). `hooks.*` toggles
-(`tddImplementation`, `intentRouter`, `tddReminder`, `mcpGate`, `bashWriteGate`, `autoFix`,
-`autoFixMaxRounds`, `selfReview`, `chainEnforcer`, …), `context.compactionNudge` /
-`context.nudgeThreshold`, and `logging.timestampStyle` (`wall|relative|none`). Env escape
-hatches: `ZENSU_TDD_GATE=off`, `ZENSU_MCP_GATE=off`, `ZENSU_BASH_WRITE_GATE=off`,
-`ZENSU_CHAIN=off`, `ZENSU_TEST_WITNESS=off`.
+(`tddImplementation`, `intentRouter`, `tddReminder`, `mcpGate`, `bashWriteGate`, `secretScan`,
+`reviewJudge`, `autoFix`, `autoFixMaxRounds`, `selfReview`, `chainEnforcer`, …),
+`context.compactionNudge` / `context.nudgeThreshold`, and `logging.timestampStyle`
+(`wall|relative|none`). Env escape hatches: `ZENSU_TDD_GATE=off`, `ZENSU_MCP_GATE=off`,
+`ZENSU_BASH_WRITE_GATE=off`, `ZENSU_SECRET_SCAN=off`, `ZENSU_CHAIN=off`,
+`ZENSU_TEST_WITNESS=off`.
+
+Every deliberate gate opt-out is recorded in the **bypass ledger** and surfaced rather than
+applied silently, so a disabled gate stays visible in the session record instead of looking
+like a gate that simply never fired.
+
+### Secret Scan
+
+`pre-write-secret-scan.sh` blocks writes whose content carries a real-looking credential
+(provider key shapes plus an entropy heuristic for assignments). Three escapes, in order of
+preference: put the sample under a `test(s)/`, `__tests__/`, `spec(s)/`, `testdata/`,
+`evals/` or `fixtures/` path or an `*.example.*` file; append the `zensu-secret-allow` marker
+to the line, which keeps the exception visible in the diff; or set `ZENSU_SECRET_SCAN=off`
+(or `hooks.secretScan: false`) to disable the gate wholesale — a deliberate, human choice.
 
 `hooks.tddImplementation:false` (the **default — vanilla**) switches `/zensu-tdd` to vanilla
 implementation mode: no RED→GREEN ceremony, the edit gate passes through, tests at the

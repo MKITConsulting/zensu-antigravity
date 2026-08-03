@@ -92,6 +92,51 @@ bash "$LOG" --tdd-complete --session "$SID" >/dev/null 2>&1
 printf '%s' '{"session_id":"'"$SID"'"}' | bash "$STOP" 2>/dev/null | grep -q '"decision":"block"' \
   && check "S14 chain 2: stop blocks again after re-begin (stale flags cleared)" PASS || check "S14 chain 2 unenforced" FAIL
 
+# 7) the stop-block budget is PER CHAIN: an exhausted chain must not disarm the
+# NEXT chain in the same session (regression — the sidecar used to survive).
+SID="stop-rearm"
+bash "$LOG" --tdd-begin --session "$SID" >/dev/null 2>&1
+bash "$LOG" --tdd-complete --session "$SID" >/dev/null 2>&1
+for i in $(seq 1 12); do
+  OUT="$(printf '%s' '{"session_id":"'"$SID"'"}' | bash "$STOP" 2>/dev/null)"
+  printf '%s' "$OUT" | grep -q '"decision":"block"' || break
+done
+BUDGET="$TDD_STATE_DIR/tdd-phase-${SID}.json.stopblocks"
+[ -f "$BUDGET" ] && check "S15 exhausted chain leaves a stop-block sidecar" PASS || check "S15 sidecar missing" FAIL
+bash "$LOG" --tdd-reset --session "$SID" >/dev/null 2>&1
+bash "$LOG" --tdd-begin --session "$SID" >/dev/null 2>&1
+printf '%s' '{"session_id":"'"$SID"'"}' | bash "$STOP" >/dev/null 2>&1
+[ -f "$BUDGET" ] && check "S16 re-armed chain retired the stale budget" FAIL || check "S16 re-armed chain retired the stale budget" PASS
+bash "$LOG" --tdd-complete --session "$SID" >/dev/null 2>&1
+printf '%s' '{"session_id":"'"$SID"'"}' | bash "$STOP" 2>/dev/null | grep -q '"decision":"block"' \
+  && check "S17 chain 2 blocks again after an exhausted chain 1" PASS || check "S17 chain 2 unenforced after exhausted chain 1" FAIL
+
+# 8) host-upgrade validation: the agy version is stamped at chain-arm time and a
+# mid-chain change is surfaced as a NON-FATAL warning.
+SID="stop-hostver"
+STAMP="$TDD_STATE_DIR/tdd-phase-${SID}.json.hostver"
+bash "$LOG" --tdd-begin --session "$SID" >/dev/null 2>&1
+printf '%s' '{"session_id":"'"$SID"'"}' | ZENSU_HOST_VERSION="1.2.3" bash "$STOP" >/dev/null 2>&1
+grep -qF '1.2.3' "$STAMP" 2>/dev/null && check "S18 host version stamped at chain-arm time" PASS || check "S18 no host-version stamp" FAIL
+bash "$LOG" --tdd-complete --session "$SID" >/dev/null 2>&1
+
+OUT="$(printf '%s' '{"session_id":"'"$SID"'"}' | ZENSU_HOST_VERSION="1.2.3" bash "$STOP" 2>/dev/null)"
+printf '%s' "$OUT" | grep -q '"decision":"block"' && check "S19 unchanged host: still blocks" PASS || check "S19 unchanged host block" FAIL
+printf '%s' "$OUT" | grep -qF 'host-upgrade warning' && check "S20 unchanged host: no false warning" FAIL || check "S20 unchanged host: no false warning" PASS
+
+ERRF="$TMP/hostdrift.err"
+OUT="$(printf '%s' '{"session_id":"'"$SID"'"}' | ZENSU_HOST_VERSION="9.9.9" bash "$STOP" 2>"$ERRF")"
+printf '%s' "$OUT" | grep -q '"decision":"block"' && check "S21 host drift stays non-fatal (still blocks, no crash)" PASS || check "S21 host drift blocked the hook" FAIL
+printf '%s' "$OUT" | grep -qF 'host-upgrade warning' && check "S22 host drift named in the block reason" PASS || check "S22 drift missing from reason" FAIL
+grep -qF '9.9.9' "$ERRF" 2>/dev/null && check "S23 host drift also warned on stderr" PASS || check "S23 no stderr warning" FAIL
+
+OUT="$(printf '%s' '{"session_id":"'"$SID"'"}' | ZENSU_HOST_VERSION="9.9.9" ZENSU_HOST_VERSION_CHECK=off bash "$STOP" 2>/dev/null)"
+printf '%s' "$OUT" | grep -qF 'host-upgrade warning' && check "S24 ZENSU_HOST_VERSION_CHECK=off silences the check" FAIL || check "S24 ZENSU_HOST_VERSION_CHECK=off silences the check" PASS
+
+bash "$LOG" --chain-done --session "$SID" >/dev/null 2>&1
+printf '%s' '{"session_id":"'"$SID"'"}' | ZENSU_HOST_VERSION="9.9.9" bash "$STOP" >/dev/null 2>&1
+[ -f "$STAMP" ] && check "S25 terminated chain retires its host-version stamp" FAIL || check "S25 terminated chain retires its host-version stamp" PASS
+
 echo "----"
 echo "test-stop-enforcer: $PASS PASS / $FAIL FAIL"
 [ "$FAIL" -eq 0 ]

@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: Run a comprehensive security review for a Zensu feature — classification, analysis, security tests, threat modeling, and review completion. Use before releasing a feature, when a feature handles sensitive data, after major scope changes, when preparing for an audit, or when the user invokes /zensu-security-review.
+description: '[Zensu] Run a comprehensive security review for a Zensu feature — classification, analysis, security tests, threat modeling, and review completion. Use before releasing a feature, when a feature handles sensitive data, after major scope changes, when preparing for an audit, or when the user invokes /zensu-security-review.'
 ---
 
 # /zensu-security-review

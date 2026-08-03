@@ -1,6 +1,6 @@
 ---
 name: reset-review-limit
-description: Reset the auto-fix loop round counter so the post-review-tdd-delegate.sh hook stops emitting the "max N rounds reached" directive, letting the review/fix cycle continue past the autoFixMaxRounds budget within the current task. Use when the convergence directive fired and you want more budget, or when the user invokes /zensu-reset-review-limit. Pure local file removal under the current worktree.
+description: '[Zensu] Reset the auto-fix loop round counter so the post-review-tdd-delegate.sh hook stops emitting the "max N rounds reached" directive, letting the review/fix cycle continue past the autoFixMaxRounds budget within the current task. Use when the convergence directive fired and you want more budget, or when the user invokes /zensu-reset-review-limit. Pure local file removal under the current worktree.'
 ---
 
 # /zensu-reset-review-limit

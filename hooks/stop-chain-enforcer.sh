@@ -19,6 +19,13 @@
 #   ZENSU_CHAIN=off                 -> never block
 #   hooks.chainEnforcer=false       -> disable via ~/.zensu/config.json
 #   stop-block budget exceeded      -> allow stop + stderr warning (anti-deadlock)
+#
+# The anti-deadlock budget is PER CHAIN, not per session. A session can run
+# several TDD chains back to back; if the budget sidecar survived a chain, the
+# next chain in that session started already over cap and its review backstop
+# never fired again. Every non-enforcing Stop (session inactive, implementation
+# not finished yet, chain terminated) therefore retires the sidecar, so each new
+# chain arms with a full budget.
 
 set -u
 
@@ -48,22 +55,51 @@ SESSION_ID="$(read_field session_id)"
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
 SESSION_ID="$(zensu_resolve_session_id "$SESSION_ID")"
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-host-version.sh" 2>/dev/null || true
 STATE_FILE="$(tdd_state_file "$SESSION_ID")"
+BUDGET_FILE="${STATE_FILE}.stopblocks"
+
+# Retire this chain's stop-block budget so the NEXT chain in the same session
+# arms with a full one. Never follows a symlink; failure is ignored (fail-open).
+zensu_rearm_stop_budget() {
+  [ -L "$BUDGET_FILE" ] && return 0
+  rm -f -- "$BUDGET_FILE" 2>/dev/null || true
+  return 0
+}
 
 # Not a main-thread TDD session -> let the agent stop.
-[ "$(tdd_session_active "$STATE_FILE")" = "true" ] || exit 0
+if [ "$(tdd_session_active "$STATE_FILE")" != "true" ]; then
+  zensu_rearm_stop_budget
+  zensu_host_version_clear "$STATE_FILE" 2>/dev/null || true
+  exit 0
+fi
 # Implementation not finished -> do not enforce the review chain yet (allow
 # legit mid-TDD pauses; TDD progression itself is driven by the gate + skill).
-[ "$(tdd_impl_complete "$STATE_FILE")" = "true" ] || exit 0
-# Chain already terminated -> allow stop.
-[ "$(tdd_chain_done "$STATE_FILE")" = "true" ] && exit 0
+# This is also the chain-ARM window: retire the previous chain's budget and
+# record the host version this chain armed on.
+if [ "$(tdd_impl_complete "$STATE_FILE")" != "true" ]; then
+  zensu_rearm_stop_budget
+  zensu_host_version_stamp "$STATE_FILE" 2>/dev/null || true
+  exit 0
+fi
+# Chain already terminated -> allow stop, and retire the chain's budget + stamp.
+if [ "$(tdd_chain_done "$STATE_FILE")" = "true" ]; then
+  zensu_rearm_stop_budget
+  zensu_host_version_clear "$STATE_FILE" 2>/dev/null || true
+  exit 0
+fi
+
+# Host-upgrade validation (non-fatal, fail-open): when the agy binary changed
+# since this chain armed, the running session still uses the OLD runtime and
+# hook dialect. Surface it, never block on it.
+HOST_DRIFT="$(zensu_host_version_drift "$STATE_FILE" 2>/dev/null || true)"
+[ -n "$HOST_DRIFT" ] && echo "$HOST_DRIFT" >&2
 
 # Anti-deadlock budget: cap consecutive Stop-hook blocks so a stalled chain
 # (agent never spawns the reviewer, chainDone never set) cannot loop forever.
 MAX_ROUNDS="$(zensu_autofix_max_rounds)"
 case "$MAX_ROUNDS" in ''|*[!0-9]*) MAX_ROUNDS=5 ;; esac
 CAP=$((MAX_ROUNDS + 3))
-BUDGET_FILE="${STATE_FILE}.stopblocks"
 if [ ! -L "$BUDGET_FILE" ]; then
   printf 'x' >> "$BUDGET_FILE" 2>/dev/null || true
 fi
@@ -98,6 +134,8 @@ if zensu_hook_enabled selfReview && [ "$CODE_REVIEW_DONE" = "true" ]; then
 else
   REASON="STOP intercepted by zensu chain-enforcer. A main-thread TDD session finished implementation (or a fix round) but the zensu-code-reviewer chain has not completed. Your VERY NEXT action MUST be to spawn the zensu-code-reviewer subagent (via the Antigravity /agents subagent dashboard), passing as the prompt a one-paragraph summary of what was implemented/fixed PLUS the list of changed files (use 'git diff --name-only HEAD' to enumerate). Do NOT end your turn, and do NOT fix anything inline first — review the report, fix any Critical/Important findings ${FIX_PHRASE}, then re-run the reviewer until it PASSes or you hit the round cap. Only valid exception: if implementation produced ZERO file changes, run 'bash ${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-log.sh --chain-done' and then stop."
 fi
+
+[ -n "$HOST_DRIFT" ] && REASON="${REASON} NOTE: ${HOST_DRIFT}"
 
 node -e 'process.stdout.write(JSON.stringify({ decision: "block", reason: process.argv[1] }))' "$REASON"
 echo

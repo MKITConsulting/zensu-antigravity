@@ -1,6 +1,6 @@
 ---
 name: self-review
-description: Terminal self-reflection stage of the post-implementation review chain. After the zensu-code-reviewer chain converges (PASS, suggestions-only, or max-rounds), re-read this session's work, take at most ONE fix round if a must-fix surfaces, render the final report, and close the chain via --chain-done. This is the chain's last gate — normally invoked automatically, or via /zensu-self-review. It never re-runs the code-reviewer.
+description: '[Zensu] Terminal self-reflection stage of the post-implementation review chain. After the zensu-code-reviewer chain converges (PASS, suggestions-only, or max-rounds), re-read this session''s work, take at most ONE fix round if a must-fix surfaces, render the final report, and close the chain via --chain-done. This is the chain''s last gate — normally invoked automatically, or via /zensu-self-review. It never re-runs the code-reviewer.'
 ---
 
 # /zensu-self-review

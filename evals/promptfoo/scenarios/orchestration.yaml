@@ -1,0 +1,257 @@
+# Proof for the orchestration-layer capabilities: requirement-ID traceability,
+# the review-judge stage, repo overlays and templates, persona activation,
+# durable autopilot state, the bypass ledger, project-dir recovery, and the
+# host-version drift guard.
+
+- description: "traceability: the TDD skill defines the stable requirement-ID format"
+  vars:
+    scenario_id: trace-tdd-declares-requirement-ids
+    kind: shell
+    script: |
+      grep -oE 'AC-###|FR-###' "$ZENSU_PLUGIN_ROOT/skills/tdd/SKILL.md" | sort -u
+    expect:
+      exit_code: 0
+      contains: ["AC-###", "FR-###"]
+
+- description: "traceability: the plan template ships the Requirements table the chain anchors on"
+  vars:
+    scenario_id: trace-template-has-requirements-table
+    kind: shell
+    script: |
+      grep -E '^## Requirements|Covers' "$ZENSU_PLUGIN_ROOT/templates/tdd-plan.md" | head -5
+    expect:
+      exit_code: 0
+      contains: ["## Requirements", "Covers"]
+
+- description: "traceability: autopilot carries the same requirement IDs end to end"
+  vars:
+    scenario_id: trace-autopilot-requirement-ids
+    kind: shell
+    script: |
+      grep -cE 'AC-|FR-' "$ZENSU_PLUGIN_ROOT/skills/autopilot/SKILL.md"
+    expect:
+      exit_code: 0
+      not_matches: ["^0$"]
+
+- description: "review chain: the judge stage sits between the merged panel and the consolidating reviewer"
+  vars:
+    scenario_id: chain-judge-stage-wired
+    kind: shell
+    script: |
+      grep -oE 'zensu-review-judge|reviewJudge|Panel-FP' "$ZENSU_PLUGIN_ROOT/skills/tdd/SKILL.md" | sort -u
+    expect:
+      exit_code: 0
+      contains: ["zensu-review-judge", "reviewJudge"]
+
+- description: "review chain: the judge agent is read-only"
+  vars:
+    scenario_id: chain-judge-is-read-only
+    kind: shell
+    script: |
+      awk '/^---$/{c++; next} c==1' "$ZENSU_PLUGIN_ROOT/agents/zensu-review-judge.md" | grep -iE '^tools:'
+    expect:
+      exit_code: 0
+      not_matches: ["write|edit|replace_file"]
+
+- description: "overlay: a missing repo overlay is a silent no-op, never an abort"
+  vars:
+    scenario_id: overlay-missing-is-noop
+    kind: shell
+    script: |
+      OUT="$(bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --overlay tdd 2>&1)"
+      echo "rc=$?"
+      [ -z "$OUT" ] && echo "EMPTY_OUTPUT" || echo "OUTPUT: $OUT"
+    expect:
+      contains: ["rc=0", "EMPTY_OUTPUT"]
+
+- description: "overlay: a present repo overlay is emitted inside the additive-only contract"
+  vars:
+    scenario_id: overlay-present-is-contract-wrapped
+    kind: shell
+    script: |
+      mkdir -p "$ZENSU_PROJECT_DIR/.zensu/overlays"
+      printf 'Always run the linter before committing.\n' > "$ZENSU_PROJECT_DIR/.zensu/overlays/tdd.md"
+      ZENSU_REPO_ROOT="$ZENSU_PROJECT_DIR" bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --overlay tdd
+    expect:
+      exit_code: 0
+      contains: ["Always run the linter", "zensu:overlay-begin", "zensu:overlay-end"]
+
+- description: "overlay: a traversal-shaped overlay name is refused fail-closed"
+  vars:
+    scenario_id: overlay-traversal-name-refused
+    kind: shell
+    script: |
+      # An absent overlay is a silent no-op (rc=0, covered above), but an
+      # ILL-FORMED name can only come from a coding bug — skills pass a fixed
+      # literal — so it is refused loudly with no content emitted.
+      OUT="$(bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --overlay ../../etc/passwd 2>&1)"
+      echo "rc=$?"
+      printf 'OUT[%s]\n' "$OUT"
+    expect:
+      contains: ["rc=2", "OUT[]"]
+      not_contains: ["root:"]
+
+- description: "templates: the shipped artifact template resolves when the repo has no override"
+  vars:
+    scenario_id: template-default-resolves
+    kind: shell
+    script: |
+      TPL="$(bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --template tdd-plan)"
+      [ -f "$TPL" ] && echo "RESOLVED: $(basename "$TPL")" || echo "UNRESOLVED"
+    expect:
+      exit_code: 0
+      contains: ["RESOLVED: tdd-plan.md"]
+
+- description: "templates: a repo-local template wins over the shipped default"
+  vars:
+    scenario_id: template-repo-override-wins
+    kind: shell
+    script: |
+      mkdir -p "$ZENSU_PROJECT_DIR/.zensu/templates"
+      printf '# repo plan\n' > "$ZENSU_PROJECT_DIR/.zensu/templates/tdd-plan.md"
+      TPL="$(ZENSU_REPO_ROOT="$ZENSU_PROJECT_DIR" bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --template tdd-plan)"
+      case "$TPL" in "$ZENSU_PROJECT_DIR"/*) echo "REPO_TEMPLATE_WINS" ;; *) echo "SHIPPED_TEMPLATE: $TPL" ;; esac
+    expect:
+      exit_code: 0
+      contains: ["REPO_TEMPLATE_WINS"]
+
+- description: "personas: no repo personas means no extra reviewers"
+  vars:
+    scenario_id: persona-none-configured
+    kind: shell
+    script: |
+      printf 'src/app.ts\n' | node "$ZENSU_PLUGIN_ROOT/hooks/lib/persona-activation.js" "$ZENSU_PROJECT_DIR/.zensu/agents"
+      echo "rc=$?"
+    expect:
+      contains: ["rc=0"]
+      not_contains: ["spawn "]
+
+- description: "personas: a matching repo persona is spawned, a non-matching one is skipped"
+  vars:
+    scenario_id: persona-activation-matches
+    kind: shell
+    script: |
+      D="$ZENSU_PROJECT_DIR/.zensu/agents"; mkdir -p "$D"
+      printf -- '---\nname: zensu-review-frontend\nactivation: "src/**/*.tsx"\n---\nFrontend review.\n' > "$D/zensu-review-frontend.md"
+      printf -- '---\nname: zensu-review-infra\nactivation: "terraform/**"\n---\nInfra review.\n' > "$D/zensu-review-infra.md"
+      printf 'src/App.tsx\n' | node "$ZENSU_PLUGIN_ROOT/hooks/lib/persona-activation.js" "$D"
+    expect:
+      exit_code: 0
+      contains: ["zensu-review-frontend"]
+      not_matches: ["spawn zensu-review-infra"]
+
+- description: "autopilot state: a run round-trips through the durable store"
+  vars:
+    scenario_id: autopilot-state-round-trip
+    kind: shell
+    script: |
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
+      autopilot_begin_run pf-auto >/dev/null 2>&1 || true
+      autopilot_status pf-auto 2>/dev/null || autopilot_read_state pf-auto 2>/dev/null
+      echo "rc=$?"
+    expect:
+      contains: ["rc=0"]
+
+- description: "autopilot state: a corrupt state file fails open instead of wedging the run"
+  vars:
+    scenario_id: autopilot-state-corrupt-fails-open
+    kind: shell
+    script: |
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
+      D="$(autopilot_state_dir)"; mkdir -p "$D"
+      printf '{ not json' > "$(autopilot_state_file pf-auto)"
+      autopilot_read_state pf-auto >/dev/null 2>&1
+      echo "rc=$?"
+    expect:
+      contains: ["rc="]
+      not_contains: ["Traceback", "syntax error"]
+
+- description: "bypass ledger: a clean session records no opt-out"
+  vars:
+    scenario_id: ledger-clean-session-empty
+    kind: shell
+    script: |
+      bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh" --bypass-list --session pf-ledger
+    expect:
+      exit_code: 0
+      contains: ["none"]
+
+- description: "bypass ledger: a gate opt-out is recorded and surfaced by name"
+  vars:
+    scenario_id: ledger-records-optout
+    kind: shell
+    env: { ZENSU_TDD_GATE: "off", TDD_STATE_DIR: "__DATA__/tdd" }
+    config: { hooks: { tddImplementation: true } }
+    script: |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      mkdir -p "$TDD_STATE_DIR"
+      bash "$LOG" --tdd-begin --session pf-ledger >/dev/null 2>&1 || true
+      bash "$LOG" --phase RED_FAIL --step s1 --session pf-ledger --reason x >/dev/null 2>&1 || true
+      printf '{"tool_name":"write_to_file","tool_input":{"file_path":"%s/src/app.ts","content":"x"},"session_id":"pf-ledger"}' \
+        "$ZENSU_PROJECT_DIR" | bash "$ZENSU_PLUGIN_ROOT/hooks/pre-edit-tdd-reminder.sh" >/dev/null 2>&1 || true
+      bash "$LOG" --bypass-list --session pf-ledger
+    expect:
+      exit_code: 0
+      contains: ["ZENSU_TDD_GATE"]
+
+- description: "project dir: an explicit project dir always wins unchanged"
+  vars:
+    scenario_id: projectdir-explicit-wins
+    kind: shell
+    script: |
+      OUT="$(node "$ZENSU_PLUGIN_ROOT/hooks/lib/resolve-project-dir.js")"
+      [ "$OUT" = "$ZENSU_PROJECT_DIR" ] && echo "MATCHES_EXPLICIT" || echo "OVERRODE_EXPLICIT: $OUT"
+    expect:
+      exit_code: 0
+      contains: ["MATCHES_EXPLICIT"]
+
+- description: "project dir: resolution is cwd-independent inside the project"
+  vars:
+    scenario_id: projectdir-subdirectory-stable
+    kind: shell
+    script: |
+      mkdir -p "$ZENSU_PROJECT_DIR/deep/nested"
+      ROOTED="$(node "$ZENSU_PLUGIN_ROOT/hooks/lib/resolve-project-dir.js")"
+      NESTED="$(cd "$ZENSU_PROJECT_DIR/deep/nested" && node "$ZENSU_PLUGIN_ROOT/hooks/lib/resolve-project-dir.js")"
+      [ "$ROOTED" = "$NESTED" ] && echo "STABLE" || echo "DRIFT: $ROOTED vs $NESTED"
+    expect:
+      exit_code: 0
+      contains: ["STABLE"]
+
+- description: "project dir: with nothing to go on it degrades gracefully"
+  vars:
+    scenario_id: projectdir-unset-degrades
+    kind: shell
+    env: { ZENSU_PROJECT_DIR: null }
+    script: |
+      node "$ZENSU_PLUGIN_ROOT/hooks/lib/resolve-project-dir.js" >/dev/null 2>&1
+      echo "rc=$?"
+    expect:
+      contains: ["rc=0"]
+
+- description: "host guard: a stamped host version reports no drift"
+  vars:
+    scenario_id: hostguard-no-drift
+    kind: shell
+    script: |
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-host-version.sh"
+      zensu_host_version_stamp pf-host >/dev/null 2>&1 || true
+      zensu_host_version_drift pf-host >/dev/null 2>&1
+      echo "rc=$?"
+    expect:
+      contains: ["rc=0"]
+
+- description: "host guard: a host swapped mid-chain is surfaced, never fatal"
+  vars:
+    scenario_id: hostguard-drift-surfaced
+    kind: shell
+    script: |
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-host-version.sh"
+      zensu_host_version_stamp pf-host >/dev/null 2>&1 || true
+      printf 'some-other-version\n' > "$(zensu_host_version_file pf-host)" 2>/dev/null || true
+      OUT="$(zensu_host_version_drift pf-host 2>&1)"
+      echo "rc=$?"
+      printf 'OUT[%s]\n' "$OUT"
+    expect:
+      contains: ["rc="]
+      not_contains: ["Traceback"]

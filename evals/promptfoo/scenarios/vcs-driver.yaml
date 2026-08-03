@@ -1,0 +1,85 @@
+- description: "vcs: an HTTPS GitHub remote resolves to the GitHub forge CLI"
+  vars:
+    scenario_id: vcs-github-https-remote
+    kind: shell
+    env: &vcs_env { ZENSU_VCS_TEST: "1", ZENSU_VCS_NO_PROBE: "1" }
+    script: |
+      ZENSU_VCS_REMOTE="https://github.com/acme/widgets.git" \
+        bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-vcs.sh" --detect --repo "$ZENSU_PROJECT_DIR"
+    expect:
+      exit_code: 0
+      contains: ["provider=github", "cliName=gh", "repo=acme/widgets"]
+
+- description: "vcs: an SSH GitHub remote resolves identically"
+  vars:
+    scenario_id: vcs-github-ssh-remote
+    kind: shell
+    env: *vcs_env
+    script: |
+      ZENSU_VCS_REMOTE="git@github.com:acme/widgets.git" \
+        bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-vcs.sh" --detect --repo "$ZENSU_PROJECT_DIR"
+    expect:
+      exit_code: 0
+      contains: ["provider=github", "repo=acme/widgets"]
+
+- description: "vcs: a GitLab remote resolves to the GitLab forge CLI"
+  vars:
+    scenario_id: vcs-gitlab-remote
+    kind: shell
+    env: *vcs_env
+    script: |
+      ZENSU_VCS_REMOTE="https://gitlab.com/group/proj.git" \
+        bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-vcs.sh" --detect --repo "$ZENSU_PROJECT_DIR"
+    expect:
+      exit_code: 0
+      contains: ["provider=gitlab", "cliName=glab"]
+
+- description: "vcs: a self-hosted GitLab host is still recognised as GitLab"
+  vars:
+    scenario_id: vcs-gitlab-self-hosted
+    kind: shell
+    env: *vcs_env
+    script: |
+      ZENSU_VCS_REMOTE="git@gitlab.internal.example.com:team/service.git" \
+      ZENSU_VCS_PROVIDER="gitlab" \
+        bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-vcs.sh" --detect --repo "$ZENSU_PROJECT_DIR"
+    expect:
+      exit_code: 0
+      contains: ["provider=gitlab"]
+
+- description: "vcs: an unknown remote degrades to a neutral result instead of guessing"
+  vars:
+    scenario_id: vcs-unknown-remote-neutral
+    kind: shell
+    env: *vcs_env
+    script: |
+      ZENSU_VCS_REMOTE="https://svn.example.org/repo" \
+        bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-vcs.sh" --detect --repo "$ZENSU_PROJECT_DIR"
+    expect:
+      exit_code: 0
+      contains: ["provider=unknown"]
+
+- description: "vcs: an unknown subcommand is refused rather than silently ignored"
+  vars:
+    scenario_id: vcs-unknown-subcommand-refused
+    kind: shell
+    env: *vcs_env
+    script: |
+      bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-vcs.sh" --not-a-real-op 2>&1
+      echo "rc=$?"
+    expect:
+      contains: ["rc=2"]
+
+- description: "vcs: sourcing the driver has no side effects"
+  vars:
+    scenario_id: vcs-source-is-side-effect-free
+    kind: shell
+    env: *vcs_env
+    script: |
+      before="$(find "$ZENSU_PROJECT_DIR" -type f | sort)"
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-vcs.sh"
+      after="$(find "$ZENSU_PROJECT_DIR" -type f | sort)"
+      [ "$before" = "$after" ] && echo "NO_SIDE_EFFECTS" || echo "SIDE_EFFECTS_DETECTED"
+    expect:
+      exit_code: 0
+      contains: ["NO_SIDE_EFFECTS"]

@@ -1,0 +1,22 @@
+{
+  "name": "zensu-antigravity-evals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Offline evaluation harness for the Zensu Antigravity plugin",
+  "scripts": {
+    "test": "bash tests/run-all.sh",
+    "promptfoo": "bash evals/promptfoo/run-eval.sh",
+    "promptfoo:self-check": "bash evals/promptfoo/run-eval.sh --self-check"
+  },
+  "devDependencies": {
+    "promptfoo": "0.121.20"
+  },
+  "overrides": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@hono/node-server": "^2.0.5",
+    "adm-zip": "^0.6.0",
+    "fast-uri": "^3.1.4",
+    "fast-xml-parser": "^5.10.1",
+    "sharp": "^0.35.0"
+  }
+}

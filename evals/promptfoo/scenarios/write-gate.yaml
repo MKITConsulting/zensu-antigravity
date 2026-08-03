@@ -1,0 +1,154 @@
+- description: "write-gate: read verb passes ungated"
+  vars:
+    scenario_id: write-gate-read-allowed
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args: { CommandLine: "zensu features get f1", Cwd: "__PROJECT__" }
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["allow_tool", "deny_reason"]
+
+- description: "write-gate: telemetry read passes ungated"
+  vars:
+    scenario_id: write-gate-telemetry-allowed
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args: { CommandLine: "zensu pulse summary s1", Cwd: "__PROJECT__" }
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["deny_reason"]
+
+- description: "write-gate: non-zensu command is none of the gate's business"
+  vars:
+    scenario_id: write-gate-foreign-command-allowed
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args: { CommandLine: "git status --short", Cwd: "__PROJECT__" }
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["deny_reason"]
+
+- description: "write-gate: free-standing security classification is denied"
+  vars:
+    scenario_id: write-gate-classify-denied
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args:
+          CommandLine: "zensu security classify f1 --classification confidential"
+          Cwd: "__PROJECT__"
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_json: { allow_tool: false }
+      contains: ["set_security_classification"]
+
+- description: "write-gate: free-standing feature creation is denied"
+  vars:
+    scenario_id: write-gate-create-denied
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args:
+          CommandLine: "zensu features create --product p --component c --title T"
+          Cwd: "__PROJECT__"
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_json: { allow_tool: false }
+
+- description: "write-gate: aliased mutation verb is denied too"
+  vars:
+    scenario_id: write-gate-alias-denied
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args:
+          CommandLine: "zensu sec classify f1 --classification confidential"
+          Cwd: "__PROJECT__"
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_json: { allow_tool: false }
+
+- description: "write-gate: inline gate opt-out is honoured"
+  vars:
+    scenario_id: write-gate-inline-optout
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args:
+          CommandLine: "ZENSU_MCP_GATE=off zensu security classify f1"
+          Cwd: "__PROJECT__"
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["deny_reason"]
+
+- description: "write-gate: a localhost API target is a local sandbox, not production"
+  vars:
+    scenario_id: write-gate-localhost-allowed
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: run_command
+        args:
+          CommandLine: "zensu --api-url http://localhost:8090 security classify f1"
+          Cwd: "__PROJECT__"
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["deny_reason"]
+
+- description: "write-gate: a write tool call is not a shell call and is left alone"
+  vars:
+    scenario_id: write-gate-ignores-write-tool
+    kind: hook
+    hook: pre-bash-zensu-gate.sh
+    env: { ZENSU_AG_HOOK_CONTRACT: superset }
+    payload:
+      toolCall:
+        name: write_to_file
+        args: { TargetFile: "__PROJECT__/notes.md", CodeContent: "zensu features create" }
+      workspacePaths: ["__PROJECT__"]
+      session_id: pf-write-gate
+    expect:
+      exit_code: 0
+      stdout_not_contains: ["deny_reason"]

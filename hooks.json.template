@@ -4,7 +4,8 @@
       {
         "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
         "hooks": [
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-edit-tdd-reminder.sh", "timeout": 30 }
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-edit-tdd-reminder.sh", "timeout": 30 },
+          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-write-secret-scan.sh", "timeout": 30 }
         ]
       }
     ]

@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: Bootstrap a new Zensu product from a vision document through to a fully configured product with features, journeys, security profiles, tiers, and an AGENTS.md. This is the greenfield entry point. Use when starting a new project from a plan/vision doc before any code, or when the user invokes /zensu-bootstrap.
+description: '[Zensu] Bootstrap a new Zensu product from a vision document through to a fully configured product with features, journeys, security profiles, tiers, and an AGENTS.md. This is the greenfield entry point. Use when starting a new project from a plan/vision doc before any code, or when the user invokes /zensu-bootstrap.'
 ---
 
 # /zensu-bootstrap

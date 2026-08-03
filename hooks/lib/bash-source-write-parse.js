@@ -58,6 +58,25 @@ function stripHeredocs(s) {
   return out.join("\n");
 }
 
+// Cheap "does this command write to a file at all?" probe for the secret scan,
+// which cares WHAT lands in a file, not WHICH file. It reuses this parser's
+// heredoc/redirect normalization so both gates agree on what counts as a write
+// channel, but resolves no targets — the answer is the channel names alone.
+function detectChannels(cmd) {
+  const found = new Set();
+  const collapsed = stripHeredocs(cmd)
+    .replace(/>\|/g, ">")
+    .replace(/(\d*)(>>?)&(?=\s*[^\s0-9&|;<>(\-])/g, "$1$2");
+  const REDIR = /(\d*)>>?(?!\s*&\s*[\d-])(?!\s*['"]?\/dev\/(?:null|stdout|stderr|tty)\b)/;
+  const VERB = "(^|\\s|;|\\||&|/)";
+  if (REDIR.test(collapsed)) found.add("redirect");
+  if (new RegExp(VERB + "tee(\\s|$)").test(cmd)) found.add("tee");
+  if (new RegExp(VERB + "sed\\s+(-[A-Za-z]*\\s+)*-i").test(cmd)) found.add("sed -i");
+  if (new RegExp(VERB + "dd\\s+[^\\n]*of=").test(cmd)) found.add("dd of=");
+  if (/(?<!<)<<(?!<)[-~]?\s*['"]?[A-Za-z_]/.test(cmd)) found.add("heredoc");
+  return Array.from(found).join("\n");
+}
+
 // Split into command segments while tracking subshell scope. `(`/`$(` emit an
 // "enter" event and `)` a "leave" event so the caller can save/restore the cwd
 // across a subshell — a `cd` inside `( … )` must not leak to later commands.
@@ -278,4 +297,8 @@ function main() {
   return "";
 }
 
-process.stdout.write(main());
+if (require.main === module) {
+  process.stdout.write(main());
+} else {
+  module.exports = { detectChannels, stripHeredocs };
+}

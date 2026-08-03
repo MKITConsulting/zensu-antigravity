@@ -1,6 +1,6 @@
 ---
 name: plan-review
-description: Multi-agent pre-implementation plan revalidator. Takes an implementation/design plan, casts a tailored reviewer team, runs the reviewers in parallel as read-only validators, consolidates their findings, and returns a single revalidation report with a verdict + concrete plan amendments — all before any code is written. Use when the user wants a plan double-checked by an agent team, "validate the plan", "multi-agent plan review", or the slash command /zensu-plan-review.
+description: '[Zensu] Multi-agent pre-implementation plan revalidator. Takes an implementation/design plan, casts a tailored reviewer team, runs the reviewers in parallel as read-only validators, consolidates their findings, and returns a single revalidation report with a verdict + concrete plan amendments — all before any code is written. Use when the user wants a plan double-checked by an agent team, "validate the plan", "multi-agent plan review", or the slash command /zensu-plan-review.'
 ---
 
 # /zensu-plan-review

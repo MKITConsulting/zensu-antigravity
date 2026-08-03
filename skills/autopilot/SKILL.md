@@ -1,7 +1,7 @@
 ---
 name: autopilot
 description: >
-  Take a feature from a plain-language idea to a ready, validated GitHub pull
+  [Zensu] Take a feature from a plain-language idea to a ready, validated GitHub pull
   request — autonomously. One interactive planning gate (spec + acceptance
   criteria), then a fully unattended build: implement via the Zensu workflow
   (vanilla `/zensu-tdd` + review chain), open the PR, run `/zensu-pr-team-review`
@@ -86,15 +86,22 @@ Phase 0. A wrong guess surfaces here, not mid-loop. Silent to the user if it wor
 fails, that becomes one of the plain questions in 0.D. Pick the validation **driver** from
 the detected app type — see `rules/drivers.md`.
 
-**0.C — Plan.** Turn the feature into:
+**0.C — Plan.** Shape the plan on the resolved spec template —
+`TPL="$(bash {PLUGIN_ROOT}/hooks/lib/zensu-overlay.sh --template autopilot-spec)"`, read `$TPL`,
+fill every `{curly}` placeholder (a repo override at `<repo>/.zensu/templates/autopilot-spec.md`
+wins over the shipped default). Turn the feature into:
 1. A short **spec** — what it does, who it's for, who it's NOT for, success, out-of-scope.
    Read the relevant domain docs first if the feature touches an existing area.
-2. **Acceptance criteria** — a NUMBERED list, each one machine-checkable: verifiable by a
-   test, a gate assertion, or a concrete observation through the validation driver. No
-   vague ACs. For any UI, pin the visual/UX criteria explicitly (copy, states, empty/error,
-   responsive); if "how it should look" can't be pinned in text, ask for a mockup or
-   reference screenshot **now**. The ACs are the contract Phase 1 validates against —
-   anything not in an AC will not be checked.
+2. **Acceptance criteria** — a NUMBERED list with **stable `AC-###` IDs** (AC-001, AC-002, …),
+   each one machine-checkable: verifiable by a test, a gate assertion, or a concrete
+   observation through the validation driver. No vague ACs. **ID allocation is stable and
+   never recycled**: IDs are assigned monotonically; a dropped criterion keeps its ID and is
+   marked deprecated — never delete or renumber, so every artifact (the TDD plan's
+   `## Requirements` table, the PR body, the validation evidence) can reference the same ID
+   for the run's whole life. For any UI, pin the visual/UX criteria explicitly (copy, states,
+   empty/error, responsive); if "how it should look" can't be pinned in text, ask for a
+   mockup or reference screenshot **now**. The ACs are the contract Phase 1 validates against
+   — anything not in an AC will not be checked.
 3. **Every open question batched** — defaults, edge cases, scope cuts, data shape — asked
    in this phase. This is the only chance.
 
@@ -104,39 +111,108 @@ for the user's approval before proceeding. If the probe wrote or would write
 `.zensu/autopilot.yaml`, propose committing it (secret-free, shared) — but **never commit
 without the user's explicit OK**.
 
+**0.E — Create the durable run.** Immediately after approval, before any build step, create
+the run's durable state (see ## Durable run state) and record the approved AC IDs:
+
+```
+RUN_ID="$(bash {PLUGIN_ROOT}/hooks/lib/zensu-autopilot-state.sh begin --feature "<slug>" --base "<base>")"
+bash {PLUGIN_ROOT}/hooks/lib/zensu-autopilot-state.sh requirements --ids "AC-001,AC-002,..."
+```
+
+Report the `RUN_ID` in the Phase 2 summary. If either command fails, note it and continue —
+the run is then session-scoped and cannot resume after an interruption, which is a
+degradation, not a blocker.
+
 ### Phase 1 — Build  (autonomous, ZERO questions) — strictly ordered
 
-Run these in order. Implement **via the Zensu workflow** throughout.
+Run these in order. Implement **via the Zensu workflow** throughout. Persist the matching
+stage (see ## Durable run state) as each step begins, so an interrupted run resumes here
+instead of restarting.
 
-1. **Implement** — invoke `/zensu-tdd` (vanilla mode) with the spec + ACs as the feature
-   specification. Let the built-in 5-perspective review chain (conventions, bugs,
-   architecture, tests, security) run and address what it raises. Stay in the worktree.
-2. **Gates green** — run every command in the resolved `gates:` recipe; all must pass
-   before the PR opens (e.g. type-check, lint, unit tests, per-file coverage floor).
+1. **Implement** — persist stage `IMPLEMENTING`, then invoke `/zensu-tdd` (vanilla mode)
+   with the spec + ACs as the feature specification. **Hand the ACs over WITH their
+   `AC-###` IDs** — the TDD skill adopts incoming IDs verbatim into its plan's
+   `## Requirements` table and never re-allocates them, so each plan step's `Covers` cell
+   ties back to the AC the user approved. Let the built-in 5-perspective review chain
+   (conventions, bugs, architecture, tests, security) run and address what it raises. Stay
+   in the worktree.
+2. **Gates green** — persist stage `GATES`, then run every command in the resolved `gates:`
+   recipe; all must pass before the PR opens (e.g. type-check, lint, unit tests, per-file
+   coverage floor).
 3. **Open the PR** — commit (Conventional Commits, no watermark), push, open the PR
-   against `--base` (English title + body). The body carries a per-AC table (status filled
-   in after step 6).
-4. **Team review — ONCE** — run `/zensu-pr-team-review` on the PR. This is the single deep
-   multi-persona pass. It runs **exactly once** and does **not** re-run in the loop.
-5. **Fix the findings** — run `/zensu-pr-fix-findings` and loop it until every review
-   thread from step 4 is resolved. Re-run the step-2 gates, then push so the PR reflects
-   the fixes.
-6. **Validate ↔ fix LOOP** — only now exercise the running feature:
+   against `--base` (English title + body). Render the body from the resolved template —
+   `TPL="$(bash {PLUGIN_ROOT}/hooks/lib/zensu-overlay.sh --template autopilot-pr-body)"`, read
+   `$TPL`, fill its placeholders (a repo override at `<repo>/.zensu/templates/autopilot-pr-body.md`
+   wins). It carries a per-AC table **keyed by the stable `AC-###` IDs** — one row per AC,
+   evidence per active AC (deprecated rows stay listed with status `deprecated` and no
+   evidence; status filled in after step 6).
+   Immediately persist stage `PR_OPEN` and the PR URL
+   (`... artifact --key prUrl --value "<url>"`) — that record is what stops a resumed run
+   from opening a second PR.
+4. **Team review — ONCE** — persist stage `TEAM_REVIEW`, then run `/zensu-pr-team-review` on
+   the PR. This is the single deep multi-persona pass. It runs **exactly once** and does
+   **not** re-run in the loop. A resumed run that already reads stage `TEAM_REVIEW` or later
+   MUST NOT run it again.
+5. **Fix the findings** — persist stage `FIX_FINDINGS`, then run `/zensu-pr-fix-findings`
+   and loop it until every review thread from step 4 is resolved. Re-run the step-2 gates,
+   then push so the PR reflects the fixes.
+6. **Validate ↔ fix LOOP** — persist stage `VALIDATE`, then exercise the running feature:
    a. Run the resolved validation **driver** (see `rules/drivers.md`), authenticating via
       the credential-blind login script if one is configured (see `rules/auth.md`). Assert
-      **every numbered AC** and capture evidence per AC.
-   b. Every AC passes + gates green → **exit the loop**.
-   c. Anything off → fix it through `/zensu-tdd` (vanilla, scoped to the failing AC(s)),
-      re-run the step-2 gates, push to update the PR, then go back to (a).
-   d. Repeat (a)–(c) until all ACs pass. `/zensu-pr-team-review` does **not** re-run here.
+      **every non-deprecated AC by its `AC-###` ID** and capture evidence per AC under that
+      ID (deprecated ACs are exempt — their rows stay in the table per the never-recycle
+      rule).
+   b. Every non-deprecated AC passes + gates green → **exit the loop**.
+   c. Anything off → fix it through `/zensu-tdd` (vanilla, scoped to the failing AC(s) and
+      naming their IDs), re-run the step-2 gates, push to update the PR, then go back to (a).
+   d. Repeat (a)–(c) until all non-deprecated ACs pass. `/zensu-pr-team-review` does **not**
+      re-run here.
 
 ### Phase 2 — Deliver
 
-Stop at a **ready, pushed PR** whose body contains a per-AC pass/fail table with the
-evidence. Then:
+Stop at a **ready, pushed PR** whose body contains a per-AC pass/fail table keyed by the
+stable `AC-###` IDs — one evidence entry per active ID, deprecated rows listed with status
+`deprecated`. Persist stage `DONE` once the PR is pushed and its body is current. Then:
 - **Do NOT merge, push a release, or deploy.** The final merge is the human's.
 - Report: the PR link, the per-AC table, what looped and why, and anything decided
   autonomously that the user may want to revisit.
+
+## Durable run state
+
+An autopilot run outlives a single session: a context compaction, a crash, or a closed IDE
+can land in the middle of Phase 1. Without a durable record the run restarts from zero and
+repeats work that is expensive or near-irreversible — a **second** PR, a **second** team
+review. So the run keeps one project-local JSON document, written by
+`hooks/lib/zensu-autopilot-state.sh`:
+
+| Command (prefix `bash {PLUGIN_ROOT}/hooks/lib/zensu-autopilot-state.sh`) | Effect |
+|---|---|
+| `begin --feature "<slug>" [--base <branch>]` | Create the run, echo its `RUN_ID`. An existing valid run is resumed, never clobbered. |
+| `requirements --ids "AC-001,AC-002"` | Record the approved stable requirement IDs (additive, never renumbered). |
+| `event --stage <STAGE> [--note "<why>"]` | Advance the run and append to its event trail. |
+| `artifact --key <branch\|prUrl\|planPath> --value "<v>"` | Persist a produced artifact. |
+| `status` | One tab-separated line: `runId  stage  ownerSessionId  feature  prUrl`. |
+| `show` | The full state document. |
+| `clear` | Retire the run. |
+
+Stages, in order: `PLANNING` → `IMPLEMENTING` → `GATES` → `PR_OPEN` → `TEAM_REVIEW` →
+`FIX_FINDINGS` → `VALIDATE` → `DONE`, plus the terminal side exits `BLOCKED` and
+`CANCELLED`. The document lives beside the session's TDD chain state (`.zensu/state/`), is
+written under a lock through an atomic rename, and is safe against concurrent writers.
+
+**Resume protocol.** Before Phase 0.A, run `status`. A line came back → a run is already in
+flight: report its stage and PR URL, skip every phase step at or before that stage
+(**never** re-open the PR recorded in `prUrl`, **never** re-run the team review once the
+stage is `TEAM_REVIEW` or later), and continue from the next one. No line → this is a fresh
+run; proceed with Phase 0 normally.
+
+**Fail open — always.** The durable state is an accelerator, never a gate. Every command
+failing, an unreadable document, or a corrupt one (quarantined automatically, never
+silently overwritten) means "no durable run": say so once and drive the run from the
+conversation exactly as before. Never halt an approved build because its bookkeeping file
+could not be written, and never treat a stage record as permission to skip a step whose
+artifact you cannot actually see (e.g. stage says `PR_OPEN` but the PR URL is gone → verify
+with the forge before assuming).
 
 ## The two seams
 
@@ -211,3 +287,10 @@ The worst case is still a reviewed, gated PR. The skill never produces nothing.
   `apply` only to a disposable environment (see `rules/drivers.md`).
 - **Review runs once.** `/zensu-pr-team-review` is the single mid-point pass; the tail loop
   is `/zensu-pr-fix-findings` + validate, never another team review.
+- **Stable requirement IDs.** ACs get `AC-###` IDs at planning time, allocated monotonically
+  and NEVER recycled or renumbered; a dropped AC keeps its ID marked `deprecated`. The same
+  IDs flow into the TDD plan's `## Requirements` table, the review baseline, the PR body's
+  per-AC table, and the validation evidence.
+- **Durable before irreversible.** Persist the stage BEFORE the step that produces an
+  external artifact (PR, published review), and the artifact immediately after — that
+  ordering is what makes a resumed run idempotent.

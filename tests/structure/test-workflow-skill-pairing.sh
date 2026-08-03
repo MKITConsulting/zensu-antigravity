@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Workflow <-> skill pairing completeness (D4). Every user-facing `/zensu-<name>`
 # is a thin `workflows/zensu-<name>.md` shim that loads `skills/<bare-verb>/
-# SKILL.md`. This pins the bijection: 13 skills, 13 workflows, no orphans on
-# either side, and every workflow body references its skill. Also pins that
+# SKILL.md`. This pins the bijection: one skill and one workflow per canonical
+# verb, no orphans on either side, and every workflow body references its skill.
+# The expected counts are DERIVED from the verb roster below rather than
+# hardcoded, so adding a verb cannot leave a stale literal behind. Also pins that
 # plugin.json lists both arrays consistently, and no `/zensu:` colon-form
 # leaks into a workflow body.
 set -u
@@ -12,10 +14,11 @@ PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); printf '  ok   %s\n' "$*"; }
 bad() { FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$*"; }
 
-# The 13 canonical verbs (C1). Workflow stem = zensu-<verb> EXCEPT zensu-help,
+# The canonical verbs (C1). Workflow stem = zensu-<verb> EXCEPT zensu-help,
 # whose skill dir is `zensu-help` and workflow is `zensu-help.md` (the stem keeps
 # the zensu- prefix because the command is /zensu-help, not /zensu-zensu-help).
-VERBS="autopilot bootstrap ghost-scan implement plan-review pr-fix-findings pr-team-review pulse reset-review-limit self-review security-review tdd zensu-help"
+VERBS="autopilot bootstrap converge cover docs doctor ghost-scan implement pilot plan-review pr-fix-findings pr-team-review pulse reset-review-limit security-review self-review setup tdd verify-feature wargame zensu-help"
+EXPECTED_COUNT="$(printf '%s\n' $VERBS | wc -w | tr -d ' ')"
 
 # skill dir for a verb
 skill_dir() { printf '%s' "$1"; }
@@ -24,8 +27,8 @@ wf_stem() { case "$1" in zensu-help) printf 'zensu-help' ;; *) printf 'zensu-%s'
 
 SKILL_COUNT="$(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
 WF_COUNT="$(find "$ROOT/workflows" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
-[ "$SKILL_COUNT" = "13" ] && ok "skills/ has 13 skill dirs" || bad "skills/ has $SKILL_COUNT dirs (expected 13)"
-[ "$WF_COUNT" = "13" ] && ok "workflows/ has 13 workflow files" || bad "workflows/ has $WF_COUNT files (expected 13)"
+[ "$SKILL_COUNT" = "$EXPECTED_COUNT" ] && ok "skills/ has $EXPECTED_COUNT skill dirs" || bad "skills/ has $SKILL_COUNT dirs (expected $EXPECTED_COUNT)"
+[ "$WF_COUNT" = "$EXPECTED_COUNT" ] && ok "workflows/ has $EXPECTED_COUNT workflow files" || bad "workflows/ has $WF_COUNT files (expected $EXPECTED_COUNT)"
 
 # Each verb has BOTH a skill and a workflow, and the workflow references the skill.
 for v in $VERBS; do

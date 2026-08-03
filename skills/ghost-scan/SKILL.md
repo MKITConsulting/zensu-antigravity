@@ -1,6 +1,6 @@
 ---
 name: ghost-scan
-description: Scan an existing repository to discover undocumented features, then review and import them into Zensu as tracked features with linked tests, docs, and source files. This is the brownfield entry point. Use when importing an existing codebase into Zensu, discovering undocumented features, or when the user invokes /zensu-ghost-scan.
+description: '[Zensu] Scan an existing repository to discover undocumented features, then review and import them into Zensu as tracked features with linked tests, docs, and source files. This is the brownfield entry point. Use when importing an existing codebase into Zensu, discovering undocumented features, or when the user invokes /zensu-ghost-scan.'
 ---
 
 # /zensu-ghost-scan
@@ -31,6 +31,8 @@ Every command accepts `--json` for machine-readable output; run `zensu <noun> <v
 ## Workflow
 
 Execute these phases in order. Present results to the user after each phase and wait for confirmation before proceeding.
+
+**Multi-component products.** A product whose code lives in several repos/components is scanned one component at a time. Establish up front whether this is one component of a larger product and which components remain — Phase 5 has a scope gate that defers journey creation until the whole feature set exists, and Phase 5b is the single cross-component journey pass that runs after the last component.
 
 **Workflow gate (first + last action).** As the VERY FIRST action, run `bash "$(cat "$HOME/.zensu/plugin-root")/hooks/lib/zensu-log.sh" --workflow-begin --tools "ghost_scan,ghost_apply,ghost_batch_review,create_feature,add_subfeature,create_user_journey,create_journey_step,split_feature,link_test,generate_claude_md"`. This marks the Zensu product workflow active so the CLI write-gate (`hooks.mcpGate`, default-on) recognizes this skill's `zensu ghost apply` / `zensu features create` commands as workflow-driven rather than freelance and does not block them. As the VERY LAST action (after the final phase, or on early exit), run `bash "$(cat "$HOME/.zensu/plugin-root")/hooks/lib/zensu-log.sh" --workflow-end`.
 
@@ -246,6 +248,10 @@ User journeys are a release gate (journey health), yet a brownfield import never
 them — close that gap here, **after `zensu ghost apply`**, when features have real ZEN IDs.
 This mirrors `/zensu-bootstrap` Step 2.
 
+**Scope gate — single- vs multi-component product (decide FIRST).**
+- **Single-component product**, or you just scanned the **last remaining** component of a multi-component one: run this per-component Phase 5 now — the whole feature set exists, so journeys can span it.
+- **One component of a multi-component product with others still unscanned:** do NOT create journeys here. A per-component pass only saw THIS repo, so it can only build component-local journeys — but the highest-value journeys are **cross-component** (e.g. landing page → frontend register → backend auth → wiki hand-off), and their downstream features do not exist yet. Instead: keep the Phase 2b draft journeys as raw material (tell the user where you saved them), tell the user that journey creation is deferred, and run **Phase 5b** once every component is scanned. Journey health is not required by the default release gate, so deferring blocks nothing.
+
 1. Run `zensu features list --product <product-id> --compact` and build a
    slug → ZEN-ID map from the just-applied features.
 2. Take the draft journeys consolidated in Phase 2b. Resolve each draft step's
@@ -270,11 +276,30 @@ This mirrors `/zensu-bootstrap` Step 2.
 > simply have no baseline; harmless. Features fan out later into deeper revisions
 > and subfeatures.
 
+### Phase 5b: Cross-Component Deep Journey Pass (multi-component products)
+
+Run this ONCE, after **every** component of a multi-component product has been scanned + applied (so all features exist). It replaces the per-component Phase 5 for such products. Rationale: a single metadata pass over feature titles yields plausible-but-unverified journeys; real cross-component journeys must be **traced through the actual code and the existing end-to-end specs**, then cross-checked adversarially. Structure it as a fan-out → debate → synthesize workflow — the same read-only lens mechanism Phase 2b uses (Antigravity's subagent mechanism, see `/agents`; if first-class parallel read-only subagents are unavailable in your build, run the lenses as sequential read-only passes yourself and consolidate identically).
+
+**A — Explore (parallel read-only lenses).** Each lens reads the whole repo set + the full feature catalog and proposes 2-5 candidate journeys. **Every step must be grounded in a REAL catalogued feature slug plus a concrete code/test evidence string** (a route/handler, a CLI verb, a UI nav target, an event/webhook, or a test that exercises the transition). Core lenses:
+- **entry-points** — routes/controllers, CLI verbs, UI nav, webhooks → where journeys start + the real step-to-step transitions.
+- **test-derived** (highest signal) — read the existing end-to-end specs + flow tests; they already encode real, team-validated user journeys. Reconstruct each onto catalogued slugs, citing the spec + test name.
+- **data-flow** — trace writer→reader across components (e.g. agent heartbeat POST → backend ingest → frontend dashboard) for genuine sequential dependencies.
+- **cross-component-bridge** — session hand-off, deep links, shared auth/redirects → the seams that let a journey cross a component boundary.
+- **persona lenses** — one per persona (new-user/admin, developer/API consumer, security-engineer/SRE) → that persona's end-to-end path.
+
+**B — Consolidate + adversarially verify.** Merge/dedupe the candidates into a master list (collapse overlapping step-sets, keep distinct personas). Then, per master journey, spawn a **skeptic** that tries to REFUTE each step transition against the code: it must find evidence that in the running product an actor genuinely moves from step k to step k+1 (a nav link, a returned id consumed by the next call, an event, a test doing exactly this). **Trim unevidenced steps, or split the journey, rather than fabricate a link.** A completeness critic names the personas/paths/components left uncovered.
+
+**C — Synthesize + create.** Emit the final evidenced journeys — carry each step's code/test citation into the step `--description` so the evidence lives in Zensu. Present the table for user approval, then create via the Phase 5 step-5 mechanic (`journeys create` / `journeys step <id> --feature <UUID>` / `journeys health`). **Real catalogued slugs ONLY** — never invent one; if a wanted step has no catalogued feature, record it as a gap.
+
+Discipline: ground every step in code, prefer at least 2 components per journey, and honestly leave a component uncovered (with a stated reason) rather than forcing an invented cross-component step. Journey-health scores reflect the underlying features' readiness (docs + security), not the wiring.
+
 ### Phase 6: Summary & Next Steps
 
 1. List created features via `zensu features list --product <product-id> --compact`.
 2. Report counts: features created/enriched, tests linked, docs linked, journeys
-   created, and journey-health weak links from Phase 5.
+   created, and journey-health weak links from Phase 5 / 5b. When Phase 5 was
+   deferred by the multi-component scope gate, say so explicitly and name the
+   components still to scan before Phase 5b can run.
 3. **Doc-gap report.** List the created/enriched features with zero docs (empty
    `detectedDocFiles`). Recommend `/zensu-implement` to author code-grounded docs
    for them — ghost-scan links existing docs but never generates new ones
@@ -295,16 +320,16 @@ This mirrors `/zensu-bootstrap` Step 2.
 | Command | Phase | Purpose |
 |---------|-------|---------|
 | `zensu products list` | 1 | Validate product |
-| `zensu features list` | 1, 5, 6 | Load existing features (dedup); resolve slug → ZEN-ID after apply |
-| `zensu journeys list` | 1, 5 | Load existing journeys (dedup) |
-| read-only subagent lenses (Antigravity `/agents`) | 2b | Parallel read-only analysis lenses (fan-out) |
+| `zensu features list` | 1, 5, 5b, 6 | Load existing features (dedup); resolve slug → ZEN-ID after apply; the full cross-component catalog for the deep journey pass |
+| `zensu journeys list` | 1, 5, 5b | Load existing journeys (dedup) |
+| read-only subagent lenses (Antigravity `/agents`) | 2b, 5b | Parallel read-only analysis lenses (fan-out); the deep journey lenses + skeptic/completeness critics |
 | `zensu ghost scan` | 3 | Create scan with candidates |
 | `zensu ghost candidates` | 1 (resume), 4 | Load candidates |
 | `zensu ghost batch` | 4 | Batch approve/reject candidates in one call |
 | `zensu ghost apply` | 4 | Apply approved candidates (use `--enrich-existing` if product has features) |
 | `zensu journeys suggest` | 5 | Product context for journey suggestions |
-| `zensu journeys create` | 5 | Create a discovered journey |
-| `zensu journeys step` | 5 | Add ordered steps linking real feature IDs |
-| `zensu journeys health` | 5 | Report weak links on created journeys |
+| `zensu journeys create` | 5, 5b | Create a discovered journey |
+| `zensu journeys step` | 5, 5b | Add ordered steps linking real feature IDs (5b carries the code/test evidence into `--description`) |
+| `zensu journeys health` | 5, 5b | Report weak links on created journeys |
 | `zensu features create` | 6 | Hybrid: create planned-but-unbuilt features from a forward plan doc |
 | `zensu doc claude-md` | 6 | Update AGENTS.md (optional) |
