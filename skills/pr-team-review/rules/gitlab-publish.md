@@ -2,14 +2,12 @@
 
 How the driver publishes one consolidated review on a **GitLab merge request**. GitLab has
 no atomic review object (unlike GitHub's `pulls/:n/reviews`), so `bash "$VCS" --post-review`
-degrades the single review into a **loop**: one summary note + N inline discussions. The
-driver owns the loop — the skill never calls `glab api` directly.
+degrades the single review into a **loop** (spec §7): one summary note + N inline
+discussions. The driver owns the loop — the skill never calls `glab api` directly.
 
 ## What the driver does
 
-```bash
-bash "$VCS" --post-review --provider gitlab --repo-id <ns%2Fproj> --diff-refs-json <json> <iid> <payload.json>
-```
+`bash "$VCS" --post-review --provider gitlab --repo-id <ns%2Fproj> --diff-refs-json <json> <iid> <payload.json>`
 
 consumes the **same** `_synthesis.json` payload the GitHub path uses
 (`{commit_id, event, body, comments:[{path,line,side,body}]}`) and emits, in order:
@@ -25,17 +23,14 @@ consumes the **same** `_synthesis.json` payload the GitHub path uses
      `position[old_path]` + `position[old_line]`.
 
 Each POST is one compact JSON object streamed to `glab api --input -`; review bodies and
-positions are never command-line arguments, so a large payload cannot hit the platform
-`ARG_MAX` limit during a partial retry.
+positions are never command-line arguments, so valid multi-megabyte payloads cannot hit
+the platform `ARG_MAX` limit during a partial retry.
 
-## Anchor validation still applies
-
-Run the pre-publish anchor validation from `github-publish.md` § Pre-Publish Anchor
-Validation **before** handing the payload to the driver. `hooks/lib/valid-diff-lines.js` is
-forge-agnostic — it parses the unified diff `$WORKDIR/_pr.diff` captured from the detached
-worktree, so the same `valid` / `remap <n>` / `none` verdicts apply. A `none` finding is
-folded into the overall body under **Findings without a diff anchor**; the driver
-additionally folds any remaining line-less comment into a positionless thread (below).
+For delegated Autopilot reconciliation, that payload coordinate is only the lookup key. The
+driver resolves it against the fully paginated MR diff before rendering the GitLab position:
+added/deleted lines carry the exact old/new path pair and their available line, while an
+unchanged context line carries **both** `old_line` and `new_line`. Renames therefore use the
+actual `old_path` and `new_path`, not one duplicated payload path.
 
 ## Diff refs (required for inline positions)
 
@@ -44,7 +39,7 @@ GitLab inline discussions need the MR's diff SHAs. Fetch them first and pass the
 ```bash
 # Run from $REPO so glab resolves the correct host (self-hosted included) from its remote.
 DR="$(cd "$REPO" && bash "$VCS" --diff-refs --provider gitlab --repo-id "$REPOID" <iid>)"
-# -> {"base_sha":"…","start_sha":"…","head_sha":"…"}  (from the MR's diff_refs)
+# → {"base_sha":"…","start_sha":"…","head_sha":"…"}  (from the MR's diff_refs)
 (cd "$REPO" && bash "$VCS" --post-review --provider gitlab --repo-id "$REPOID" --diff-refs-json "$DR" <iid> "$WORKDIR/_synthesis.json")
 ```
 
@@ -63,53 +58,94 @@ review. The driver avoids that two ways:
 - **Fail loud before posting.** If any comment *does* need an inline position but the MR's
   `base_sha`/`head_sha` came back empty, `--post-review` returns non-zero **before** posting
   the summary note — nothing is published, so the run is cleanly retryable (no partial post).
+- **Delegated anchor preflight.** Before its first missing-part write, `--reconcile-review`
+  fetches every page of `merge_requests/:iid/diffs` and builds the complete render plan. A
+  non-zero, malformed, truncated, structurally incomplete, or numerically overflowing diff
+  read fails before any write. A valid diff whose individual anchor is missing, ambiguous,
+  collapsed, too large, or not safely parseable degrades that finding deterministically to a
+  positionless discussion.
 
-A newly opened MR can briefly expose empty `diff_refs`. If that happens, wait and re-run
-rather than publishing a positionless-only review.
+## Idempotency and delegated reconciliation
 
-## Idempotency via markers
-
-Every posted part carries a unique marker comment so a re-run after a partial failure can
-skip what is already there instead of duplicating it:
+Standalone `--post-review` retains its existing summary-plus-discussions behavior. An
+Autopilot delegation instead uses `--reconcile-review` with the durable operation key and
+expected head. For `N = 1 + comments.length`, every part carries a unique full marker:
 
 ```text
-<!-- zensu-review:v1:<operationDigest>:<payloadDigest>:<headSha>:<N>:part=<i>/<N> -->
+<!-- zensu-review:v1:<sha256(operationKey)>:<payloadDigest>:<headSha>:<N>:part=<i>/<N> -->
 ```
 
-For `N = 1 + comments.length`, part 1 is the summary note and parts 2..N are the ordered
-inline/positionless discussions. Before writing, the driver fetches **all** paginated MR
-notes and discussions; if every expected marker is present exactly once it posts nothing,
-and if a strict subset is present it posts only the missing parts. Fail closed on a
-duplicate marker, a malformed marker, the same operation digest bound to a different
-payload/head/part count, an unexpected part index, incomplete pagination, or an MR that is
-not OPEN at the expected head.
+Part 1 is the summary note; parts 2..N are the ordered inline/positionless discussions.
+Before any write, the driver fetches **all** paginated MR notes and discussions. If every
+expected marker is present exactly once, return `present` with `postedCount=0`. If none are
+present, post the ordered parts and return `posted`. If a strict subset is present, post
+only the missing parts and return `reconciled`, so a crash-retry completes without
+duplicates.
+
+New GitLab MRs may expose empty `diff_refs` briefly. Delegated reconcile therefore owns a
+bounded readiness loop, rechecking `OPEN` and the bound head on every attempt, and writes no
+summary/discussion until complete base/start/head refs are available. It then resolves every
+payload coordinate against the current fully paginated MR diff before posting any missing
+part, so context lines and renamed files use the exact GitLab position tuple.
+
+Fail closed before posting on a duplicate marker, malformed v1 marker, the same operation
+digest bound to a different payload/head/part count, an unexpected part index, incomplete
+pagination, or an MR that is not OPEN at the expected head. Re-read all pages after writes
+and require the complete exact marker set. The structured result has exactly
+`{status,marker,headSha,partCount,postedCount,url,provider}` with `provider=gitlab`; `marker` is always the part-1 marker,
+which lets Autopilot validate and persist one durable publication receipt.
+Autopilot serializes one operation through its durable owner; the protocol supports
+sequential crash/retry repair, not simultaneous independent writers that bypass that owner.
 
 ## Verdict / approval — never automatic
 
 The verdict (`COMMENT` / `REQUEST_CHANGES` / `APPROVE`) is carried in the **summary note
 text only**. The driver **never** calls `glab mr approve` or `glab mr merge` — approving a
-merge request is a human action, matching the plugin's never-auto-merge stance.
-`--verdict=APPROVE` still just annotates the note; it does not approve the MR.
+merge request is a human action (spec §9 decision 3, matching the plugin's never-auto-merge
+stance). `--verdict=APPROVE` still just annotates the note; it does not approve the MR.
 
 ## `id` / `iid` / project-id notes
 
-- GitLab addresses an MR by its **`iid`** (the per-project number in the URL), not the global
+- GitLab addresses an MR by its **`iid`** (per-project number in the URL), not the global
   `id`. The pr-url's `.../-/merge_requests/<n>` number is the `iid`.
 - The project id is the **URL-encoded** `namespace/project` (`grp%2Fproj`), exactly as
   `bash "$VCS" --detect` emits in its `repo=` line — pass it verbatim as `--repo-id`.
 
-## No markdown tables (one carve-out)
+## No markdown tables
 
-Same hard rule as the GitHub path: no markdown tables in the summary body or inline
-discussions — GitLab's diff view squeezes them unreadably. Use numbered subsections + bullet
-lists with bold prefixes. The single exception is the parent skill's `### Test Coverage`
-counts table (four short all-numeric columns), and it is **body-only** — inline discussions
-never contain a table.
+Same hard rule as the GitHub path, with the same single carve-out: the four-column
+`### Test Coverage` counts table in the summary body. No other table in the summary body and
+none in the inline discussions — GitLab's diff view squeezes them unreadably. Use bold
+`F<n>` lead-ins and bullet lists instead.
 
-## Known limits
+## Alerts, suggestions, and links
+
+The summary note and the discussions use the same Markdown as the GitHub path
+(`references/publish.md`). Four details differ on GitLab:
+
+- **Alerts.** GitLab renders the lower-case `> [!caution]` family from version 17.10 on. An
+  older self-managed instance shows a plain quote whose first line reads `[!caution]`; the
+  verdict sentence below it stays readable. The driver still puts `_Verdict: <EVENT>_` above
+  the body, so the submitted event is visible either way.
+- **Suggestions.** Spell the fence info string `suggestion:-0+0`. The offsets count lines
+  relative to the commented line, and the driver posts every inline discussion at one line,
+  so emit single-line suggestions only — never a multi-line one on GitLab. The conditions in
+  `rules/github-publish.md` § Suggested changes apply unchanged. GitLab applies a suggestion
+  only in a diff thread: when the driver degrades a finding to a positionless discussion, the
+  author can no longer apply its block from the merge request.
+- **Permalinks.** File links take the form `<base>/-/blob/<sha>/<path>#L<a>-<b>` and the
+  commit link `<base>/-/commit/<sha>`, where `<base>` is the MR `url` without its trailing
+  `/-/merge_requests/<iid>` (`rules/workflow.md` Phase D).
+- **References.** GitLab turns `#<n>` into an issue link and `!<n>` into a merge request
+  link. The `F<n>` finding IDs avoid both.
+
+`<details>`, `<summary>`, `<sub>`, and HTML comments work as on GitHub: GitLab's sanitizer
+allows the first three and hides the comments.
+
+## Known limits (Phase-3 follow-ups)
 
 - Multi-line range comments (`start_line`/`start_side`) collapse to a single-line inline
-  position on GitLab (its `position[line_range]` nesting is not emitted). The comment still
-  posts, anchored at `line`.
+  position on GitLab (its `position[line_range]` nesting is not emitted yet). The comment
+  still posts, anchored at `line`.
 - The summary note returns no `html_url`; the skill reports the MR URL from the scout
   metadata plus the count of posted threads.

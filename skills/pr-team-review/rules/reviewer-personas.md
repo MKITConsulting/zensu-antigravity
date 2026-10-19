@@ -1,19 +1,20 @@
 # Reviewer Personas
 
-25-persona pool. The skill auto-casts a tailored subset per PR in Phase A.2 (see `SKILL.md`). Four personas form the **always-on holistic core** cast on every code PR — `coverage-audit` (guaranteed test-coverage evaluation), `bug-hunter` (functional correctness), `maintainability` (design + complexity), and `adversarial` (devil's-advocate / anti-groupthink) — so no code PR is ever reviewed by specialist lenses alone. `adversarial`'s output drives the Phase C **Challenge Round** (see `workflow.md`). Docs-only PRs stay lean (`docs-only` + `coverage-audit`).
+25-persona pool. The skill auto-casts a tailored subset per PR in Phase A.2 (see `references/cast.md`). Four personas form the **always-on holistic core** cast on every code PR — `coverage-audit` (guaranteed test-coverage evaluation), `bug-hunter` (functional correctness), `maintainability` (design + complexity), and `adversarial` (devil's-advocate / anti-groupthink) — so no code PR is ever reviewed by specialist lenses alone. `adversarial`'s output drives the Phase C **Challenge Round** (see `workflow.md`). Docs-only PRs stay lean (`docs-only` + `coverage-audit`).
 
 ## Shared Output Schema
 
-Every persona writes `$WORKDIR/<role>.json` with this minimum shape:
+Every persona returns exactly one raw JSON object as its entire final assistant message with this shape. No Markdown fence, preface, suffix, or keys beyond this schema and the role-specific extension declared below are allowed. The native artifact adapter validates the object, and only the main thread may then materialize it as `$WORKDIR/<role>.json`:
 
 ```json
 {
+  "kind": "pr-review",
   "role": "<persona-id>",
   "verdict_hint": "approve | approve-with-comments | minor-changes | major-changes | request-changes",
   "summary": "<2-4 sentence overview>",
   "inline_findings": [
     {
-      "path": "<repo-relative path>",
+      "path": "<repo-relative path — MUST be a file listed in `_name-status.txt`>",
       "line": <integer>,
       "side": "RIGHT" | "LEFT",
       "severity": "P1" | "P2" | "P3",
@@ -21,125 +22,99 @@ Every persona writes `$WORKDIR/<role>.json` with this minimum shape:
       "body": "<markdown comment incl. reasoning + concrete fix>"
     }
   ],
-  "overall_notes": ["<cross-cutting points without a single line anchor>"],
-  "positives": ["<things done well — for the synthesis Strengths section>"]
+  "overall_notes": ["<cross-cutting points, plus every finding anchored outside `_name-status.txt`>"],
+  "positives": ["<things done well — for the synthesis What is solid block>"]
 }
 ```
 
 The `coverage-audit` persona additionally emits a top-level `coverage_report` object (schema in its section below) — the always-on test-coverage evaluation that inventories uncovered files and paths.
 
-Hard caps: ≤ 8 inline findings per persona. Severity meaning:
+Hard caps: ≤ 8 inline findings, ≤ 32 overall notes, and ≤ 32 positives per persona. Severity meaning:
 - **P1** — required before merge (correctness, security, data integrity, contract break)
 - **P2** — suggested (idiom, robustness, maintainability)
 - **P3** — nit (style, naming, redundancy)
 
-**Hard rule for `body` field**: NO Markdown tables. The forge's PR/MR view compresses tables into unreadable narrow columns. Use code fences, bullet lists, and bold prefixes only. Internal fields like `test_coverage_matrix` and `coverage_report` may stay as JSON objects — they are not posted; the lead synthesises them into the overall body, where the ONLY permitted table is the compact `### Test Coverage` counts table (four numeric columns, see `workflow.md` § Phase D). That body-only carve-out never extends to inline comments.
+**Hard rule for the finding channel**: every `inline_findings[].path` MUST be one of the files listed in `_name-status.txt` — the exact set this PR changes. A finding about a file the PR does not touch is **legitimate and wanted** whenever it interacts with the change: a pre-existing bug the new code now reaches, a caller the change breaks, a missing guard in untouched middleware the new path traverses. It simply cannot travel as an inline comment, because the forge can only anchor one to a line inside the diff. Route it to `overall_notes` instead and name the anchor in the note text (`` `path/to/file.ts:42` — <finding>``). Never drop such a finding to satisfy the rule, and never re-anchor it to an unrelated changed file to smuggle it in — that produces a comment on code that does not contain the problem. The collector rejects your **entire** result when a single inline path falls outside the set, and `finalize` requires every worker in the generation to have been accepted, so one misrouted finding discards your whole review and blocks the run for every other reviewer too. The same bind applies to every path inside `coverage-audit`'s `coverage_report`.
 
-**Working directory**: The skill injects `$WORKTREE` — the absolute path to this run's detached worktree (the `wt/` subdir of an `mktemp -d` workspace) — into every persona prompt. ALL git/grep/find/file-read commands MUST run with `$WORKTREE` as the working directory:
+**Hard rule for `body` field**: NO Markdown tables in a persona's inline-finding `body` — GitHub PR view compresses tables into unreadable narrow columns. Use code fences, bullet lists, and bold prefixes only. Internal fields like `coverage-audit`'s `coverage_report` stay as JSON objects — they are not posted; the lead synthesises them into the overall body, where the ONLY permitted table is the compact `### Test Coverage` counts table (four numeric columns, see `workflow.md` Phase D). That body-only carve-out never extends to inline comments.
 
-- `git -C "$WORKTREE" diff origin/<base>...HEAD ...`
-- `cd "$WORKTREE" && grep -rn "pattern" src/`
-- `read $WORKTREE/src/.../File.java`
+## Reviewer Evidence and Capability Contract
 
-**Never** `cd` into the user's main repo at `$REPO` (`~/IdeaProjects/.../<repo>`). The user has parallel work there — any `git checkout`, `git switch`, or stray write would clobber their branch. Output JSON paths (`$WORKDIR/<role>.json`) remain absolute and outside the worktree. `--context=` paths likewise remain absolute (refinement repos, glossary files).
+Persona templates are lead-facing fragments. Expand every input path and supply each native worker with the prepared PR evidence, repo map, exact changed-production inventory, exact candidate files, and coverage evidence. Large reviews may shard evidence by role and area, but every accepted file must appear in the immutable snapshot.
+
+A role pass is procedurally read-only. Use native file-reading tools on those exact files. Do not run commands, mutate files, fetch network content, change session state or widen the evidence inventory during a role pass. Missing evidence becomes an `overall_notes` gap. The main thread gathers additional evidence and starts a new snapshot generation if necessary. This restriction is not a host-enforced private capability lease: all passes share the main conversation. Validate each report through the bound `review-artifacts` session helper and recheck the snapshot before publishing.
 
 ## Persona Pool
 
+**Reading a trigger.** Each trigger is a criterion about what the change IS, not a file-name list. The paths, file types and annotations it names are examples from common stacks, never a closed set: a diff meets the trigger when it meets the criterion in whatever language, framework or layout the repository uses, including one no example mentions. Judge by what the changed code does and use the examples only to calibrate. `docs-only` is the one deliberate exception — its list IS closed, because casting it suppresses the holistic core.
+
 ### `ddd-strategic`
 
-**Trigger:** `docs/DDD/`, `*-bounded-context.md`, naming discussions in `--conversation`, BC-renames in git log.
+**Trigger:** A change that defines, renames or redraws a bounded context, its ubiquitous language, or the context map — in documentation or in code that declares module or context boundaries. Examples: `docs/DDD/`, `*-bounded-context.md`, context-map or glossary files, naming discussions in `--conversation`, bounded-context renames in the git log.
 
 **Focus:** Bounded Context naming, Context Map, Published Language contracts, BC boundaries (true BC vs ACL adapter), cross-BC event payloads.
 
-**Useful commands:**
-```bash
-git diff origin/<base>...HEAD -- docs/DDD/
-grep -rn "BoundedContext\|@ApplicationModule" src/
-```
+**Evidence targets:** Prepared DDD-document hunks, allowlisted context-map files, and candidate source files containing bounded-context or application-module declarations.
 
-**Prompt template:** You are reviewing PR #<n> as DDD Strategic. Inputs: PR head SHA `<sha>`, base `<base>`, files `<count>`, refinement context `<paths>`, conversation context `<text>`. Check: BC naming consistency (code/docs/REST/tests/glossary), Context Map alignment, Published Language contracts (events crossing BC boundaries), supplier/customer relationships, BC vs ACL labelling. Output `$WORKDIR/ddd-strategic.json` per shared schema. Max 6 inline findings. When done, mark your tracked item complete.
+**Prompt template:** You are reviewing PR #<n> as DDD Strategic. Inputs: PR head SHA `<sha>`, base `<base>`, files `<count>`, refinement context `<paths>`, conversation context `<text>`. Check: BC naming consistency (code/docs/REST/tests/glossary), Context Map alignment, Published Language contracts (events crossing BC boundaries), supplier/customer relationships, BC vs ACL labelling. Return the shared-schema object as your entire final assistant message with `kind` exactly `pr-review` and `role` exactly `ddd-strategic`. Max 6 inline findings.
 
 ### `ddd-tactical`
 
-**Trigger:** `@AggregateRoot`/aggregate classes, `*VO.java`/`*ValueObject*`, invariant docs, state-machine docs.
+**Trigger:** Domain-model code in any language — aggregates, entities that guard invariants, value objects, domain events, explicit state machines — and the documents that specify them. Examples: `@AggregateRoot` or aggregate classes, `*VO.java`, `*ValueObject*`, records or immutable types used as value objects in Kotlin, C#, TypeScript or Python, domain-event types, invariant or state-machine docs.
 
 **Focus:** Aggregate design, Value Objects (Records + compact constructors), invariant enforcement, named state-transition methods (no setters), Domain Events (past tense, no entity refs), Tell-Don't-Ask.
 
-**Useful commands:**
-```bash
-grep -rn "@AggregateRoot\|extends AggregateRoot\|extends BaseAggregateRoot" src/main/
-wc -l src/main/.../<aggregate>.java   # warn if > 500
-```
+**Evidence targets:** Prepared aggregate/value-object hunks plus allowlisted candidate files containing aggregate roots, invariants, transition methods, and domain events.
 
 **Prompt template:** Same as strategic but tactical focus: aggregate boundaries, VO immutability, invariant code (compact constructors + named transition methods), Domain Events shape, missing state transitions. Max 8 inline findings.
 
 ### `backend-idiom`
 
-**Trigger:** `*.java`, `*.kt`, `*.cs`, `*.go`, `*.rs`, `*.py`, `*.ts` (Node) — stack-aware.
+**Trigger:** Server-side or backend source code in any language — stack-aware: judge it against the idioms of the language and framework the diff actually uses. Examples: `*.java`, `*.kt`, `*.scala`, `*.cs`, `*.go`, `*.rs`, `*.py`, `*.rb`, `*.php`, `*.ex`, `*.swift` on the server, C or C++ services, `*.ts`/`*.js` on Node, Deno or Bun.
 
 **Focus:** Framework idiom (Spring/Micronaut/Quarkus/Node/Django/etc.), Modulith/layering boundaries, DI, transactional boundaries (HTTP-call-inside-Tx is a P1 smell), exception handling (no brittle string-matches), null/Optional discipline.
 
-**Useful commands:**
-```bash
-grep -rn "@Transactional" src/main/   # find boundaries
-grep -rn "@PreAuthorize\|@PostAuthorize" src/main/
-```
+**Evidence targets:** Prepared backend hunks, exact stack manifests, and allowlisted source candidates containing transactional, dependency-injection, authorization, and exception boundaries.
 
-**Prompt template:** Detect stack from `build.gradle`/`pom.xml`/`package.json`. Review framework-idiomatic patterns + watch for anti-patterns (HTTP-in-Tx, manual SecurityContext access, brittle string-matching on exception messages, missing `@Transactional(readOnly=true)` on queries). Max 8 inline findings.
+**Prompt template:** Detect the stack from the manifest in the leased evidence, whichever the language uses — e.g. `build.gradle`, `pom.xml`, `package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `composer.json`, `Gemfile`, `*.csproj`, `mix.exs`. Review framework-idiomatic patterns for THAT stack + watch for anti-patterns (HTTP-in-Tx, brittle string-matching on exception messages, and the stack's own framework misuse — in Spring: manual SecurityContext access, missing `@Transactional(readOnly=true)` on queries). Max 8 inline findings.
 
 ### `persistence-db`
 
-**Trigger:** Migrations dirs (`db/migration/`, `prisma/migrations/`, `alembic/`), ORM-Files (`*Entity.java`, `*Repository.java`, Prisma schema, SQLAlchemy models).
+**Trigger:** Schema migrations, persistence mappings, or data-access code in any framework or ORM. Examples — migrations: Flyway `db/migration/`, Liquibase changelogs, Rails `db/migrate/`, Django `*/migrations/`, Laravel `database/migrations/`, EF Core `Migrations/`, `prisma/migrations/`, `alembic/`, raw `*.sql`; mappings and data access: `*Entity.java`, `*Repository.java`, Prisma schema, SQLAlchemy, Django or ActiveRecord models, Eloquent, TypeORM, GORM, Diesel, Ecto schemas.
 
 **Focus:** Migration quality (idempotent, forward-only, no `NOT NULL DEFAULT ''` traps), JPA/ORM mapping (`@EntityGraph` + `Pageable` → in-memory pagination smell), indices (partial unique predicates, GIN-trigram planner verification), constraints (CHECK/FK), multi-tenancy strategy.
 
-**Useful commands:**
-```bash
-ls src/main/resources/db/migration/ | tail -10
-git diff origin/<base>...HEAD -- src/main/resources/db/migration/
-grep -rn "@EntityGraph\|@OneToMany\|@ManyToOne" src/main/
-```
+**Evidence targets:** Prepared migration/ORM hunks, exact migration files, and allowlisted persistence candidates containing entity graphs, relationships, constraints, and indices.
 
 **Prompt template:** Verify migrations are idempotent + reversible (or document why not). Watch for: `WHERE col LIKE '%token%'` partial-unique false-negatives, `EntityGraph + Pageable` → HHH000104 in-memory pagination, snapshot fields missing `updatable=false`, FK cascade vs domain delete semantics. Max 8 inline findings.
 
 ### `security`
 
-**Trigger:** Auth/SecurityConfig changes, new endpoints, JWT-Forwarding code, CORS config, anything in `infrastructure/security/`.
+**Trigger:** NOT gated by path alone. Path signals: authentication, session or authorization configuration in any framework (e.g. a Spring `SecurityConfig`, auth middleware, identity-provider setup), new endpoints, token-forwarding code such as JWT forwarding, CORS config, anything in a security module such as `infrastructure/security/`. Content signals, which fire on an EXISTING path a path rule never matches: authorization or tenant-scoping code touched (role/permission checks, ownership predicates, repository or query filters), a secret/credential/token/API key introduced in code, config, or a log or trace statement, or a new outbound third-party client. The content signals are load-bearing because `bug-hunter` is instructed to defer security-only defects to this persona — an uncast seat leaves that whole class unowned, and it is a P1 (must-fix-before-merge) class.
 
-**Focus:** AuthN/AuthZ matrix (role-based + resource-based), tenant isolation, input validation (Unicode-letters in multi-locale tenants!), PII in logs/events, CORS allowedOrigins (no `*` with credentials), JWT Bearer-prefix compliance, dead-code ACL checkers (false-positive for auditors).
+**Focus:** AuthN/AuthZ matrix (role-based + resource-based), tenant isolation, input validation (Unicode-letters in DE/EN/FR tenants!), secret/credential leakage in logs (the PII-in-logs *privacy* judgement is owned by `data-privacy`), CORS allowedOrigins (no `*` with credentials), JWT Bearer-prefix compliance, dead-code ACL checkers (false-positive for auditors).
 
-**Useful commands:**
-```bash
-grep -rn "@PreAuthorize\|hasRole\|hasAnyRole" src/main/
-grep -rn "ProjectAccessChecker\|@PostAuthorize" src/main/   # check it's actually wired up
-```
+**Evidence targets:** Prepared auth/security hunks and allowlisted candidates containing role/resource checks, access checkers, token forwarding, validation, logging, and CORS rules.
 
 **Prompt template:** Check authorization completeness (role + resource), input regex (Unicode for non-ASCII tenants), PII risk in events/logs, CORS, JWT forwarding (`Bearer ` prefix vs raw token), dead ACL classes. Max 8 inline findings. Flag P1 must-fix-before-merge list separately in `overall_notes`.
 
 ### `rest-api`
 
-**Trigger:** `*Controller.java`, `OpenAPI*.yaml`, `routes.ts`, anything with `@GetMapping`/`@PostMapping`/etc.
+**Trigger:** HTTP endpoint definitions or their contracts in any framework — route and controller declarations, handlers, OpenAPI specs. Examples: `*Controller.java` with `@GetMapping`/`@PostMapping`, ASP.NET `[HttpGet]`, Express, Fastify or NestJS routes such as `routes.ts`, FastAPI or Flask route decorators, Django `urls.py`, Rails `config/routes.rb`, Laravel `routes/*.php`, Go `net/http`, gin or echo handlers, Phoenix routers, `OpenAPI*.yaml`.
 
 **Focus:** REST conventions (PUT=full-replace vs PATCH=partial), DTO/Request/Response separation (no application DTOs leaking through presentation), OpenAPI annotations, error contract (RFC 7807 ProblemDetail), pagination (no `Page<T>` leaking Spring-Data internals), HTTP status codes (201/204 differentiation), idempotency keys.
 
-**Useful commands:**
-```bash
-grep -n "@GetMapping\|@PostMapping\|@PutMapping\|@PatchMapping\|@DeleteMapping" src/main/.../*Controller.java
-```
+**Evidence targets:** Prepared controller/route/schema hunks plus exact API contract and candidate handler files.
 
 **Prompt template:** Inspect endpoint design vs REST conventions. Watch for: `Page<T>` in response signatures, PUT used for partial update, application DTOs returned directly from controllers, ProblemDetail without `type`/`title`, inconsistent errorCode casing. Max 8 inline findings.
 
 ### `tests-qa`
 
-**Trigger:** Test files in PR — or notable absence thereof. Mutation in test/ directory.
+**Trigger:** Test files in the PR — or notable absence thereof — in any framework or layout. Examples: `test/`, `tests/`, `spec/`, `__tests__/`, `src/test/`, `*Test.java`, `*_test.go`, `test_*.py`, `*.spec.ts`, `*.test.js`, `*_spec.rb`.
 
-**Focus:** Coverage (per BR/invariant), integration vs unit balance (Testcontainers/WireMock vs mocks-only), concurrency tests for race-prone paths (number allocators, optimistic locking), edge-case coverage (length boundaries, null, empty), mock strategy.
+**Focus:** Test *quality + strategy* — integration vs unit balance (Testcontainers/WireMock vs mocks-only), concurrency tests for race-prone paths (number allocators, optimistic locking), edge-case coverage (length boundaries, null, empty), mock strategy, coverage per BR/invariant. The explicit covered/uncovered *file + path inventory* is owned by `coverage-audit` — here focus on whether the tests that exist are the RIGHT tests.
 
-**Useful commands:**
-```bash
-find src/test -newer .git/refs/heads/<base> -name '*.java'
-grep -c "@Test" src/test/.../<X>Test.java
-```
+**Evidence targets:** Main-thread changed-test inventory, exact candidate test files, production-to-test mapping, and allowlisted test subtrees.
 
 **Prompt template:** Build a `test_coverage_matrix` mapping each business rule / invariant to test status (OK/PARTIAL/MISSING). Flag missing integration tests, missing concurrency tests, single-value Whitelist tests instead of parametrized boundaries. Max 8 inline findings.
 
@@ -151,20 +126,22 @@ grep -c "@Test" src/test/.../<X>Test.java
 
 **Methodology (evidence-first, real data when the main thread provides it):**
 
-1. **Static diff-vs-test mapping (always).** Consume `_changed-production-files.txt`, the diff input, and the production-to-test mapping in `_review-evidence.md`. For each file, decide whether the PR adds/changes a test that exercises it, or an existing test already covers it, by matching test names, imports, and referenced symbols. Classify each changed production file `covered` / `partial` / `uncovered`. Inside covered/partial files, name the specific uncovered paths (new public functions/methods, new branches, new endpoints/handlers) that no test references.
-2. **Ingest prepared coverage evidence.** Read line/branch data and report excerpts already placed in `_coverage-evidence.md` by the main thread. The main thread searches these report families before spawn:
+1. **Static diff-vs-test mapping (always).** Consume the changed-production inventory, PR diff, candidate files, and production-to-test mapping in the injected evidence packet. For each file, decide whether the PR adds/changes a test that exercises it, or an allowlisted existing test already covers it, by matching test names, imports, and referenced symbols. Classify each changed production file `covered` / `partial` / `uncovered`. Inside covered/partial files, name the specific uncovered paths (new public functions/methods, new branches, new endpoints/handlers) that no supplied test references.
+2. **Ingest prepared coverage evidence.** Read line/branch data and report excerpts already placed in `_coverage-evidence.md` by the main thread. The main thread searches for these report families before the role passes:
    - Java/JVM: `**/target/site/jacoco/jacoco.xml`, `**/build/reports/jacoco/**/*.xml`
    - JS/TS: `coverage/lcov.info`, `coverage/coverage-final.json`
    - Python: `coverage.xml`, `.coverage`
    - Go: `coverage.out`
    - .NET: `**/coverage.cobertura.xml`
 
-   When supplied, cross real uncovered lines against the diff hunks and record `coverage_source: "report:<path>"`.
-3. **Consume the optional main-thread run.** With `--run-coverage`, the main thread detects and executes the coverage process once before spawn and places the result or failure fallback in `_coverage-evidence.md`. The reviewer NEVER detects or executes a coverage process. If the artifact records failure, fall back to static and preserve `coverage_source: "static (tool run failed: <reason>)"`.
+   When supplied, cross real uncovered lines against the prepared diff hunks and record `coverage_source: "report:<path>"`.
+3. **Consume the optional main-thread run.** With `--run-coverage`, the main thread detects and executes the coverage process once before the role passes and places the result or failure fallback in `_coverage-evidence.md`. The reviewer never detects or executes a process. If the artifact records failure, fall back to static and preserve `coverage_source: "static (tool run failed: <reason>)"`.
 
 Always record which method produced the numbers in `coverage_source`, and be honest when it is an approximation.
 
-The union of `uncovered_files[].path`, `partial_files[].path`, and `covered_files[]` MUST be duplicate-free and set-equal to the exact `_changed-production-files.txt` inventory; `changed_production_files` MUST equal that set's size. An omitted path, an extra path, a duplicate classification, or a mismatched count is invalid.
+The union of `uncovered_files[].path`, `partial_files[].path`, and `covered_files[]` MUST be duplicate-free and set-equal to the exact `_changed-production-files.txt` inventory; `changed_production_files` MUST equal that set's size. Zero classified files on a code PR, an omitted path, an extra path, a duplicate classification, or a mismatched count is invalid and prevents the entire review generation from being finalized.
+
+**Evidence targets:** The injected diff input(s) (`_pr.diff` for a small PR or the role's bounded shards for a large PR), `_name-status.txt`, `_changed-production-files.txt`, `_review-evidence.md`, `_candidate-files.txt`, `_safe-subtrees.txt`, and `_coverage-evidence.md` at their exact absolute paths.
 
 **`coverage_report` schema** (top-level, in addition to the shared fields):
 ```json
@@ -185,25 +162,21 @@ The union of `uncovered_files[].path`, `partial_files[].path`, and `covered_file
 
 Also emit up to 6 inline findings on the highest-risk uncovered files/paths (an uncovered new public API or security-sensitive path warrants a P1-severity note; whether that BLOCKS the merge is governed by `--coverage-gate`, not by this persona). For docs-only or config-only PRs with zero changed production files, still emit the report with `changed_production_files: 0`, empty `uncovered_files`, and `summary: "No production code changed — coverage evaluation N/A."`
 
-**Prompt template:** You are the coverage-audit reviewer for PR #<n>. Head SHA `<sha>`, base `<base>`. Produce the guaranteed test-coverage evaluation: inventory every changed production file as covered/partial/uncovered and list the uncovered paths. Use the injected static mapping and the prepared `_coverage-evidence.md`; never execute a coverage process. Write the shared schema plus `coverage_report` to `$WORKDIR/coverage-audit.json`. Max 6 inline findings.
+**Prompt template:** You are the coverage-audit reviewer for PR #<n>. Head SHA `<sha>`, base `<base>`. Produce the guaranteed test-coverage evaluation: inventory every changed production file as covered/partial/uncovered and list the uncovered paths. Use the injected static mapping and prepared coverage evidence; never execute a coverage process. Return the shared fields plus `coverage_report` as your entire final assistant message with `kind` exactly `pr-review` and `role` exactly `coverage-audit`. Max 6 inline findings.
 
 ### `domain-refiner`
 
 **Trigger:** `--context=<path>` activates this persona. Without `--context` it is not cast.
 
-**Focus:** Code behavior vs business specification (Wiki/Glossary/Stories). Mandatory fields per business rules, status workflow, enum completeness vs market scope (e.g., 11 calculation variants per DACH+LUX+IT+FR), naming alignment across locales.
+**Focus:** Code behavior vs business specification (Wiki/Glossary/Stories). Mandatory fields per business rules, status workflow, enum completeness vs market scope (e.g., 11 calculation variants per DACH+LUX+IT+FR), naming alignment DE↔EN.
 
-**Useful commands:**
-```bash
-ls <context-path>
-grep -rn "<topic>" <context-path>
-```
+**Evidence targets:** Only the explicitly enumerated exact refinement-context files, prepared domain-concept excerpts, and allowlisted code candidates mapped to those concepts. A directory, glob, or parent path is invalid as refinement context.
 
-**Prompt template:** Read every file under `<context-paths>`. For each domain concept (status workflow, mandatory fields, enums, snapshot semantics, number-series modes), compare against code. Output a `wiki_alignment` map with PASS/PARTIAL/FAIL per concept. Flag missing enum values, missing mandatory fields, wrong status names. Max 8 inline findings.
+**Prompt template:** Read each explicitly enumerated absolute file in `<exact-context-files>` and no other refinement file. For each domain concept (status workflow, mandatory fields, enums, snapshot semantics, number-series modes), compare against code. Return a shared-schema `pr-review` object and include the alignment in `overall_notes` as PASS/PARTIAL/FAIL per concept. Flag missing enum values, missing mandatory fields, and wrong status names. Max 8 inline findings.
 
 ### `frontend-component`
 
-**Trigger:** `*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.html` (Angular), `*.component.ts`.
+**Trigger:** UI component code in any framework, on the web, mobile or desktop — components with their own state, inputs and lifecycle. Examples: `*.tsx`/`*.jsx` (React, Preact, Solid), `*.vue`, `*.svelte`, `*.astro`, Angular `*.component.ts` with its `*.html` template, Lit or other web components, Blazor `*.razor`, SwiftUI views, Jetpack Compose `@Composable` functions, Flutter widgets in `*.dart`.
 
 **Focus:** Component structure, state management (signals/hooks/computed), props/inputs, lifecycle, event handlers, change detection. **Accessibility semantics (WCAG, ARIA, keyboard, focus) are owned by the `accessibility` persona** — review component design here, not a11y.
 
@@ -211,7 +184,7 @@ grep -rn "<topic>" <context-path>
 
 ### `frontend-ux`
 
-**Trigger:** UI templates + CSS-Files (`*.scss`, `*.css`, `*.tailwind.config.*`), design-system imports.
+**Trigger:** The visual and layout surface in any styling approach — templates and stylesheets, design tokens and themes, design-system imports, responsive layout, user-facing strings and locale files. Examples: `*.css`, `*.scss`, `*.less`, CSS-in-JS or styled components, `tailwind.config.*`, token or theme files, SwiftUI or Compose theme objects, locale resources such as `locales/*.json`, `*.po`, `*.xliff`, `*.arb`, Android `strings.xml`, iOS `Localizable.strings`.
 
 **Focus:** Design system adherence (no one-off colors/spacing), responsive (mobile-first breakpoints), i18n (no hard-coded strings). **WCAG / accessibility semantics are owned by the `accessibility` persona** — review layout + design-system consistency here, not a11y.
 
@@ -219,7 +192,7 @@ grep -rn "<topic>" <context-path>
 
 ### `infrastructure-iac`
 
-**Trigger:** `*.tf`, `*.tfvars`, `*.yaml` under `k8s/`/`helm/`, `Dockerfile`, `docker-compose.yml`.
+**Trigger:** Infrastructure or deployment definitions in any tool — provisioning, orchestration, container builds, runtime configuration. Examples: Terraform or OpenTofu `*.tf`/`*.tfvars`, Pulumi or CDK programs, CloudFormation or SAM templates, Bicep or ARM, Ansible playbooks, Kubernetes manifests, Helm charts, Kustomize overlays, `Dockerfile`/`Containerfile`, `docker-compose.yml`/`compose.yaml`, Nomad jobs, `serverless.yml`.
 
 **Focus:** IaC idiom (variables vs hardcoded), state management (remote backend, locking), drift, cost, secrets handling (no plaintext, no committed creds), least-privilege IAM.
 
@@ -227,7 +200,7 @@ grep -rn "<topic>" <context-path>
 
 ### `ci-cd`
 
-**Trigger:** `.github/workflows/`, `Jenkinsfile`, `Makefile`, `azure-pipelines.yml`, `gitlab-ci.yml`.
+**Trigger:** Build, test or delivery pipeline definitions in any CI/CD system, and the build scripts a pipeline invokes. Examples: GitHub Actions `.github/workflows/`, GitLab `.gitlab-ci.yml`, `Jenkinsfile`, `azure-pipelines.yml`, CircleCI `.circleci/`, `bitbucket-pipelines.yml`, Buildkite `.buildkite/`, Tekton or Argo pipelines, `Makefile`, `justfile`, `Taskfile.yml`.
 
 **Focus:** Pipeline correctness, secrets exposure (`echo $SECRET`!), caching, idempotency, matrix strategies, branch protection alignment.
 
@@ -243,7 +216,7 @@ grep -rn "<topic>" <context-path>
 
 ### `docs-only`
 
-**Trigger:** PR diff has ONLY `*.md`/`*.adoc`/`*.rst` files. Single-agent cast.
+**Trigger:** PR diff has ONLY prose documentation files — `*.md`, `*.adoc` or `*.rst`, and nothing else. Single-agent cast. This is the one trigger whose list is deliberately CLOSED: casting `docs-only` suppresses the holistic core, so a file that only resembles documentation keeps the ordinary cast — `*.mdx`, which can embed components, a `*.txt` that may be a dependency manifest such as `requirements.txt`, or a doc template that code renders.
 
 **Focus:** Clarity, consistency, cross-links, glossary alignment, broken anchor links, code-block syntax tags.
 
@@ -255,15 +228,19 @@ grep -rn "<topic>" <context-path>
 
 **Focus:** Functional correctness — does the code do what it intends? Logic errors, wrong conditionals/operators, off-by-one, boundary + edge cases (null / empty / zero / max), unhandled error/exception paths, missing return or early-exit, swallowed errors, incorrect error propagation, resource leaks (unclosed handles/streams/connections), state-mutation bugs, wrong defaults. Distinct from `security` (exploitable vulns) and `tests-qa` (test quality) — this hunts behavioral defects in the production code itself. Mirrors the `bugs` perspective of the Zensu implementation review chain.
 
-**Prompt template:** You are the bug-hunter for PR #<n>. Head SHA `<sha>`, base `<base>`. Read every changed production hunk and hunt functional-correctness defects: logic/operator errors, off-by-one, unhandled null/empty/boundary inputs, error paths that are missing or swallow the failure, missing returns, resource leaks, wrong defaults, state bugs. For each, give the concrete failing input/state and the fix. Do NOT report style or security-only issues (other personas own those). Max 8 inline findings.
+**Evidence targets:** Every prepared changed production hunk plus allowlisted candidates containing error handling, boundary logic, resource ownership, and state mutation.
+
+**Prompt template:** You are the bug-hunter for PR #<n>. Head SHA `<sha>`, base `<base>`. Read every prepared changed production hunk and hunt functional-correctness defects: logic/operator errors, off-by-one, unhandled null/empty/boundary inputs, error paths that are missing or swallow the failure, missing returns, resource leaks, wrong defaults, state bugs. For each, give the concrete failing input/state and the fix. Do NOT report style or security-only issues (other personas own those). Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ### `maintainability`
 
 **Trigger:** ALWAYS cast on any PR that changes executable code (not gated by file type). Part of the always-on holistic core. Not cast on docs-only PRs.
 
-**Focus:** The dimension Google's review guide ranks first — design + complexity. Over-engineering / speculative generality (YAGNI — abstractions with one caller, config no one sets, hooks for a future that isn't here), unnecessary complexity, duplication (DRY violations that should be extracted), dead / unreachable code, deep nesting + high cyclomatic complexity, poor cohesion / tight coupling, unclear names, comments that restate the code instead of explaining why, oversized functions/classes, general readability.
+**Focus:** The dimension Google's review guide ranks first — design + complexity. Over-engineering / speculative generality (YAGNI — abstractions with one caller, config no one sets, hooks for a future that isn't here), unnecessary complexity, duplication (DRY violations that should be extracted), dead / unreachable code, deep nesting + high cyclomatic complexity, poor cohesion / tight coupling, unclear names, comments that restate the code instead of explaining why, oversized functions/classes, general readability. Complements the standalone `/zensu-simplify` skill but runs inside the review.
 
-**Prompt template:** You are the maintainability reviewer for PR #<n>. Judge the change on design + complexity: is anything over-engineered for a need that isn't here yet (YAGNI)? Duplicated logic that should be extracted? Dead code, deep nesting, tangled coupling, unclear names, comments that explain "what" not "why", functions/classes that are too large? Prefer the simplest change that solves the actual problem. Give a concrete simplification per finding. Max 8 inline findings.
+**Evidence targets:** Prepared diff/stat evidence and allowlisted changed candidates showing complexity, duplication, dead code, markers, naming, and coupling.
+
+**Prompt template:** You are the maintainability reviewer for PR #<n>. Judge the prepared change on design + complexity: is anything over-engineered for a need that isn't here yet (YAGNI)? Duplicated logic that should be extracted? Dead code, deep nesting, tangled coupling, unclear names, comments that explain "what" not "why", functions/classes that are too large? Prefer the simplest change that solves the actual problem. Give a concrete simplification per finding. Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ### `adversarial`
 
@@ -271,7 +248,9 @@ grep -rn "<topic>" <context-path>
 
 **Focus:** Devil's advocate / anti-groupthink. Instead of a single specialist lens it attacks the change as a whole: challenge the core assumptions, run a pre-mortem ("it's 3am in production — how did this change cause the incident?"), steelman the strongest objection a senior engineer would raise, question whether the PR solves the RIGHT problem, surface hidden coupling + blast radius, and probe worst-case / adversarial inputs the happy-path tests never exercise. It also asks what the other specialist personas, each in its own silo, might have collectively missed.
 
-**Prompt template:** You are the adversarial (devil's-advocate) reviewer for PR #<n>. Do NOT rubber-stamp. Pre-mortem the change: assume it caused a production incident and explain the most likely path. Steelman the strongest objection to the approach. Ask whether this solves the right problem, what breaks at scale / under concurrency / with hostile input, and what a siloed specialist review would collectively miss. Prefer few high-signal challenges over many nits. Use `overall_notes[]` for whole-change challenges and `inline_findings[]` where a challenge anchors to a line. Max 8 inline findings.
+**Evidence targets:** The role- and area-bounded prepared diff shards, repository/PR context, and relevant history summary supplied by the main thread. On large PRs, reason across the supplied shard index and summaries; do not require or request one monolithic full diff.
+
+**Prompt template:** You are the adversarial (devil's-advocate) reviewer for PR #<n>. Do NOT rubber-stamp. Pre-mortem the prepared change: assume it caused a production incident and explain the most likely path. Steelman the strongest objection to the approach. Ask whether this solves the right problem, what breaks at scale / under concurrency / with hostile input, and what a siloed specialist review would collectively miss. Prefer few high-signal challenges over many nits. Return the shared-schema object as your entire final assistant message (use `overall_notes[]` for whole-change challenges, `inline_findings[]` where a challenge anchors to a line). Max 8 inline findings.
 
 ### `observability`
 
@@ -279,23 +258,29 @@ grep -rn "<topic>" <context-path>
 
 **Focus:** Will we know when this breaks in production? Structured logging (correct levels, correlation/trace IDs, no secrets in log lines — PII-in-logs judgement is owned by `data-privacy`), metrics on every new endpoint/job (the RED method — Rate, Errors, Duration), distributed tracing (OpenTelemetry spans for key operations + context propagation across service boundaries), health/readiness probes for new services, alertability of new failure modes, log noise / metric cardinality (no unbounded label sets).
 
-**Prompt template:** You are the observability reviewer for PR #<n>. For every new endpoint/job/integration, check: are failures logged at the right level with a correlation ID and no PII? Are Rate/Errors/Duration metrics emitted? Are trace spans created and context propagated across boundaries? Are new services wired to health/readiness probes? Would an on-call engineer be alerted when this fails, or would it fail silently? Watch for log noise + unbounded metric cardinality. Max 8 inline findings.
+**Evidence targets:** Prepared endpoint/job/integration hunks and allowlisted candidates containing logging, metrics, tracing, and health/readiness wiring.
+
+**Prompt template:** You are the observability reviewer for PR #<n>. For every prepared new endpoint/job/integration, check: are failures logged at the right level with a correlation ID and no PII? Are Rate/Errors/Duration metrics emitted? Are trace spans created and context propagated across boundaries? Are new services wired to health/readiness probes? Would an on-call engineer be alerted when this fails, or would it fail silently? Watch for log noise + unbounded metric cardinality. Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ### `supply-chain`
 
-**Trigger:** Dependency manifests / lockfiles changed — `package.json`/`package-lock.json`/`pnpm-lock.yaml`/`yarn.lock`, `build.gradle`/`pom.xml`, `go.mod`/`go.sum`, `pyproject.toml`/`poetry.lock`/`requirements*.txt`, `Cargo.toml`/`Cargo.lock`, `Gemfile`/`Gemfile.lock`, and CI action pins.
+**Trigger:** Dependency manifests or lockfiles changed in any ecosystem, or CI action pins. Examples: `package.json`/`package-lock.json`/`pnpm-lock.yaml`/`yarn.lock`/`bun.lock`, `build.gradle`/`pom.xml`/`gradle/libs.versions.toml`, `go.mod`/`go.sum`, `pyproject.toml`/`poetry.lock`/`uv.lock`/`requirements*.txt`, `Cargo.toml`/`Cargo.lock`, `Gemfile`/`Gemfile.lock`, `composer.json`/`composer.lock`, `*.csproj`/`packages.lock.json`, `Package.swift`/`Package.resolved`, `pubspec.yaml`/`pubspec.lock`, `mix.exs`/`mix.lock`; CI action pins under `.github/`.
 
-**Focus:** OWASP Top 10 2025 **A03 — Software Supply Chain Failures**. New/updated dependencies justified and pinned (no floating ranges on security-sensitive deps), transitive-vulnerability surface, versions with known CVEs, license compatibility (copyleft pulled into a proprietary product), typosquat / dependency-confusion / namespace risk, lockfile integrity (no unexplained churn or integrity-hash drop), unmaintained or deprecated packages, CI-action / build-plugin provenance (third-party pipeline actions pinned to a full commit SHA, not a mutable tag).
+**Focus:** OWASP Top 10 2025 **A03 — Software Supply Chain Failures**. New/updated dependencies justified and pinned (no floating ranges on security-sensitive deps), transitive-vulnerability surface, versions with known CVEs, license compatibility (copyleft pulled into a proprietary product), typosquat / dependency-confusion / namespace risk, lockfile integrity (no unexplained churn or integrity-hash drop), unmaintained or deprecated packages, CI-action / build-plugin provenance (third-party GitHub Actions pinned to a full commit SHA, not a mutable tag).
 
-**Prompt template:** You are the supply-chain reviewer for PR #<n> (OWASP 2025 A03). For every added/updated dependency: is it justified, pinned, and free of known CVEs? Check transitive-vuln surface, license compatibility for a proprietary product, typosquat / confusion risk, lockfile-integrity churn, unmaintained packages, and unpinned third-party CI actions (require full-SHA pins). Flag anything that widens the trust boundary. Max 8 inline findings.
+**Evidence targets:** Prepared manifest/lockfile/workflow hunks plus exact dependency and CI-action candidates supplied by the main thread.
+
+**Prompt template:** You are the supply-chain reviewer for PR #<n> (OWASP 2025 A03). For every prepared added/updated dependency: is it justified, pinned, and free of known CVEs? Check transitive-vuln surface, license compatibility for a proprietary product, typosquat / confusion risk, lockfile-integrity churn, unmaintained packages, and unpinned third-party CI actions (require full-SHA pins). Flag anything that widens the trust boundary. Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ### `resilience`
 
-**Trigger:** Outbound HTTP / RPC clients, message producers/consumers, retry/timeout config, transactional methods that make external calls, schedulers, distributed locks, idempotency keys, caches with fallbacks.
+**Trigger:** Outbound HTTP / RPC clients, message producers/consumers, retry/timeout config, transaction boundaries that make external calls (e.g. Spring `@Transactional`), schedulers, distributed locks, idempotency keys, caches with fallbacks.
 
 **Focus:** Behavior under partial failure. A timeout on every remote call (no unbounded waits), retries with capped exponential backoff + jitter (never naive tight-loop retries), circuit breakers / bulkheads to stop cascading failure, idempotency of side-effecting operations so a retry is safe, graceful degradation / fallback when a dependency is down, partial-failure handling (don't leave half-written state), poison-message handling on consumers, correct at-least-once vs exactly-once semantics.
 
-**Prompt template:** You are the resilience reviewer for PR #<n>. For every new outbound call or async consumer: is there a timeout? Are retries capped with backoff + jitter? Is there a circuit breaker / fallback so a downstream outage degrades gracefully instead of cascading? Are side-effecting operations idempotent so a retry is safe? Is partial failure handled without leaving inconsistent state? Are consumers protected against poison messages? Max 8 inline findings.
+**Evidence targets:** Prepared external-call/consumer hunks and allowlisted candidates containing timeout, retry, circuit-breaker, idempotency, and fallback behavior.
+
+**Prompt template:** You are the resilience reviewer for PR #<n>. For every prepared new outbound call or async consumer: is there a timeout? Are retries capped with backoff + jitter? Is there a circuit breaker / fallback so a downstream outage degrades gracefully instead of cascading? Are side-effecting operations idempotent so a retry is safe? Is partial failure handled without leaving inconsistent state? Are consumers protected against poison messages? Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ### `api-compat`
 
@@ -303,7 +288,9 @@ grep -rn "<topic>" <context-path>
 
 **Focus:** Backward compatibility of the contract. Classify each change additive (safe) vs breaking (removed/renamed/retyped field, optional→required, tightened validation, changed enum, changed error model / HTTP status, reinterpreted semantics). Verify semver correctness — a breaking change demands a major bump / new version, not an in-place edit. Check event-schema evolution (forward + backward compatibility for producers and consumers), a documented deprecation policy + migration path for anything removed, impact on existing consumer contracts. Prefer additive-then-deprecate over in-place breakage.
 
-**Prompt template:** You are the api-compat reviewer for PR #<n>. For every change to a public contract (REST/gRPC/GraphQL/events/exported symbols), classify it additive vs breaking. A breaking change (removed/renamed/retyped field, optional→required, tightened validation, enum removal, changed status/error model) requires a major version bump + migration path — flag it if the version wasn't bumped. Check event schemas evolve forward- and backward-compatibly. Recommend additive-then-deprecate where a break was avoidable. Max 8 inline findings.
+**Evidence targets:** Prepared public-contract hunks, exact schema/DTO files, and allowlisted candidates showing versions, deprecations, producers, and consumers.
+
+**Prompt template:** You are the api-compat reviewer for PR #<n>. For every prepared change to a public contract (REST/gRPC/GraphQL/events/exported symbols), classify it additive vs breaking. A breaking change (removed/renamed/retyped field, optional→required, tightened validation, enum removal, changed status/error model) requires a major version bump + migration path — flag if the version wasn't bumped. Check event schemas evolve forward- and backward-compatibly. Recommend additive-then-deprecate where a break was avoidable. Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ### `data-privacy`
 
@@ -311,32 +298,47 @@ grep -rn "<topic>" <context-path>
 
 **Focus:** GDPR (EU data-protection) data lifecycle — distinct from `security` (which owns access control). Data minimization (collect only what's needed), purpose limitation, retention + deletion incl. right-to-erasure, consent / lawful-basis touchpoints, PII in logs / events / traces / analytics, cross-border / data-residency egress, encryption at rest + in transit for personal data, pseudonymization / masking in non-prod, an access audit trail. Especially relevant for EU-tenant SaaS.
 
-**Prompt template:** You are the data-privacy reviewer for PR #<n> (GDPR / EU data protection). For every new personal-data field or data-processing path: is collection minimized and purpose-bound? Is retention + erasure handled? Is PII kept out of logs/events/traces/analytics? Is personal data encrypted in transit + at rest, masked in non-prod, and never egressed cross-border without a basis? Is access audited? Flag privacy risks distinct from access-control (security owns that). Max 8 inline findings.
+**Evidence targets:** Prepared personal-data/logging/analytics hunks and allowlisted candidates covering collection, retention, deletion, egress, encryption, masking, and audit trails.
+
+**Prompt template:** You are the data-privacy reviewer for PR #<n> (GDPR / EU data protection). For every prepared new personal-data field or data-processing path: is collection minimized and purpose-bound? Is retention + erasure handled? Is PII kept out of logs/events/traces/analytics? Is personal data encrypted in transit + at rest, masked in non-prod, and never egressed cross-border without a basis? Is access audited? Flag privacy risks distinct from access-control (security owns that). Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ### `accessibility`
 
-**Trigger:** `*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.html` (Angular), `*.component.ts`, form + interactive-widget templates, icon/image markup. (Split out of `frontend-ux`, which now owns only design-system / responsive / i18n.)
+**Trigger:** User-facing UI markup or interactive widgets in any framework, on the web, mobile or desktop — anything a person perceives, navigates or operates. Examples: the UI component files `frontend-component` names, form and interactive-widget templates, icon and image markup, SwiftUI accessibility modifiers, Compose `semantics`, Flutter `Semantics`, Android `contentDescription`. (Split out of `frontend-ux`, which now owns only design-system / responsive / i18n.)
 
 **Focus:** WCAG 2.2 AA. Semantic HTML + correct ARIA (roles/states, no ARIA misuse over native elements), full keyboard operability + logical focus order + visible focus indicators, color-contrast ratios, alt text / accessible names for images + icon buttons, form-label association + programmatic error messaging, `prefers-reduced-motion` for animation, screen-reader flow, correct `lang` attributes, adequate target sizes.
 
-**Prompt template:** You are the accessibility reviewer for PR #<n> (WCAG 2.2 AA). Check semantic HTML + correct ARIA (no misuse), keyboard operability + focus order + visible focus, color contrast, alt text / accessible names for images + icon buttons, form-label association + error messaging, `prefers-reduced-motion`, `lang` attributes, target sizes. Give the concrete markup fix per finding. Max 8 inline findings.
+**Evidence targets:** Prepared UI/template/style hunks and allowlisted candidate files containing semantic elements, ARIA, focus, labels, media, motion, and language metadata.
+
+**Prompt template:** You are the accessibility reviewer for PR #<n> (WCAG 2.2 AA). Check prepared semantic HTML + correct ARIA (no misuse), keyboard operability + focus order + visible focus, color contrast, alt text / accessible names for images + icon buttons, form-label association + error messaging, `prefers-reduced-motion`, `lang` attributes, target sizes. Give the concrete markup fix per finding. Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ### `concurrency`
 
-**Trigger:** Threads / async / coroutines, shared mutable state, locks / atomics / volatile fields, thread pools / executors, parallel streams, optimistic / pessimistic locking, caches, message consumers with shared handlers.
+**Trigger:** Threads / async / coroutines, shared mutable state, locks / `synchronized` / atomics / `volatile`, thread pools / executors / `@Async`, parallel streams, optimistic / pessimistic locking, caches, message consumers with shared handlers.
 
-**Focus:** "Parallel programming done safely" (a Google review pillar). Data races on unguarded shared mutable state, deadlock / livelock from inconsistent lock ordering, non-atomic check-then-act (TOCTOU) sequences, thread-pool sizing / starvation, blocking calls on an event loop or reactive pipeline, memory-visibility gaps (missing happens-before), idempotency under concurrent delivery, lost updates (incorrect optimistic-lock retry or lock-free CAS).
+**Focus:** "Parallel programming done safely" (a Google review pillar). Data races on unguarded shared mutable state, deadlock / livelock from inconsistent lock ordering, non-atomic check-then-act (TOCTOU) sequences, thread-pool sizing / starvation, blocking calls on an event loop or reactive pipeline, memory-visibility gaps (missing happens-before / `volatile`), idempotency under concurrent delivery, lost updates (incorrect optimistic-lock retry or lock-free CAS).
 
-**Prompt template:** You are the concurrency reviewer for PR #<n>. Find data races on shared mutable state, deadlock from inconsistent lock ordering, non-atomic check-then-act, thread-pool starvation, blocking calls on event loops / reactive chains, memory-visibility gaps (missing happens-before), non-idempotent handlers under concurrent delivery, lost updates in optimistic-lock / CAS retry loops. Give the interleaving that triggers each bug. Max 8 inline findings.
+**Evidence targets:** Prepared concurrency/async hunks and allowlisted candidates containing shared state, locks, atomics, pools, blocking calls, delivery handlers, and retry loops.
+
+**Prompt template:** You are the concurrency reviewer for PR #<n>. In prepared evidence, find data races on shared mutable state, deadlock from inconsistent lock ordering, non-atomic check-then-act, thread-pool starvation, blocking calls on event loops / reactive chains, memory-visibility gaps (missing happens-before), non-idempotent handlers under concurrent delivery, lost updates in optimistic-lock / CAS retry loops. Give the interleaving that triggers each bug. Return the shared-schema object as your entire final assistant message. Max 8 inline findings.
 
 ## Casting Rules of Thumb
 
 - **Always cast the holistic core on every code PR — `coverage-audit`, `bug-hunter`, `maintainability`, `adversarial`.** These four are not trigger-gated: `coverage-audit` guarantees the test-coverage evaluation, `bug-hunter` a functional-correctness pass, `maintainability` a design/complexity pass, and `adversarial` an anti-groupthink challenge (its output drives the Phase C Challenge Round). Without them a PR that trips no specialist trigger would get no holistic review at all.
 - **Always cast `coverage-audit` — every PR, no exceptions** (docs-only included; it reports `N/A` when no production code changed). It produces the guaranteed test-coverage evaluation, so the `### Test Coverage` synthesis section is always backed by data.
 - Always cast `tests-qa` unless the PR is docs-only.
-- Always cast `security` when new endpoints, auth-config, or third-party clients appear; add `supply-chain` when dependency manifests/lockfiles change and `data-privacy` when new personal data is stored, logged, or exported.
+- Always cast `security` when new endpoints, auth-config, or third-party clients appear — and equally when an EXISTING path's authorization or tenant-scoping changes, or a secret/credential/token enters code, config, or a log. `security` is trigger-gated rather than always-on because a change with no security surface (a render function, a build script) has nothing for it to judge; that only holds while the trigger covers content, not just paths. Add `supply-chain` when dependency manifests/lockfiles change and `data-privacy` when new personal data is stored, logged, or exported.
 - Cast `observability` + `resilience` when new endpoints/jobs/outbound calls appear; `api-compat` when a public contract (REST/gRPC/GraphQL/events/exported symbols) changes; `concurrency` when shared mutable state / threads / async appear.
 - Split frontend: `frontend-component` + `frontend-ux` (design-system / responsive / i18n) + `accessibility` (WCAG 2.2 AA) for UI changes.
 - `domain-refiner` requires `--context=` — otherwise it has nothing to compare against.
 - Pure docs PR → `docs-only` reviewer PLUS `coverage-audit` (reports N/A); the rest of the holistic core (`bug-hunter` / `maintainability` / `adversarial`) and the specialist cast are skipped, as is the debate phase — still synthesize + publish **with the mandatory `### Test Coverage` section**.
-- Mixed-stack PRs (frontend + backend) → cast from both sides; with the always-on core a typical code PR runs 6-12 reviewers.
+- Mixed-stack PRs (frontend + backend) → cast from both sides; with the always-on core a typical code PR runs 6-12 reviewers (see `workflow.md` for the size band).
+
+## Repo-custom seats
+
+The 25-persona pool above is the built-in set. A repo can ALSO define its own reviewer seats — fully custom roles tailored to that codebase (e.g. `fee-calc-integrity`, `api-contract-integrity`, `angular-architecture`) — without forking the plugin, using the SAME `.agents/zensu-review-*.md` convention that `/zensu-tdd`'s review fan-out consumes. They are additive: they never displace the always-on holistic core.
+
+- **Discovery.** In Phase A.2 the lead runs `node "{plugin_root}/hooks/lib/persona-activation.js" "$REPO/.agents"` with the worktree diff's changed paths on stdin. Each `spawn <name>` is a castable seat; the `activation:` glob field decides relevance (a seat with no `activation:` field always joins), and the helper caps customs at 5 (matched-before-always-join). Pass `--no-custom-roles` to skip discovery entirely.
+- **Trust guard.** Discovery reads the BASE checkout `$REPO/.agents`, NEVER the PR-head worktree. A PR must not introduce its own reviewer seats — the same rule the repo overlay follows.
+- **Output contract.** A custom seat emits the SAME shared JSON schema above (materialized to `$WORKDIR/<persona-name>.json`); the lead injects that contract at the role pass (Phase B). The seat runs as the fixed `zensu-pr-review-worker` type under the same private lease, with its concern as the focus; native provenance binds its actual child UUID. The persona *file* declares only the concern (body) + activation (frontmatter), staying output-format-agnostic so one file works across `/zensu-tdd`'s `## Aspect:` markdown and this skill's JSON. Findings are namespaced by the persona id and flow through debate → synthesis → publish exactly like a pool persona's.
+- **Authoring.** See `docs/review-chain.md` "Custom review personas (repo-local)" section for the file format, the `name:` = filename-stem rule, and the activation-glob semantics.

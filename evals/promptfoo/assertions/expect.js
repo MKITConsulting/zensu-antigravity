@@ -59,6 +59,17 @@ module.exports = (output, context) => {
     checks += 1;
     if (stdout.includes(needle)) failures.push(`stdout unexpectedly contains ${JSON.stringify(needle)}`);
   }
+  // At least one of the alternatives must appear. The live suite needs this: a
+  // scenario legitimately passes either with its real result OR with the
+  // LIVE-SKIPPED marker when the opt-in env var is unset — and a skip must stay
+  // visible in the report rather than being asserted away.
+  const anyOf = asList(expect.stdout_contains_any);
+  if (anyOf.length) {
+    checks += 1;
+    if (!anyOf.some(needle => stdout.includes(needle))) {
+      failures.push(`stdout contains none of ${JSON.stringify(anyOf)}`);
+    }
+  }
   for (const needle of asList(expect.contains)) {
     checks += 1;
     if (!combined.includes(needle)) failures.push(`output missing ${JSON.stringify(needle)}`);
@@ -84,7 +95,12 @@ module.exports = (output, context) => {
     } catch (_) {
       failures.push('stdout is not valid JSON');
     }
-    if (parsed) {
+    if (parsed === null || typeof parsed !== 'object') {
+      // A falsy-but-valid JSON body (null, 0, false, "") used to skip every declared
+      // key comparison while still counting as a check, so a scenario could pass
+      // having verified nothing at all.
+      if (parsed !== null) failures.push(`stdout parsed to ${JSON.stringify(parsed)}, not an object`);
+    } else {
       for (const [dotted, want] of Object.entries(expect.stdout_json)) {
         checks += 1;
         const got = readPath(parsed, dotted);

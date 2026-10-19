@@ -1,0 +1,134 @@
+# Live hook checks against a real agy session.
+#
+# These two questions were open for the entire port and could not be answered by
+# any offline suite:
+#   1. does agy ACCEPT our hooks.json, or does it silently drop groups?
+#   2. do the hooks actually RUN?
+#
+# The answer to (1) lives in agy's own CLI log, not in `agy plugin validate` —
+# validate reported a clean plugin while the host was logging
+#   Failed to parse hooks for plugin zensu: invalid hook "zensu-pre-invocation"
+# on every single run.
+#
+# (2) is answered by a trace the hooks leave themselves: the shipped shim appends
+# "<event> <script>" to $ZENSU_SHIM_TRACE, and the provider hands each probe its
+# own trace path inside that probe's throwaway workspace. Nothing is instrumented
+# by hand — an instrumented copy would prove only that the MODIFIED artifact fires.
+# These stay out of the default gate because they need a real agy, not because
+# they need a manual step.
+
+- description: "live: agy parses every hook group in the installed hooks.json"
+  vars:
+    scenario_id: live-hooks-parse-clean
+    probe: hooklog
+    prompt: "Reply with exactly: READY"
+    timeout_s: 90
+    expect:
+      stdout_contains_any: ["HOOK-PARSE-CLEAN", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
+      stdout_not_contains: ["HOOK-PARSE-REJECTED"]
+
+# `require_fired` names EVENT:SCRIPT pairs, not bare script names, and that is the
+# whole point. A bare "some hook fired" assertion stays green after reverting the
+# hooks.json flat-list fix: the host would again reject the PreInvocation and Stop
+# groups, the PreToolUse group alone would fire, and the scenario would report
+# success for the exact regression it exists to catch. These two pairs are the two
+# groups that were silently dropped.
+# A plain prompt makes no tool call, so PreToolUse/PostToolUse are deliberately not
+# required here — the Stop-cycle scenario below exercises those.
+- description: "live: the advisory and Stop hooks actually run in a real session"
+  vars:
+    scenario_id: live-hooks-fire
+    probe: hookfire
+    prompt: "Reply with exactly: READY"
+    timeout_s: 90
+    # Space-separated, NOT a YAML list — promptfoo turns an array-valued var into
+    # one test run per element.
+    require_fired: "PreInvocation:session-start-evidence-discipline.sh PreInvocation:session-start-primer.sh PreInvocation:session-start-prompt-ledger.sh PreInvocation:user-prompt-intent-router.sh PreInvocation:user-prompt-tdd-reminder.sh Stop:stop-chain-enforcer.sh"
+    expect:
+      stdout_contains_any: ["HOOKS-FIRED-ALL", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
+      stdout_not_contains: ["HOOKS-NOT-FIRED", "HOOKS-FIRED-MISSING"]
+
+# A single host registration dispatches the complete neutral gate chain. These
+# benign probes prove routing; the paired mutation probes below prove denial.
+- description: "live: every write-side gate executes behind one host handler"
+  vars:
+    scenario_id: live-hooks-fire-write
+    probe: hookfire
+    prompt: "Use write_to_file to create probe.txt in the current working directory containing hello. Then reply WROTE. Do not run a Zensu workflow."
+    timeout_s: 120
+    require_fired: "PreToolUse:pre-reviewer-capability-gate.sh PreToolUse:pre-write-plugin-data-guard.sh PreToolUse:pre-edit-tdd-reminder.sh PreToolUse:pre-write-secret-scan.sh PreToolUse:pre-work-order-gate.sh PostToolUse:post-artifact-redact.sh PostToolUse:post-work-order.sh"
+    expect:
+      stdout_contains_any: ["HOOKS-FIRED-ALL", "LIVE-INCONCLUSIVE", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
+      stdout_not_contains: ["HOOKS-NOT-FIRED", "HOOKS-FIRED-MISSING"]
+
+- description: "live: every shell-side gate executes behind one host handler"
+  vars:
+    scenario_id: live-hooks-fire-bash
+    probe: hookfire
+    prompt: "Use run_command to run exactly: echo zensu-probe. Then reply RAN."
+    timeout_s: 120
+    require_fired: "PreToolUse:pre-reviewer-capability-gate.sh PreToolUse:pre-bash-zensu-gate.sh PreToolUse:pre-bash-source-write-gate.sh PreToolUse:pre-write-secret-scan.sh PreToolUse:pre-browser-navigation-consent.sh PreToolUse:pre-work-order-gate.sh PostToolUse:post-artifact-redact.sh PostToolUse:post-browser-navigation-consent.sh PostToolUse:post-work-order.sh"
+    expect:
+      stdout_contains_any: ["HOOKS-FIRED-ALL", "LIVE-INCONCLUSIVE", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
+      stdout_not_contains: ["HOOKS-NOT-FIRED", "HOOKS-FIRED-MISSING"]
+
+- description: "live: writer secret denial prevents the actual write"
+  vars:
+    scenario_id: live-writer-secret-denied
+    probe: gatewrite
+    gate: writer-secret
+    timeout_s: 150
+    expect: &gate_expect
+      stdout_contains_any: ["GATE-BLOCKED GATE-HONORED CONTROL-WROTE", "LIVE-INCONCLUSIVE", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
+      stdout_not_contains: ["GATE-NOT-BLOCKED", "GATE-NOT-HONORED"]
+
+- description: "live: opt-in source gate prevents a tracked-source shell overwrite"
+  vars:
+    scenario_id: live-source-write-denied
+    probe: gatewrite
+    gate: source-write
+    timeout_s: 150
+    expect:
+      stdout_contains_any: ["GATE-BLOCKED GATE-HONORED CONTROL-WROTE IN-ROOT-TRACKED-SOURCE", "LIVE-INCONCLUSIVE", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
+      stdout_not_contains: ["GATE-NOT-BLOCKED", "GATE-NOT-HONORED", "GATE-WRONG-BRANCH"]
+
+- description: "live: shell secret denial works while the source gate is disabled"
+  vars:
+    scenario_id: live-shell-secret-denied
+    probe: gatewrite
+    gate: shell-secret
+    timeout_s: 150
+    expect: *gate_expect
+
+- description: "live: a plain prompt reaches the model and comes back"
+  vars:
+    scenario_id: live-session-round-trip
+    probe: prompt
+    prompt: "Reply with exactly: READY"
+    timeout_s: 90
+    expect:
+      stdout_contains_any: ["READY", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
+
+# The most expensive scenario in the suite, and the only one that proves the Stop
+# dialect end to end. It runs the conversation TWICE (once unarmed for the control,
+# once with the chain armed). The proof requires the native SYSTEM block and
+# later completed MODEL activity in that same armed turn. A bounded print timeout
+# may end observation while review work continues; chain completion is separate.
+#
+# STOP-BLOCKED is the enforcer's own decision; STOP-HONORED is the host obeying it.
+# Both are asserted, because either one alone would be satisfied by a broken
+# system: the enforcer happily writes block verdicts into a host that ignores them,
+# which is exactly the bug that shipped.
+- description: "live: the Stop verdict actually blocks the agent from stopping"
+  vars:
+    scenario_id: live-stop-block-and-resume
+    probe: stopcycle
+    prompt: "Reply with exactly: DONE"
+    timeout_s: 120
+    expect:
+      # The two verdicts are asserted as ONE literal, in the order the probe emits
+      # them. Requiring only "STOP-BLOCKED" and the absence of "STOP-NOT-HONORED"
+      # would stay green if the host verdict stopped being emitted at all — the
+      # assert-only-the-absence trap this suite has already shipped once.
+      stdout_contains_any: ["STOP-BLOCKED STOP-HONORED", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
+      stdout_not_contains: ["STOP-NOT-BLOCKED", "STOP-NOT-HONORED"]

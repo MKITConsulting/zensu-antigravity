@@ -1,68 +1,87 @@
 #!/usr/bin/env node
-// emit-verdict.js — the SOLE home of Antigravity's hook output schema. Given a
-// role (deny|context|block) and text, print the top-level verdict JSON that
-// Antigravity reads on stdout. The shim owns the exit code (always 0 unless the
-// contract is `exit`).
+'use strict';
+// emit-verdict.js — the SOLE home of Antigravity's hook output schema. Given the
+// EVENT being served and a role (deny|context|block), print the top-level verdict
+// JSON the host reads on stdout. The shim owns the exit code (always 0).
 //
-// The hook stdout/exit contract is the one [AMBIGUOUS] item quarantined here:
-//   - Convention A: {"allow_tool":false,"deny_reason":"..."}
-//   - Convention B: {"decision":"deny","reason":"..."}
-// Both sources agree the verdict is TOP-LEVEL and the hook exits 0. They differ
-// only on the field names. ZENSU_AG_HOOK_CONTRACT picks the dialect:
-//   superset (default) -> emit BOTH shapes (a probe; pin to the accepted single
-//                         dialect once a live `agy` deny-probe confirms which one
-//                         actually blocks — superset is the least-safe default
-//                         if a strict parser rejects a foreign verdict key, so it
-//                         must be verified before being relied on)
-//   allow_tool          -> Convention A only
-//   decision | exit     -> Convention B only (exit also flips the shim to rc 2)
+// The schema is per-EVENT, not per-role: the same "inject some context" intent is
+// a different wire shape on PreToolUse than on PreInvocation. Source of truth:
+// the host's own spec, ~/.gemini/antigravity-cli/builtin/skills/agy-customizations/
+// docs/hooks.md ("Input/Output Contract"), agy 1.1.10.
 //
-// ZENSU_AG_STOP_BLOCKS (Stop only): 1 -> emit the block verdict; 0 (default)
-// -> emit the directive as advisory allow-context (Stop is advisory until a live
-// probe confirms a plugin Stop hook can hard-block).
+//   PreToolUse    {"decision":"allow"|"deny"|"ask"|"force_ask","reason":"..."}
+//   PostToolUse   {}
+//   PreInvocation {"injectSteps":[{"ephemeralMessage":"..."}]}
+//   PostInvocation same as PreInvocation, plus optional terminationBehavior
+//   Stop          {"decision":"continue","reason":"..."} blocks the stop;
+//                 ANY other value lets the agent stop.
+//
+// Two of those were wrong before this file was rewritten, and both failures were
+// silent. The old code emitted a PreToolUse-shaped allow+additionalContext object
+// on PreInvocation, so no advisory ever reached the model; and it emitted
+// decision:"block" on Stop, which the host reads as "not continue" — i.e. stop
+// anyway — so the chain-enforcer could never hold a turn open. Neither produced a
+// warning anywhere. Do not reintroduce a role-only shape.
+//
+// ZV_EVENT selects the dialect. An unknown or missing event is a bug in the shim,
+// not in the host: emit {} without claiming an executable tool verdict rather than
+// guessing a shape that might deny a tool call or wedge the loop.
 
-var role = process.env.ZV_ROLE || "";
-var text = process.env.ZV_TEXT || "";
-var contract = process.env.ZENSU_AG_HOOK_CONTRACT || "superset";
-var stopBlocks = process.env.ZENSU_AG_STOP_BLOCKS === "1";
+const event = process.env.ZV_EVENT || "";
+const role = process.env.ZV_ROLE || "";
+const text = process.env.ZV_TEXT || "";
 
-function denyObj() {
-  if (contract === "allow_tool") return { allow_tool: false, deny_reason: text };
-  if (contract === "decision" || contract === "exit") return { decision: "deny", reason: text };
-  return { allow_tool: false, deny_reason: text, decision: "deny", reason: text };
+function injectSteps() {
+  return text ? { injectSteps: [{ ephemeralMessage: text }] } : {};
 }
 
-function allowContextObj() {
-  // Allow the action AND inject context. Honor the pinned dialect so the context
-  // path narrows to one shape too (the injection field name is host-dependent;
-  // superset emits the primary field name plus an alias). Extra keys are ignored by lenient
-  // parsers; a strict parser is satisfied once the dialect is pinned.
-  if (contract === "allow_tool") {
-    var a = { allow_tool: true };
-    if (text) a.context = text;
-    return a;
+function preToolUse() {
+  if (["deny", "ask", "force_ask", "allow"].includes(role)) {
+    return { decision: role, reason: text || "zensu hook requires a decision for this tool call." };
   }
-  if (contract === "decision" || contract === "exit") {
-    var d = { decision: "allow" };
-    if (text) d.additionalContext = text;
-    return d;
+  // The host requires an explicit decision: live control probes showed that
+  // {} is treated as a denial with an empty reason. Ask preserves the native
+  // permission path and Always Allow cache without auto-approving the tool.
+  // Advisory text has no channel on this event and must remain absent.
+  return { decision: "ask" };
+}
+
+function stop() {
+  // "continue" is the ONLY value that blocks stopping. A deny/block role means
+  // the chain is not finished, so the loop must re-enter.
+  if (role === "block" || role === "deny") {
+    return { decision: "continue", reason: text || "zensu: the review chain has not terminated." };
   }
-  var o = { decision: "allow", allow_tool: true };
-  if (text) { o.additionalContext = text; o.context = text; }
-  return o;
+  // Nothing to enforce: say nothing and let the agent stop.
+  return {};
 }
 
-function blockObj() {
-  if (!stopBlocks) return allowContextObj();
-  if (contract === "allow_tool") return { allow_tool: false, deny_reason: text };
-  if (contract === "decision" || contract === "exit") return { decision: "block", reason: text };
-  return { decision: "block", reason: text, allow_tool: false, deny_reason: text };
+// An uneventful PreToolUse still needs an explicit native permission decision.
+// Other events retain the empty verdict when there is nothing to emit.
+if (!role && event !== "PreToolUse") {
+  process.stdout.write("{}");
+  process.exit(0);
 }
 
-var o;
-if (role === "deny") o = denyObj();
-else if (role === "block") o = blockObj();
-else if (role === "context") o = allowContextObj();
-else o = {};
+let o;
+switch (event) {
+  case "PreToolUse":
+    o = preToolUse();
+    break;
+  case "PostToolUse":
+    // The host expects an empty object. There is no advisory channel here.
+    o = {};
+    break;
+  case "PreInvocation":
+  case "PostInvocation":
+    o = injectSteps();
+    break;
+  case "Stop":
+    o = stop();
+    break;
+  default:
+    o = {};
+    break;
+}
 
 process.stdout.write(JSON.stringify(o));

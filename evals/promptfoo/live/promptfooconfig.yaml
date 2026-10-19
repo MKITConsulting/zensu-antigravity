@@ -1,0 +1,36 @@
+description: "Zensu Antigravity plugin — LIVE proof suite (drives a real agy install)"
+
+# Opt-in only: every scenario reports LIVE-SKIPPED unless ZENSU_LIVE_AGY=1 and an
+# `agy` binary is on PATH. Run it with evals/promptfoo/live/run-live.sh.
+#
+# This is the only suite that can observe the HOST. The offline suite proves our
+# scripts behave; it cannot notice that agy rejected a hook group, ignored a
+# verdict shape, or never registered a component. All three shipped that way.
+
+providers:
+  - id: "exec: node ../lib/agy-live-provider.js"
+
+prompts:
+  - id: zensu-live-scenario
+    label: "live scenario runner"
+    raw: "{{scenario_id}}"
+
+defaultTest:
+  options:
+    transform: |
+      return typeof output === 'string' ? output : JSON.stringify(output);
+  assert:
+    - type: javascript
+      value: file://../assertions/expect.js
+
+tests:
+  - file://scenarios/commands.yaml
+  - file://scenarios/hooks.yaml
+  - file://scenarios/agents.yaml
+  - file://scenarios/runtime.yaml
+
+evaluateOptions:
+  # Each scenario is a real model call. Keep concurrency low so a sweep does not
+  # hammer the account, and let a slow first call finish.
+  maxConcurrency: 2
+  repeat: 1

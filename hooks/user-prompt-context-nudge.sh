@@ -19,17 +19,32 @@
 # prompt, and re-arms after a compaction shrinks the context back down.
 set -u
 
-: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+_ZENSU_EXECUTED_PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)" || exit 2
+if [ -n "${ZENSU_PLUGIN_ROOT:-}" ]; then
+  _ZENSU_DECLARED_PLUGIN_ROOT="$(cd -P -- "$ZENSU_PLUGIN_ROOT" 2>/dev/null && pwd -P)" || {
+    echo "zensu- inherited ZENSU_PLUGIN_ROOT does not match the executing plugin" >&2
+    exit 2
+  }
+  if [ "$_ZENSU_DECLARED_PLUGIN_ROOT" != "$_ZENSU_EXECUTED_PLUGIN_ROOT" ]; then
+    echo "zensu- inherited ZENSU_PLUGIN_ROOT does not match the executing plugin" >&2
+    exit 2
+  fi
+fi
+ZENSU_PLUGIN_ROOT="$_ZENSU_EXECUTED_PLUGIN_ROOT"
+unset _ZENSU_EXECUTED_PLUGIN_ROOT _ZENSU_DECLARED_PLUGIN_ROOT
+{ INPUT="$(cat)"; } 2>/dev/null
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-agent-context.sh"
+zensu_hook_is_main_principal "$INPUT" UserPromptSubmit || exit 0
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+zensu_bind_hook_session "$INPUT" || exit 0
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_context_nudge_enabled || exit 0
 command -v node >/dev/null 2>&1 || exit 0
 
-INPUT="$(cat)"
-
 read_field() {
-  PAYLOAD="$INPUT" FIELD="$1" node -e '
+  printf '%s' "$INPUT" | FIELD="$1" node -e '
     try {
-      const j = JSON.parse(process.env.PAYLOAD || "{}");
+      const j = JSON.parse(require("fs").readFileSync(0, "utf8") || "{}");
       const v = j[process.env.FIELD];
       process.stdout.write(typeof v === "string" ? v : "");
     } catch (_) { process.stdout.write(""); }
@@ -41,16 +56,32 @@ TRANSCRIPT="$(read_field transcript_path)"
 [ -f "$TRANSCRIPT" ] || exit 0
 
 SESSION_ID="$(read_field session_id)"
-source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
 SESSION_ID="$(zensu_resolve_session_id "$SESSION_ID")"
 
 THRESHOLD="$(zensu_context_nudge_threshold)"
 WINDOW="$(zensu_context_window_size)"
 
-STATE_DIR="${ZENSU_PROJECT_DIR:-.}/.zensu/state"
+STATE_DIR="$ZENSU_PROJECT_ROOT/.zensu/state"
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 STATE_FILE="${STATE_DIR}/context-nudge-${SESSION_ID}.txt"
 
+# UNBOUNDED, and named here so the obligation has an observer where the edit happens.
+# `$TRANSCRIPT` is host-supplied and lives outside the project root, so it can sit on
+# stalled or network-backed storage while this runs with no deadline above it.
+#
+# The ladder that bounds the Stop hook's equivalent children now lives in
+# `hooks/lib/zensu-bounded-run.sh` and is reachable from here with one `source` line;
+# wrapping this spawn is a one-line change deliberately left to its own review, because it
+# alters this hook's behaviour and belongs to this hook's own suite. Do not hand-copy the
+# ladder — source it.
+#
+# STATE THE EXPOSURE HONESTLY, because a first version of this comment called it "the same
+# exposure" the Stop hook bounds, and it is WIDER. That reader hardens its open — NUL
+# rejection, an `lstat` regular-file test before opening, `O_NOFOLLOW|O_NONBLOCK`, an
+# `fstat` re-check — which is why the Stop hook's residual narrows to a regular file on
+# stalled storage. This one opens with a plain `openSync(path, "r")` after a shell `[ -f ]`
+# in a different process, so a FIFO planted in the TOCTOU window blocks it outright. Both
+# the watchdog and the hardened open are owed here; neither is taken in this change set.
 TRANSCRIPT="$TRANSCRIPT" WINDOW="$WINDOW" THRESHOLD="$THRESHOLD" STATE_FILE="$STATE_FILE" node -e '
   const fs = require("fs");
   try {
@@ -69,7 +100,7 @@ TRANSCRIPT="$TRANSCRIPT" WINDOW="$WINDOW" THRESHOLD="$THRESHOLD" STATE_FILE="$ST
     fs.closeSync(fd);
     const lines = buf.toString("utf8").split("\n");
 
-    // Most recent NON-ZERO usage block. Session transcripts can end with a
+    // Most recent NON-ZERO usage block. the host runtime transcripts can end with a
     // trailing assistant record whose usage is all zeros (e.g. a stop/summary
     // record) — reading the literal last usage would mask the real occupancy, so
     // we skip zero-sum blocks and take the latest one that actually carries tokens.
@@ -92,7 +123,7 @@ TRANSCRIPT="$TRANSCRIPT" WINDOW="$WINDOW" THRESHOLD="$THRESHOLD" STATE_FILE="$ST
     // Hooks never receive the real context-window size. The only unambiguous signal
     // is occupancy: a 200k window cannot exceed 200k, so >200k proves a 1M session.
     // With context.windowSize unset we stay silent at or below 200k (a 200k session
-    // is handled by the host itself via auto-compaction; a 1M session there is nowhere
+    // is handled by the host runtime itself via auto-compaction; a 1M session there is nowhere
     // near full) and treat anything past 200k as the 1M window.
     const configured = Number.isInteger(cfgWindow) && cfgWindow > 0;
     let window;

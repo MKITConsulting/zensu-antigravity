@@ -1,4 +1,4 @@
-WARGAME ORDER. You are not executing this mission, you are wargaming it. A cheaper executor (a mid-tier model) runs the brief below later. Your job is the route it will follow.
+WARGAME ORDER. You are not executing this mission, you are wargaming it. A cheaper executor (Antigravity on a cheaper model) runs the brief below later. Your job is the route it will follow.
 
 Recon first, read-only: the process description and every tool it touches.
 
@@ -20,4 +20,4 @@ Map it into an automation blueprint. Classify every step as automate fully, auto
 
 Sequence the build starting with the step that saves the most time per week. Each phase of the build gets its own acceptance check, something I can run to confirm that phase works before starting the next.
 
-Delegate independent steps to subagents and keep working while they run. The final output is a blueprint I can hand to a coding agent and say, build phase one.
+Delegate independent steps to subagents and keep working while they run. The final output is a blueprint I can hand to Antigravity and say, build phase one.

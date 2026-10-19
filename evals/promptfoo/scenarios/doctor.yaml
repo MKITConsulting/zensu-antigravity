@@ -1,66 +1,84 @@
-- description: "doctor: the report renders all four diagnostic blocks"
+- description: 'doctor: the report renders all four diagnostic blocks'
   vars:
     scenario_id: doctor-renders-four-blocks
     kind: shell
-    script: &run_doctor |
-      bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-doctor.sh" 2>&1 || true
+    script: 'bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-doctor.sh" 2>&1 || true
+
+      '
     expect:
       matches:
-        - "CLI"
-        - "[Pp]lugin"
-        - "[Cc]onfig"
-        - "[Ss]ession"
-
-- description: "doctor: a missing CLI is reported, not fatal"
+      - CLI
+      - '[Pp]lugin'
+      - '[Cc]onfig'
+      - '[Ss]ession'
+- description: 'doctor: a missing CLI is reported, not fatal'
   vars:
     scenario_id: doctor-missing-cli-reported
     kind: shell
-    env: { PATH: "/usr/bin:/bin" }
-    script: |
-      bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-doctor.sh" >"$ZENSU_PROJECT_DIR/out.txt" 2>&1
-      echo "rc=$?"
-      grep -c . "$ZENSU_PROJECT_DIR/out.txt" >/dev/null && echo "REPORT_PRODUCED"
-    expect:
-      contains: ["rc=0", "REPORT_PRODUCED"]
+    env:
+      PATH: /usr/bin:/bin
+    script: 'bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-doctor.sh" >"$ZENSU_PROJECT_DIR/out.txt" 2>&1
 
-- description: "doctor: malformed config JSON is reported rather than crashing the report"
+      echo "rc=$?"
+
+      grep -c . "$ZENSU_PROJECT_DIR/out.txt" >/dev/null && echo "REPORT_PRODUCED"
+
+      '
+    expect:
+      contains:
+      - rc=0
+      - REPORT_PRODUCED
+- description: 'doctor: malformed config JSON is reported rather than crashing the report'
   vars:
     scenario_id: doctor-malformed-config-reported
     kind: shell
-    config: "{ this is not valid json"
-    script: *run_doctor
+    config: '{ this is not valid json'
+    script: 'bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-doctor.sh" 2>&1 || true
+
+      '
     expect:
       exit_code: 0
-      matches: ["[Cc]onfig"]
-
-- description: "doctor: the quoted-boolean config trap is surfaced"
+      matches:
+      - '[Cc]onfig'
+- description: 'doctor: the quoted-boolean config trap is surfaced'
   vars:
     scenario_id: doctor-quoted-boolean-trap
     kind: shell
     config: '{"hooks":{"autoTdd":"true"}}'
-    script: *run_doctor
+    script: 'bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-doctor.sh" 2>&1 || true
+
+      '
     expect:
       exit_code: 0
-      matches: ["autoTdd|quoted|string"]
-
-- description: "doctor: the report is read-only — it writes nothing into the project"
+      matches:
+      - autoTdd|quoted|string
+- description: 'doctor: the report is read-only — it writes nothing into the project'
   vars:
     scenario_id: doctor-is-read-only
     kind: shell
-    script: |
-      before="$(find "$ZENSU_PROJECT_DIR" -type f | sort)"
+    script: 'before="$(find "$ZENSU_PROJECT_DIR" -type f | sort)"
+
       bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-doctor.sh" >/dev/null 2>&1 || true
+
       after="$(find "$ZENSU_PROJECT_DIR" -type f | sort)"
+
       [ "$before" = "$after" ] && echo "READ_ONLY_CONFIRMED" || echo "PROJECT_MUTATED"
+
+      '
     expect:
       exit_code: 0
-      contains: ["READ_ONLY_CONFIRMED"]
-
-- description: "doctor: the host it reports on is Antigravity, never a foreign agent host"
+      contains:
+      - READ_ONLY_CONFIRMED
+- description: 'doctor: reports the native immutable session binding'
   vars:
     scenario_id: doctor-reports-antigravity-host
     kind: shell
-    script: *run_doctor
+    script: bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-doctor.sh" 2>&1
     expect:
-      matches: ["agy|Antigravity"]
-      not_matches: ["Cl[a]ude"]
+      exit_code: 0
+      matches:
+      - '[Ss]ession'
+      - '[Pp]lugin'
+      not_matches:
+      - Cl[a]ude
+    bind_session: true

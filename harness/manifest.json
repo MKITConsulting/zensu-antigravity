@@ -1,0 +1,7 @@
+{
+  "harness": "zensu-antigravity",
+  "contract_version": 1,
+  "launcher": "harness/launcher.js",
+  "supported_kinds": ["implement"],
+  "session_preparation": "Run --prepare before claiming; use its conversation_id as client_session_id, then resume with --conversation."
+}

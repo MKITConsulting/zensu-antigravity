@@ -4,7 +4,7 @@
 // step-10 fan-out (no hook consumer).
 //
 // Projects extend the review panel by dropping agent definitions at
-// .zensu/agents/zensu-review-*.md. Each may declare an `activation:`
+// .zensu/reviewers/zensu-review-*.md. Each may declare an `activation:`
 // frontmatter field — a comma-separated list of glob patterns matched against
 // the changed-file paths of the implementation. This helper decides, fully
 // deterministically, which personas join the fan-out batch:
@@ -17,7 +17,7 @@
 //                                       not equal to the filename stem
 //   drop <name> over-cap              — eligible, but the 5-spawn cap was hit
 //
-// The persona name doubles as the Antigravity subagent type and the finding
+// The persona name doubles as the Agent-tool subagent_type and the finding
 // ID prefix, so its shape is validated hard (single token, reserved
 // zensu-review- namespace, equal to the filename stem) — a file failing the
 // shape check is skipped as malformed, never spawned.
@@ -139,7 +139,9 @@ function decide(personasDir, changedPaths) {
   } catch (_) {
     return [];
   }
-  const files = entries.filter((f) => /^zensu-review-.*\.md$/.test(f)).sort();
+  const files = entries
+    .filter((f) => /^zensu-review-.*\.md$/.test(f))
+    .sort();
   const matched = [];
   const alwaysJoin = [];
   const rejected = [];

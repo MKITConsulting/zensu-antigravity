@@ -14,9 +14,11 @@ set -u
 # so a rule that is not written down does not exist.
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-TDD="$PLUGIN_DIR/skills/tdd/SKILL.md"
-AUTOPILOT="$PLUGIN_DIR/skills/autopilot/SKILL.md"
-IMPLEMENT="$PLUGIN_DIR/skills/implement/SKILL.md"
+. "$PLUGIN_DIR/tests/structure/lib-skill-text.sh"
+TDD="$(skill_text_file "$PLUGIN_DIR/skills/tdd")" || exit 1
+AUTOPILOT="$(skill_text_file "$PLUGIN_DIR/skills/autopilot")" || exit 1
+IMPLEMENT="$(skill_text_file "$PLUGIN_DIR/skills/implement")" || exit 1
+trap 'rm -f "$TDD" "$AUTOPILOT" "$IMPLEMENT"' EXIT
 # The artifact SHAPES live in the shipped templates the skills resolve; the
 # skills own the RULES about those shapes.
 PLAN_TPL="$PLUGIN_DIR/templates/tdd-plan.md"
@@ -30,7 +32,7 @@ check() {
   else echo "  FAIL  $label"; FAIL=$((FAIL+1)); fi
 }
 has()  { grep -qF -- "$2" "$1" 2>/dev/null; }
-hasE() { grep -qEi -- "$2" "$1" 2>/dev/null; }
+hasE() { tr '\n' ' ' < "$1" | grep -qEi -- "$2"; }
 
 for f in "$TDD" "$AUTOPILOT" "$IMPLEMENT"; do
   [ -f "$f" ] || { check "R0 missing skill file: ${f#"$PLUGIN_DIR"/}" FAIL; }
@@ -85,7 +87,7 @@ hasE "$TDD" 'vanilla' && hasE "$TDD" 'Requirements. table and the per-step .Cove
 
 # Stage: review. The reviewers receive the requirement baseline.
 hasE "$TDD" 'requirements_baseline' && check "R26 review stage: reviewers get a requirements baseline" PASS || check "R26 review baseline" FAIL
-hasE "$TDD" 'requirement drift' && check "R27 review stage: judge checks requirement drift" PASS || check "R27 judge requirement drift" FAIL
+hasE "$PLUGIN_DIR/agents/zensu-review-judge.md" 'behavioral drift against stable requirement IDs' && check "R27 review stage: judge checks requirement drift" PASS || check "R27 judge requirement drift" FAIL
 
 # Stage: validation. Autopilot asserts per id, and the PR body is keyed by id.
 hasE "$AUTOPILOT" 'every non-deprecated AC by its .AC-###. ID' \
@@ -100,16 +102,16 @@ hasE "$SPEC_TPL" 'never recycled' && has "$SPEC_TPL" 'AC-###' \
   && check "R30d spec template states the stable-id rule" PASS || check "R30d spec template id rule" FAIL
 
 # The skills must RESOLVE those templates rather than restate a second shape.
-has "$TDD" '--template tdd-plan' && check "R30e tdd resolves the shared plan template" PASS || check "R30e tdd template resolution" FAIL
-has "$AUTOPILOT" '--template autopilot-spec' && has "$AUTOPILOT" '--template autopilot-pr-body' \
+has "$TDD" '.zensu/templates/tdd-plan.md' && has "$TDD" '{plugin_root}/templates/tdd-plan.md' && check "R30e tdd resolves the shared plan template" PASS || check "R30e tdd template resolution" FAIL
+has "$AUTOPILOT" '.zensu/templates/autopilot-spec.md' && has "$AUTOPILOT" '$ROOT/templates/autopilot-spec.md' && has "$AUTOPILOT" '.zensu/templates/autopilot-pr-body.md' && has "$AUTOPILOT" '$ROOT/templates/autopilot-pr-body.md' \
   && check "R30f autopilot resolves the shared spec + PR-body templates" PASS || check "R30f autopilot template resolution" FAIL
 
 # Stage: hand-off. The ids survive the skill boundary in both directions.
-hasE "$AUTOPILOT" 'WITH their\s+.AC-###. IDs|Hand the ACs over' \
+hasE "$AUTOPILOT" 'WITH AC IDs.*retain every .AC-###. and .FR-###. identifier and requirement text verbatim' \
   && check "R31 hand-off: autopilot passes ids into the TDD skill" PASS || check "R31 autopilot->tdd hand-off" FAIL
 hasE "$IMPLEMENT" 'AC-###' && hasE "$IMPLEMENT" 'FR-###' \
   && check "R32 hand-off: implement gives its spec stable ids" PASS || check "R32 implement ids" FAIL
-hasE "$IMPLEMENT" 'adopts incoming IDs verbatim' \
+hasE "$IMPLEMENT" 'Adopt every existing .AC-###. and .FR-###. identifier and its text verbatim' \
   && check "R33 hand-off: implement states the adopt-verbatim contract" PASS || check "R33 implement adopt-verbatim" FAIL
 
 echo "----"

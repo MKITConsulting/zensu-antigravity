@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Skill frontmatter compliance for all 21 zensu skills. Each skills/<verb>/
+# Skill frontmatter compliance for all 32 zensu skills. Each skills/<verb>/
 # SKILL.md must carry YAML frontmatter whose `name` equals the folder name
 # (lowercase letters, digits, hyphens; max 64 chars) and a non-empty
 # `description` (max 1024 chars) that opens with the `[Zensu] ` marker so the
 # host's skill picker attributes it to this plugin. No skill body may reference
 # the `/zensu:x` colon-form invocation (Antigravity invokes via the `/<name>`
-# workflow shims, D4).
+# command shims, D4).
 #
 # The description extractor understands BOTH shapes in use: a single-line
 # scalar (plain, single- or double-quoted) and a YAML folded/literal block.
@@ -19,7 +19,7 @@ PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); printf '  ok   %s\n' "$*"; }
 bad() { FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$*"; }
 
-EXPECTED="autopilot bootstrap converge cover docs doctor ghost-scan implement pilot plan-review pr-fix-findings pr-team-review pulse reset-review-limit security-review self-review setup tdd verify-feature wargame zensu-help"
+EXPECTED="adopt-session autopilot autopilot-adopt autopilot-release bootstrap converge cover delivery-route docs doctor full-suite gauntlet-loop ghost-scan implement pilot plan-review pr-fix-findings pr-team-review pulse recover-chain reset-review-limit security-review self-review session-trail setup tdd tdd-mode verify-feature wargame work zen-mode zensu-help"
 
 read_description() { # $1=SKILL.md path
   awk '
@@ -86,7 +86,7 @@ ok "roster covers every skill dir on disk"
 
 # No `/zensu:` colon-form invocation anywhere in skill bodies.
 if [ -d "$ROOT/skills" ]; then
-  HITS="$(grep -rn "/zensu:" "$ROOT/skills" 2>/dev/null || true)"
+  HITS="$(grep -rn "/zensu:" "$ROOT/skills" 2>/dev/null | grep -v '<!-- /zensu:' || true)"
   [ -z "$HITS" ] && ok "no /zensu: colon-form in skills/" || { bad "colon-form found:"; printf '%s\n' "$HITS" | head -5; }
 fi
 

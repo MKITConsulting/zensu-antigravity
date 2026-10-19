@@ -41,3 +41,6 @@ tests/results/
 
 # Logs
 *.log
+
+# Session worktrees (other agents check out here; never part of the plugin)
+.claude/

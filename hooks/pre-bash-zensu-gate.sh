@@ -11,8 +11,8 @@
 #
 # Scoped to its actual threat model — a low-context agent writing to the real
 # tracked product — so it deliberately does NOT fire on: reads and `--help`/`-h`
-# (how an agent *gains* the context the gate wants), an explicit per-command
-# `ZENSU_MCP_GATE=off` prefix, or a write whose target backend
+# (how an agent *gains* the context the gate wants), the explicit per-command
+# `ZENSU_MCP_GATE=off` prefix of a main-thread command, or a write whose target backend
 # (`--api-url` flag / `ZENSU_API_URL` env) is localhost — a throwaway dev/test DB
 # where the dedup/journey/classification conventions are meaningless.
 #
@@ -24,11 +24,23 @@
 # replaces (the env/config knob name is kept for backward compatibility).
 set -u
 
-: "${ZENSU_PLUGIN_ROOT:=${ANTIGRAVITY_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+_ZENSU_EXECUTED_PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)" || exit 2
+if [ -n "${ZENSU_PLUGIN_ROOT:-}" ]; then
+  _ZENSU_DECLARED_PLUGIN_ROOT="$(cd -P -- "$ZENSU_PLUGIN_ROOT" 2>/dev/null && pwd -P)" || {
+    echo "zensu- inherited ZENSU_PLUGIN_ROOT does not match the executing plugin" >&2
+    exit 2
+  }
+  if [ "$_ZENSU_DECLARED_PLUGIN_ROOT" != "$_ZENSU_EXECUTED_PLUGIN_ROOT" ]; then
+    echo "zensu- inherited ZENSU_PLUGIN_ROOT does not match the executing plugin" >&2
+    exit 2
+  fi
+fi
+ZENSU_PLUGIN_ROOT="$_ZENSU_EXECUTED_PLUGIN_ROOT"
+unset _ZENSU_EXECUTED_PLUGIN_ROOT _ZENSU_DECLARED_PLUGIN_ROOT
 
 command -v node >/dev/null 2>&1 || exit 0
 
-INPUT="$(cat 2>/dev/null || true)"
+{ INPUT="$(cat 2>/dev/null || true)"; } 2>/dev/null
 
 # Parse the Bash command into zensu invocations. Emits one line per invocation,
 # tab-separated "<noun>\t<verb>". Emits nothing — so the
@@ -36,13 +48,14 @@ INPUT="$(cat 2>/dev/null || true)"
 # known noun set makes flag values (e.g. an --api-url argument) immune to being
 # misread as a subcommand, and basename=="zensu" keeps `bash .../zensu-log.sh`
 # and `.zensu/...` paths from ever matching.
-INVOCATIONS="$(PAYLOAD="$INPUT" ZAPI="${ZENSU_API_URL:-}" node -e '
-  let cmd = "";
+INVOCATIONS="$(printf '%s' "$INPUT" | ZAPI="${ZENSU_API_URL:-}" ZGUARD="${ZENSU_PLUGIN_ROOT}/hooks/lib/subagent-shell-guard-v1.js" node -e '
+  let cmd = "", sub = false;
   try {
-    const j = JSON.parse(process.env.PAYLOAD || "{}");
+    const j = JSON.parse(require("fs").readFileSync(0, "utf8") || "{}");
     if (j.tool_input && typeof j.tool_input.command === "string") cmd = j.tool_input.command;
+    sub = [j.agent_id, j.agent_type].some((v) => typeof v === "string" && v !== "");
   } catch (_) { process.exit(0); }
-  if (!cmd || cmd.indexOf("zensu") === -1) process.exit(0);
+  if (!cmd || !/(?:^|[^A-Za-z0-9_.-])zensu(?![A-Za-z0-9_-])/.test(cmd)) process.exit(0);
   const ALIAS = {product:"products",feature:"features",subfeature:"subfeatures",roadmaps:"roadmap",tier:"tiers",sec:"security",journey:"journeys",docs:"doc",kb:"knowledge","wiki-pages":"wiki"};
   const NOUNS = new Set("products features subfeatures roadmap tiers security journeys link ghost wiki doc knowledge pulse meta org auth product feature subfeature roadmaps tier sec journey docs kb wiki-pages".split(" "));
   const WRAP = new Set(["command","builtin","exec","env","sudo","nohup","nice","time"]);
@@ -58,25 +71,39 @@ INVOCATIONS="$(PAYLOAD="$INPUT" ZAPI="${ZENSU_API_URL:-}" node -e '
     }
     return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "::1" || h === "[::1]";
   }
-  const norm = cmd.replace(/\x24\x28|[\x60\x28\x29]/g, ";");                        // $( backtick ( ) start a fresh command — treat as boundaries. Hex escapes keep literal ()/$ out of the bash $(...)-embedded node script so its paren counter stays balanced.
-  for (const seg of norm.split(/\|\||&&|[;|\n&]/)) {
-    const toks = seg.trim().split(/\s+/).filter(Boolean);
-    let i = 0, base = "";
-    const envp = {};
-    for (;;) {
-      while (i < toks.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(toks[i])) {         // capture env prefixes (VAR=val)
-        const a = toks[i], eq = a.indexOf("=");
-        envp[a.slice(0, eq)] = a.slice(eq + 1).replace(/^[\x22\x27]+|[\x22\x27]+$/g, "");
-        i++;
+  function tokenInvocations() {
+    const found = [];
+    const norm = cmd.replace(/\x24\x28|[\x60\x28\x29]/g, ";");                      // $( backtick ( ) start a fresh command — treat as boundaries. Hex escapes keep literal ()/$ out of the bash $(...)-embedded node script so its paren counter stays balanced.
+    for (const seg of norm.split(/\|\||&&|[;|\n&]/)) {
+      const toks = seg.trim().split(/\s+/).filter(Boolean);
+      let i = 0, base = "";
+      const envp = {};
+      for (;;) {
+        while (i < toks.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(toks[i])) {       // capture env prefixes (VAR=val)
+          const a = toks[i], eq = a.indexOf("=");
+          envp[a.slice(0, eq)] = a.slice(eq + 1).replace(/^[\x22\x27]+|[\x22\x27]+$/g, "");
+          i++;
+        }
+        if (i >= toks.length) break;
+        const t = toks[i].replace(/^\\/, "").replace(/^[\x22\x27]+|[\x22\x27]+$/g, ""); // strip a leading backslash and any wrapping quote chars; quote bytes are hex-escaped so no literal quote appears in this bash single-quoted node script
+        if (WRAP.has(t)) { i++; continue; }                                        // skip transparent wrappers (command/env/sudo/…)
+        base = t.split("/").pop(); break;                                           // resolved command basename
       }
-      if (i >= toks.length) break;
-      const t = toks[i].replace(/^\\/, "").replace(/^[\x22\x27]+|[\x22\x27]+$/g, ""); // strip a leading backslash and any wrapping quote chars; quote bytes are hex-escaped so no literal quote appears in this bash single-quoted node script
-      if (WRAP.has(t)) { i++; continue; }                                          // skip transparent wrappers (command/env/sudo/…)
-      base = t.split("/").pop(); break;                                             // resolved command basename
+      if (base !== "zensu") continue;                                              // command basename must be zensu
+      found.push({ envp, rest: toks.slice(i + 1) });
     }
-    if (base !== "zensu") continue;                                                // command basename must be zensu
-    const rest = toks.slice(i + 1);
-    if (envp.ZENSU_MCP_GATE === "off") {                                           // explicit per-command bypass (deliberate one-off) — reported as a ledger marker
+    return found;
+  }
+  let invocations = tokenInvocations();
+  try {
+    invocations = require(process.env.ZGUARD).commandInvocations(cmd, { platform: process.platform })
+      .filter((c) => c.name === "zensu")
+      .map((c) => ({ envp: c.environment, rest: c.words }))
+      .concat(invocations);
+  } catch (_) {}
+  for (const invocation of invocations) {
+    const envp = invocation.envp, rest = invocation.rest;
+    if (envp.ZENSU_MCP_GATE === "off" && !sub) {                                   // explicit per-command bypass (deliberate one-off) — reported as a ledger marker
       if (out.indexOf("__bypass__\tZENSU_MCP_GATE") < 0) out.push("__bypass__\tZENSU_MCP_GATE");
       continue;
     }
@@ -100,80 +127,98 @@ INVOCATIONS="$(PAYLOAD="$INPUT" ZAPI="${ZENSU_API_URL:-}" node -e '
       const t = rest[m];
       if (t === "--api-url") { m++; continue; }
       if (t.charAt(0) === "-") continue;
-      verb = t; break;
+      verb = t.split(/[\t\r\n]/)[0]; break;
     }
     out.push(noun + "\t" + verb);
   }
   process.stdout.write(out.join("\n"));
 ' 2>/dev/null)"
 
-# No zensu CLI invocation at all (or unparseable) → not our concern, allow
-# (fail-open, mirroring the MCP gate's empty/non-JSON behaviour). Inline bypasses
-# still parse as __bypass__ marker lines, so a bypassed zensu segment never lands
-# in this hot-path exit.
-[ -z "$INVOCATIONS" ] && exit 0
-
 field() {
-  PAYLOAD="$INPUT" F="$1" node -e '
+  printf '%s' "$INPUT" | F="$1" node -e '
     try {
-      const j = JSON.parse(process.env.PAYLOAD || "{}");
+      const j = JSON.parse(require("fs").readFileSync(0, "utf8") || "{}");
       const v = j[process.env.F];
       process.stdout.write(typeof v === "string" ? v : "");
     } catch (_) { process.stdout.write(""); }
   ' 2>/dev/null
 }
 
+# No zensu CLI invocation at all (or unparseable) → not our concern, allow
+# (fail-open, mirroring the MCP gate's empty/non-JSON behaviour). Inline
+# bypasses still parse as __bypass__ marker lines, so a bypassed zensu segment
+# never lands in this hot-path exit.
+[ -z "$INVOCATIONS" ] && exit 0
+
 # Config-disabled gate has no decision point — nothing to bypass, nothing to
-# ledger (kept ahead of the marker/escape handling on purpose).
+# ledger (kept ahead of the marker/escape handling so all Bash gates share the
+# order).
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-config.sh"
 zensu_hook_enabled mcpGate || exit 0
 
-# Bypass ledger: escapes stay free, but while a Zensu session is active the
-# opt-out is recorded to chain state (fail-open, gate name only). Inline escapes
-# are reported by the embedded parser itself (__bypass__ marker lines in
-# INVOCATIONS) — the one code path that decides the bypass — so quoted
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
+if ! zensu_bind_hook_session "$INPUT"; then
+  # The two recognized commands are reachable in EVERY bind failure, not only the
+  # two relaxable ones — including a record that exists and disagrees, which is
+  # what a mid-session plugin upgrade produces. Denying them there put
+  # /zensu-doctor behind the very defect it reports and left the repair
+  # unreachable with it. Everything else in this branch denies as before.
+  if zensu_doctor_allowed "$INPUT"; then
+    exit 0
+  fi
+  # A deny still has to say WHY. The named-state ladder and its rationale live in
+  # zensu_emit_named_bind_deny (hooks/lib/zensu-session.sh). This gate names no
+  # fallback scope, so an unnamed state gets the generic deny.
+  zensu_emit_named_bind_deny "$INPUT"
+  exit 0
+fi
+
+# Bypass ledger: escapes stay free, but while a TDD session is active the
+# opt-out is recorded to chain state (fail-open, gate name only). Inline
+# escapes are reported by the embedded parser itself (__bypass__ marker lines
+# in INVOCATIONS) — the one code path that decides the bypass — so quoted
 # spellings, mixed commands, and mere textual mentions all behave correctly.
 # Recording is DEFERRED to the allow outcomes below: a command that ends up
-# denied never executes, so it must not mint a ledger entry.
-source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-bypass-ledger.sh"
+# denied never executes, so it must not mint a ledger entry (deny wins over
+# markers, same rule the source-write parser enforces).
+source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
 
 BYPASS_GATES="$(printf '%s\n' "$INVOCATIONS" | awk -F'\t' '$1=="__bypass__"{print $2}')"
-INVOCATIONS="$(printf '%s\n' "$INVOCATIONS" | grep -v '^__bypass__' || true)"
+INVOCATIONS="$(printf '%s\n' "$INVOCATIONS" | grep -v '^__bypass__')"
 record_bypass_markers() {
-  local gate
   for gate in $BYPASS_GATES; do
     case "$gate" in
-      ZENSU_MCP_GATE) zensu_bypass_record_payload "$INPUT" "$gate" 2>/dev/null || true ;;
+      ZENSU_MCP_GATE) tdd_record_bypass_payload "$INPUT" "$gate" 2>/dev/null || true ;;
     esac
   done
 }
 
-# Only markers left, no real invocation → allow (and record them).
+# Only markers, no real invocation left → allow.
 [ -z "$INVOCATIONS" ] && { record_bypass_markers; exit 0; }
 
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh"
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh"
 
 # Global env escape (applies regardless of which tool) — an allow outcome, so
-# record the env escape plus any inline markers here.
-[ "${ZENSU_MCP_GATE:-}" = "off" ] && { zensu_bypass_record_payload "$INPUT" ZENSU_MCP_GATE 2>/dev/null || true; record_bypass_markers; exit 0; }
+# record env + any markers here.
+[ "${ZENSU_MCP_GATE:-}" = "off" ] && { tdd_record_bypass_payload "$INPUT" ZENSU_MCP_GATE 2>/dev/null || true; record_bypass_markers; exit 0; }
 
+SID_CURRENT="$(zensu_resolve_session_id "$(field session_id)" 2>/dev/null || true)"
+AGENT_ID="$(field agent_id)"
 AGENT_TYPE="$(field agent_type)"
-case "$AGENT_TYPE" in
-  *zensu-plm*) record_bypass_markers; exit 0 ;;
-esac
+IS_SUBAGENT=false
+if [ -n "$AGENT_ID" ] || [ -n "$AGENT_TYPE" ]; then
+  IS_SUBAGENT=true
+fi
 
-source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-session.sh"
-source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-tdd-phase.sh"
-SID_PRIMARY="$(zensu_resolve_session_id "$(field session_id)")"
-SID_FALLBACK="$(zensu_resolve_session_id "${ZENSU_SESSION_ID:-}")"
-
-# Returns 0 (allowed) if a workflow declaring $1 is active in either session.
+# Returns 0 (allowed) only when the current hook payload session (or, when the
+# payload omitted it, the exact exported Session Control key) owns a workflow
+# declaring $1. Ambient HOST_SESSION_ID is legacy introspection data and must
+# never donate another session's authorization.
 tool_allowed_by_workflow() {
   local tool="$1"
-  [ "$(zensu_workflow_allows "$(tdd_state_file "$SID_PRIMARY")" "$tool")" = "true" ] && return 0
-  [ -n "$SID_FALLBACK" ] && [ "$SID_FALLBACK" != "$SID_PRIMARY" ] \
-    && [ "$(zensu_workflow_allows "$(tdd_state_file "$SID_FALLBACK")" "$tool")" = "true" ] && return 0
+  [ -n "$SID_CURRENT" ] || return 1
+  [ "$(zensu_workflow_allows "$(tdd_state_file "$SID_CURRENT")" "$tool")" = "true" ] && return 0
   return 1
 }
 
@@ -184,6 +229,10 @@ while IFS="$(printf '\t')" read -r noun verb; do
   [ -z "$TOOL" ] && continue                          # unknown/neutral (auth, version) → allow
   zensu_is_read_tool "$TOOL" && continue              # read → allow
   zensu_is_mutation_tool "$TOOL" || continue          # not a known mutation → allow (safety)
+  if [ "$IS_SUBAGENT" = true ]; then
+    DENY_TOOL="$TOOL"
+    break                                               # a child never borrows main's workflow window
+  fi
   tool_allowed_by_workflow "$TOOL" && continue        # workflow-driven → allow
   DENY_TOOL="$TOOL"; break                            # freelance mutation → deny
 done <<EOF
@@ -192,7 +241,11 @@ EOF
 
 [ -z "$DENY_TOOL" ] && { record_bypass_markers; exit 0; }
 
-REASON="Zensu state-mutating command (maps to '${DENY_TOOL}') was blocked. A direct main-thread \`zensu\` mutation bypasses the Zensu workflow conventions (dedup, user journeys, baseline revisions, security classification, release-readiness gates) that the skills and the zensu-plm agent enforce. Run the matching skill — /zensu-bootstrap or /zensu-ghost-scan (onboarding), /zensu-implement (feature work), /zensu-security-review (classification/review) — or delegate the whole task to the zensu-plm agent, instead of running the zensu CLI mutation directly. For a deliberate one-off, prefix the command with ZENSU_MCP_GATE=off (honored inline); writes targeting a localhost backend (--api-url/ZENSU_API_URL) and --help are never gated."
+if [ "$IS_SUBAGENT" = true ]; then
+  REASON="Zensu state-mutating command (maps to '${DENY_TOOL}') was blocked. Zensu CLI mutations are reserved for the interactive main thread: a subagent never borrows the main thread's skill window, and the per-command gate escape is a deliberate one-off for the main thread, never a route for a subagent. Do not retry this command, with or without a prefix. Report the operation you need to the main thread, which runs it through the matching skill — /zensu-bootstrap or /zensu-ghost-scan (onboarding), /zensu-implement (feature work), /zensu-security-review (classification/review)."
+else
+  REASON="Zensu state-mutating command (maps to '${DENY_TOOL}') was blocked. A direct command without an active main-thread skill window bypasses the Zensu workflow conventions (dedup, user journeys, baseline revisions, security classification, release-readiness gates). Run the matching skill — /zensu-bootstrap or /zensu-ghost-scan (onboarding), /zensu-implement (feature work), /zensu-security-review (classification/review) — in the interactive main thread. For a deliberate one-off, prefix the command with ZENSU_MCP_GATE=off (honored inline); writes targeting a localhost backend (--api-url/ZENSU_API_URL) and --help are never gated."
+fi
 
 REASON="$REASON" node -e '
   process.stdout.write(JSON.stringify({

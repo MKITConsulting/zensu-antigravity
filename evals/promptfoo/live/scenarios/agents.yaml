@@ -1,0 +1,8 @@
+- description: "live: two native read-only agents produce distinct verified child completion receipts"
+  vars:
+    scenario_id: live-native-agent-delegation
+    probe: nativeagents
+    timeout_s: 240
+    expect:
+      stdout_contains_any: ["NATIVE-AGENTS-VERIFIED READONLY-DENIAL-HONORED", "LIVE-SKIPPED", "LIVE-UNAVAILABLE", "LIVE-INCONCLUSIVE"]
+      stdout_not_contains: ["NATIVE-AGENT-STATE-CHANGED"]

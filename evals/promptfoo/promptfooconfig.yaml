@@ -27,6 +27,7 @@ tests:
   - file://scenarios/doctor.yaml
   - file://scenarios/orchestration.yaml
   - file://scenarios/manifest.yaml
+  - file://scenarios/host-contract.yaml
 
 evaluateOptions:
   maxConcurrency: 4
