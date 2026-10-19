@@ -31,9 +31,11 @@ combined `SHA256SUMS`. Before distributing a package, run the deterministic gate
 live suite against the extracted, natively installed artifact. An accepted manifest alone
 does not prove hook execution, rule loading or actual denial by the gates.
 
-## Publisher intake draft
+## Publisher intake
 
-Status: **prepared; not submitted or approved**. Keep this status accurate after submission.
+Status: **submitted on 2026-10-19; awaiting Google's review, not approved or listed**.
+The Google form displayed its submission confirmation after the public documentation page
+was verified. Submission is an expression of publisher interest, not Marketplace acceptance.
 The repository remains private. The intake form does not require a public repository URL.
 Do not change repository visibility as part of submission.
 
@@ -45,11 +47,11 @@ Do not change repository visibility as part of submission.
 | Primary contact name | Marcel Karras |
 | Primary contact email | integrations@zensu.dev |
 | Public support email | integrations@zensu.dev |
-| Documentation URL | https://zensu.dev/antigravity/ — use only after publication and verification |
+| Documentation URL | https://zensu.dev/antigravity/ |
 
 Provider identity is published in [Zensu's imprint](https://zensu.dev/imprint/).
 
-Suggested plugin description:
+Submitted plugin description:
 
 > Zensu brings feature tracking, implementation workflows, evidence checks, native agent
 > review, security reviews and release-readiness gates to Google Antigravity. The standalone
@@ -57,8 +59,8 @@ Suggested plugin description:
 > typed CLI. It runs directly in Antigravity, with session-bound authority and completion
 > checks. Strict test-first implementation is optional; evidence and review remain required
 > in an armed workflow. Native CLI behavior is verified on agy 1.4.2. IDE acceptance is a
-> separate, unverified target.
+> separate, unverified target. Package access and support: integrations@zensu.dev.
 
-Submit only after the public documentation page is live. Google controls acceptance and
-the final listing identifier; do not advertise a catalog installation command before the
-listing has been confirmed in the native catalog.
+The public documentation was published in website release `www/v0.21.0` before submission.
+Google controls acceptance and the final listing identifier; do not advertise a catalog
+installation command before the listing has been confirmed in the native catalog.
