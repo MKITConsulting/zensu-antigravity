@@ -54,8 +54,9 @@ from surviving an update. The source ZIP is a separate artifact: use its `instal
 the unrendered repository directly.
 
 Google now offers an [official curated Antigravity Marketplace](https://antigravity.google/docs/marketplace?tab=cli).
-Zensu is being prepared for inclusion and is **not yet listed**. Google reviews submissions;
-there is no documented Claude-style custom marketplace manifest to add to this repository.
+Zensu's publisher interest form was submitted on 2026-10-19 and is **awaiting Google's
+review; not yet listed**. There is no documented Claude-style custom marketplace manifest
+to add to this repository.
 Contact **integrations@zensu.dev** for package access and support while listing is pending.
 See [distribution and submission details](docs/distribution.md).
 
