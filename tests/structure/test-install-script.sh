@@ -210,6 +210,88 @@ IFS='|' read -r TOTAL BADLIST < "$TMP/hookstats"
 [ -z "${BADLIST:-}" ] && ok "every wrapped command is an absolute shim path at the destination with a bare, existing script" \
   || bad "malformed wrapped command(s): $BADLIST"
 
+# --- portable package: relocation without host or user-state writes ----------
+: > "$AGY_LOG"
+run_install --portable-stage-only >"$TMP/portable-missing.out" 2>&1
+[ "$?" != "0" ] && ok "portable staging requires a directory" || bad "portable staging fell through to install"
+run_install --portable-stage-only "" >"$TMP/portable-empty.out" 2>&1
+[ "$?" != "0" ] && ok "portable staging refuses an empty directory" || bad "portable staging accepted an empty directory"
+run_install --portable-stage-only "$TMP/portable" --uninstall >"$TMP/portable-conflict.out" 2>&1
+[ "$?" != "0" ] && ok "portable staging refuses uninstall" || bad "portable staging allowed uninstall"
+run_install --portable-stage-only "$TMP/portable" --stage-only "$TMP/other" >"$TMP/portable-conflict2.out" 2>&1
+[ "$?" != "0" ] && ok "staging modes cannot be combined" || bad "staging modes were combined"
+run_install --portable-stage-only "$TMP/portable-dry" --dry-run >"$TMP/portable-dry.out" 2>&1
+{ [ "$?" = "0" ] && [ ! -e "$TMP/portable-dry" ]; } && ok "portable dry-run writes nothing" || bad "portable dry-run wrote files"
+run_install --portable-stage-only "$FAKE_HOME/.gemini/config/plugins/portable" >"$TMP/portable-guard.out" 2>&1
+[ "$?" != "0" ] && ok "portable staging retains the host-root guard" || bad "portable staging wrote inside the host root"
+run_install --portable-stage-only "$TMP/portable stage one" >"$TMP/portable.out" 2>&1
+[ "$?" = "0" ] && ok "portable staging supports spaces" || { bad "portable stage failed"; tail -5 "$TMP/portable.out"; }
+cp -R "$TMP/portable stage one" "$TMP/relocated stage two"
+node - "$TMP/portable stage one/zensu" "$TMP/relocated stage two/zensu" <<'JS'
+const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
+const roots = process.argv.slice(2);
+const hashes = roots.map(root => {
+  const hooks = JSON.parse(fs.readFileSync(path.join(root, 'hooks.json'), 'utf8'));
+  const seen = [];
+  for (const group of Object.values(hooks)) for (const [event, entries] of Object.entries(group)) {
+    assert.equal(entries.length, 1);
+    const h = entries[0].hooks ? entries[0].hooks[0] : entries[0];
+    assert.match(h.command, /^bash \.\/hooks\/antigravity\/antigravity-shim\.sh [a-z-]+\.sh [A-Za-z]+$/);
+    assert.ok(h.command.endsWith(` ${event}`)); seen.push(event);
+  }
+  assert.deepEqual(seen.sort(), ['PostToolUse', 'PreInvocation', 'PreToolUse', 'Stop'].sort());
+  const run = require('node:child_process').spawnSync('bash', ['./hooks/antigravity/antigravity-shim.sh', '--list-handlers', 'pre-tool-chain.sh', 'Bash'], {cwd: root, encoding: 'utf8'});
+  assert.equal(run.status, 0); assert.ok(run.stdout.includes('pre-write-secret-scan.sh'));
+  return require(path.join(root, 'hooks/lib/session-control-core-v1.js')).computeRuntimeDigest(root, 'native');
+});
+assert.equal(hashes[0], hashes[1]);
+JS
+[ "$?" = "0" ] && ok "portable hooks and runtime digest survive relocation" || bad "portable runtime depends on the build path"
+[ -s "$AGY_LOG" ] && bad "portable staging invoked agy" || ok "portable staging never invokes agy"
+
+HOME="$FAKE_HOME" ZENSU_TEST_HOME="$FAKE_HOME" AGY_LOG="$AGY_LOG" PATH="$BIN:$PATH" \
+  bash "$PLUGIN_DIR/package-native.sh" "$TMP/packages" >"$TMP/package.out" 2>&1
+[ "$?" = "0" ] && ok "native ZIP builds without the host" || { bad "native ZIP build failed"; tail -5 "$TMP/package.out"; }
+VERSION="$(node -p 'require(process.argv[1]).version' "$PLUGIN_DIR/plugin.json")"
+ARCHIVE="$TMP/packages/zensu-antigravity-native-v$VERSION.zip"
+node - "$ARCHIVE" <<'JS'
+const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), assert = require('node:assert/strict');
+const file = process.argv[2];
+assert.equal(fs.readFileSync(`${file}.sha256`, 'utf8'), `${crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')}  ${path.basename(file)}\n`);
+JS
+[ "$?" = "0" ] && ok "native ZIP checksum matches the bytes" || bad "native ZIP checksum mismatch"
+unzip -q "$ARCHIVE" -d "$TMP/unpacked" && diff -qr "$TMP/portable stage one/zensu" "$TMP/unpacked/zensu" >"$TMP/package-diff.out"
+[ "$?" = "0" ] && ok "native ZIP contains exactly the curated portable stage" || bad "native ZIP differs from the portable stage"
+bash "$PLUGIN_DIR/package-native.sh" "$TMP/packages" >"$TMP/package-repeat.out" 2>&1
+[ "$?" != "0" ] && ok "packager refuses to overwrite an existing artifact" || bad "packager replaced an artifact"
+[ -s "$AGY_LOG" ] && bad "native packaging invoked agy" || ok "native packaging never invokes agy"
+
+# An incomplete or linked source cannot become a distributable artifact.
+cp -R "$TMP/portable stage one/zensu" "$TMP/package-source"
+cp "$INSTALL" "$PLUGIN_DIR/hooks.json.template" "$TMP/package-source/"
+rm "$TMP/package-source/plugin.json"
+HOME="$FAKE_HOME" bash "$TMP/package-source/install.sh" --portable-stage-only "$TMP/incomplete-stage" >"$TMP/incomplete.out" 2>&1
+[ "$?" != "0" ] && ok "portable staging rejects an incomplete source" || bad "portable staging accepted an incomplete source"
+cp "$PLUGIN_DIR/plugin.json" "$TMP/package-source/"
+ln -s "$PLUGIN_DIR/README.md" "$TMP/package-source/docs/linked.md"
+HOME="$FAKE_HOME" bash "$TMP/package-source/install.sh" --portable-stage-only "$TMP/linked-stage" >"$TMP/linked.out" 2>&1
+[ "$?" != "0" ] && ok "portable staging rejects symbolic links" || bad "portable staging accepted linked content"
+
+rm "$TMP/package-source/docs/linked.md"
+cp "$PLUGIN_DIR/package-native.sh" "$TMP/package-source/"
+git -C "$TMP/package-source" init -q
+git -C "$TMP/package-source" add .
+printf 'Synthetic local-only note\n' > "$TMP/package-source/docs/local-note.txt"
+HOME="$FAKE_HOME" bash "$TMP/package-source/package-native.sh" "$TMP/private-package" >"$TMP/private-package.out" 2>&1
+{ [ "$?" != "0" ] && grep -q 'Untracked package entry: docs/local-note.txt' "$TMP/private-package.out"; } \
+  && ok "native packaging rejects untracked descendants" || bad "native packaging included a local-only note"
+rm "$TMP/package-source/docs/local-note.txt"
+printf '.env\n' > "$TMP/package-source/.gitignore"
+printf 'SYNTHETIC_FIXTURE=not-a-secret\n' > "$TMP/package-source/hooks/.env"
+HOME="$FAKE_HOME" bash "$TMP/package-source/package-native.sh" "$TMP/ignored-package" >"$TMP/ignored-package.out" 2>&1
+{ [ "$?" != "0" ] && grep -q 'Untracked package entry: hooks/.env' "$TMP/ignored-package.out"; } \
+  && ok "native packaging rejects ignored descendants" || bad "native packaging included an ignored local file"
+
 # --- full install: pin the effects -------------------------------------------
 : > "$AGY_LOG"
 run_install >"$TMP/install.out" 2>&1

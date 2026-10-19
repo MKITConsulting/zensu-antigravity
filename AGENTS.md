@@ -37,8 +37,8 @@ The version lives in **three** places that must carry the same value in the same
 3. `CHANGELOG.md` → the newest `## [X.Y.Z]` heading
 
 Commit subject: `chore(release): bump version to X.Y.Z`. Machine-enforced by
-`tests/structure/test-version-sync.sh`. There is **no marketplace manifest** — Antigravity
-has none, so there is no fourth file. The `Release` workflow bumps all three together; for a
+`tests/structure/test-version-sync.sh`. Google's curated Antigravity Marketplace has no
+documented repository-owned marketplace manifest, so there is no fourth file. The `Release` workflow bumps all three together; for a
 manual hotfix follow the invariant by hand.
 
 ## Architecture invariants
@@ -93,6 +93,9 @@ manual hotfix follow the invariant by hand.
 - **`hooks.json` is generated at install and gitignored.** `install.sh` renders `hooks.json`
   from the tracked `hooks.json.template` (replacing `__ZENSU_HOME__` with absolute paths);
   the generated `hooks.json` is gitignored — edit `hooks.json.template` instead.
+  `--portable-stage-only` instead renders `.` for native distribution. agy 1.4.2 executes
+  commands from the directory containing `hooks.json`, verified with an isolated live probe.
+  `package-native.sh` packages only the curated stage, rejects symbolic links and never invokes agy.
 - **Plugin-root and session binding.** The adapter resolves its installed root and exports
   `ZENSU_PLUGIN_ROOT` before invoking the neutral scripts. Installation records the separate
   `~/.zensu/antigravity/plugin-root` pointer. Stateful model calls use the exact session-helper

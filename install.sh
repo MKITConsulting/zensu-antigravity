@@ -16,11 +16,13 @@
 #      `evals/` and the local `.zensu/` runtime state into the plugin.
 #
 # So: build a CURATED staging tree outside the plugin root, render hooks.json
-# into it with the FINAL destination baked in (the importer will not expand a
-# placeholder later), then hand that tree to the host importer.
+# into it with the FINAL destination baked in, then hand it to the host importer.
+# Portable staging instead uses relative commands: agy executes each command in
+# the directory containing hooks.json (verified on 1.4.2).
 #
 # Usage:
 #   install.sh [--dry-run] [--uninstall] [--stage-only <dir>]
+#   install.sh --portable-stage-only <dir> [--dry-run]
 #
 # ~/.zensu user data (config.json) is never removed by --uninstall.
 
@@ -36,24 +38,30 @@ ZENSU_HOME_DIR="$HOME/.zensu"
 ZENSU_HOST_HOME_DIR="$ZENSU_HOME_DIR/antigravity"
 PLUGIN_PARENTS=("$HOME/.gemini/config/plugins" "$HOME/.gemini/antigravity-cli/plugins")
 
-DRY=0; UNINSTALL=0; STAGE_ONLY=""; STAGE_ONLY_SET=0
+DRY=0; UNINSTALL=0; STAGE_ONLY=""; STAGE_ONLY_SET=0; PORTABLE=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dry-run)    DRY=1 ;;
     --uninstall)  UNINSTALL=1 ;;
-    --stage-only)
+    --stage-only|--portable-stage-only)
       # A missing value used to fall through to a REAL install, and a following
       # flag was swallowed as the directory name.
-      [ "$#" -ge 2 ] || { echo "install.sh: --stage-only needs a directory" >&2; exit 2; }
-      [ -n "$2" ] || { echo "install.sh: --stage-only needs a NON-EMPTY directory" >&2; exit 2; }
-      case "$2" in -*) echo "install.sh: --stage-only needs a directory, got '$2'" >&2; exit 2 ;; esac
+      [ "$STAGE_ONLY_SET" -eq 0 ] || { echo "install.sh: choose one staging mode" >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "install.sh: $1 needs a directory" >&2; exit 2; }
+      [ -n "$2" ] || { echo "install.sh: $1 needs a NON-EMPTY directory" >&2; exit 2; }
+      case "$2" in -*) echo "install.sh: $1 needs a directory, got '$2'" >&2; exit 2 ;; esac
+      [ "$1" != "--portable-stage-only" ] || PORTABLE=1
       shift; STAGE_ONLY="$1"; STAGE_ONLY_SET=1
       ;;
-    -h|--help)    sed -n '2,25p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)    sed -n '2,/^set -u/{ /^set -u/d; p; }' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "install.sh: unknown argument '$1'" >&2; exit 2 ;;
   esac
   shift
 done
+[ "$STAGE_ONLY_SET" -eq 0 ] || [ "$UNINSTALL" -eq 0 ] \
+  || { echo "install.sh: staging cannot be combined with --uninstall" >&2; exit 2; }
+HOOK_ROOT="$DEST"
+[ "$PORTABLE" -eq 0 ] || HOOK_ROOT="."
 
 say()  { printf '%s\n' "$*"; }
 step() { printf '%-8s %s\n' "$1" "$2"; }
@@ -63,29 +71,36 @@ die()  { printf 'install.sh: %s\n' "$*" >&2; exit 1; }
 # The hazard is not only "source == destination": any path this script deletes
 # or builds inside a plugin root can clobber a live installation.
 guard_plugin_root() { # $1 = candidate path, $2 = what it is used for
-  local candidate="$1" role="$2" parent resolved probe
-  probe="$candidate"
-  # Resolve the nearest existing ancestor so a not-yet-created target is judged
-  # by where it WOULD land, not skipped for being absent.
-  while [ -n "$probe" ] && [ ! -d "$probe" ]; do probe="$(dirname "$probe")"; [ "$probe" = "/" ] && break; done
-  [ -d "$probe" ] || return 0
-  probe="$(cd "$probe" && pwd -P 2>/dev/null)" || return 0
-  local suffix="${candidate#"${probe}"}"
-  local full="$probe$suffix"
-  for parent in "${PLUGIN_PARENTS[@]}"; do
-    [ -d "$parent" ] || continue
-    # Compare physically-resolved paths on BOTH sides: SRC comes from `pwd -P`,
-    # so a $HOME traversing a symlink (macOS /var -> /private/var) would never
-    # match the raw string and the guard would silently pass.
-    resolved="$(cd "$parent" && pwd -P 2>/dev/null)" || continue
-    case "$full/" in
-      "$resolved"/*)
-        die "refusing to use '$candidate' as the $role: it is inside the host plugin root ($parent).
+  local candidate="$1" role="$2" resolved
+  require_node
+  # Resolve both sides even on a fresh machine whose host roots do not exist.
+  # Resolve existing symlinks before normalizing the missing path suffix.
+  resolved="$(node - "$candidate" "${PLUGIN_PARENTS[@]}" <<'JS'
+const fs = require('node:fs'), path = require('node:path');
+function proposed(input) {
+  let probe = path.isAbsolute(input) ? input : `${process.cwd()}/${input}`;
+  const tail = [];
+  while (!fs.existsSync(probe)) {
+    const parent = path.dirname(probe);
+    if (parent === probe) throw Error('Cannot resolve path');
+    tail.unshift(path.basename(probe)); probe = parent;
+  }
+  return path.resolve(fs.realpathSync(probe), ...tail);
+}
+const candidate = proposed(process.argv[2]);
+for (const parent of process.argv.slice(3)) {
+  const root = proposed(parent);
+  if (candidate === root || candidate.startsWith(`${root}${path.sep}`)) {
+    process.stdout.write(parent); break;
+  }
+}
+JS
+)" || die "cannot safely resolve the $role"
+  if [ -n "$resolved" ]; then
+    die "refusing to use '$candidate' as the $role: it is inside the host plugin root ($resolved).
      The host copies a plugin directory onto itself there, truncating the plugin's own files.
      Run install.sh from the repository checkout and stage somewhere outside that root."
-        ;;
-    esac
-  done
+  fi
 }
 
 # --- Curated stage -----------------------------------------------------------
@@ -110,6 +125,11 @@ build_stage() { # $1 = stage root; sets STAGE (no subshell: `die` must reach the
   rm -rf -- "$STAGE"
   mkdir -p -- "$STAGE" || die "cannot create staging dir '$STAGE'"
   for entry in $STAGE_ENTRIES; do
+    if [ "$PORTABLE" -eq 1 ]; then
+      [ -e "$SRC/$entry" ] || die "portable package is missing required entry '$entry'"
+      [ -z "$(find "$SRC/$entry" -type l -print)" ] \
+        || die "portable package cannot contain symbolic links: $entry"
+    fi
     [ -e "$SRC/$entry" ] || continue
     cp -R "$SRC/$entry" "$STAGE/" || die "staging failed for '$entry'"
   done
@@ -134,16 +154,16 @@ render_hooks_json() { # $1 = template, $2 = output
   # plain SPACE is enough to split the path so all 8 hooks resolve to nothing
   # while JSON.parse and `agy plugin validate` both still pass. An allowlist
   # covers the JSON, shell and control-character cases in one rule.
-  case "$DEST" in
+  case "$HOOK_ROOT" in
     *[!A-Za-z0-9/._-]*)
       die "the install destination contains a character that cannot be embedded safely in a
      hook command string: $DEST
      Only letters, digits and / . _ - are safe here, because the host shell-splits the
      rendered command. Install under a path without spaces or punctuation." ;;
   esac
-  DEST="$DEST" node -e '
+  ZENSU_RENDER_ROOT="$HOOK_ROOT" node -e '
     const fs = require("fs");
-    const out = fs.readFileSync(process.argv[1], "utf8").split("__ZENSU_HOME__").join(process.env.DEST);
+    const out = fs.readFileSync(process.argv[1], "utf8").split("__ZENSU_HOME__").join(process.env.ZENSU_RENDER_ROOT);
     fs.writeFileSync(process.argv[2], out);
   ' "$1" "$2" || die "rendering hooks.json failed"
 }
@@ -258,6 +278,9 @@ if [ "$UNINSTALL" -eq 1 ]; then
 fi
 
 # --- Install -----------------------------------------------------------------
+if [ "$STAGE_ONLY_SET" -eq 0 ] && [ "$DRY" -eq 0 ]; then
+  command -v agy >/dev/null 2>&1 || die "the 'agy' CLI is not on PATH. Install Antigravity first."
+fi
 guard_plugin_root "$SRC" "install source"
 
 say "zensu-antigravity installer -> $DEST$([ "$DRY" -eq 1 ] && echo ' (dry-run)')"
@@ -268,7 +291,7 @@ if [ "$STAGE_ONLY_SET" -eq 1 ] && [ "$DRY" -eq 1 ]; then
   guard_plugin_root "$STAGE_ONLY/$PLUGIN_NAME" "staging directory"
   step DRY "rm -rf $STAGE_ONLY/$PLUGIN_NAME"
   step DRY "stage: $STAGE_ENTRIES"
-  step DRY "render hooks.json (__ZENSU_HOME__ -> $DEST)"
+  step DRY "render hooks.json (__ZENSU_HOME__ -> $HOOK_ROOT)"
   say ""
   say "dry-run: nothing was written."
   exit 0
