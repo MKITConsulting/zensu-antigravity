@@ -147,13 +147,43 @@ grep -qF '"decision":"deny"' "$TMP/on" \
 # 5) DISABLED: provably inert — nothing created OR grown anywhere in the sandbox
 #    Red when: the trace writes to a default path, the cwd, $HOME, $TMPDIR or the
 #    project dir when the variable is unset. Names alone are not enough: an append
-#    to an existing file would be invisible, so sizes are part of the snapshot.
+#    to an existing file would be invisible, so sizes and content hashes are part
+#    of the snapshot. Node avoids BSD/GNU stat dialect differences: GNU stat -f
+#    reports shared filesystem usage, which changes when unrelated jobs write.
 # ---------------------------------------------------------------------------
-snapshot() { (cd "$1" && find . -type f -exec stat -f '%N %z' {} \; 2>/dev/null | LC_ALL=C sort); }
+snapshot() {
+  node - "$1" <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const { createHash } = require('crypto');
+const root = process.argv[2];
+const rows = [];
+function walk(relative) {
+  for (const name of fs.readdirSync(path.join(root, relative)).sort()) {
+    const entry = path.join(relative, name);
+    const absolute = path.join(root, entry);
+    const stat = fs.lstatSync(absolute);
+    if (stat.isDirectory()) {
+      rows.push([entry, 'directory']);
+      walk(entry);
+    } else if (stat.isFile()) {
+      const hash = createHash('sha256').update(fs.readFileSync(absolute)).digest('hex');
+      rows.push([entry, 'file', stat.size, hash]);
+    } else if (stat.isSymbolicLink()) {
+      rows.push([entry, 'symlink', fs.readlinkSync(absolute)]);
+    } else {
+      rows.push([entry, 'special', stat.mode, stat.size]);
+    }
+  }
+}
+walk('');
+process.stdout.write(JSON.stringify(rows));
+NODE
+}
 RUNDIR="$TMP/rundir"; mkdir -p "$RUNDIR"
-BEFORE="$(snapshot "$TMP")"
+BEFORE="$(snapshot "$TMP")" || { bad "cannot snapshot the sandbox before the disabled trace probe"; exit 1; }
 ( cd "$RUNDIR" && printf '%s' "$PAYLOAD" | env -u ZENSU_SHIM_TRACE bash "$SBSHIM" zz-quiet.sh PreInvocation ) >/dev/null 2>&1
-AFTER="$(snapshot "$TMP")"
+AFTER="$(snapshot "$TMP")" || { bad "cannot snapshot the sandbox after the disabled trace probe"; exit 1; }
 if [ "$BEFORE" = "$AFTER" ]; then
   ok "trace disabled: not one file created or grown anywhere under the sandbox"
 else

@@ -16,6 +16,7 @@ set -u
 
 EVAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(cd "$EVAL_DIR/../.." && pwd)"
+node "$PLUGIN_DIR/tests/prepare-runtime.js" "$PLUGIN_DIR" || exit 2
 RESULTS_DIR="$EVAL_DIR/results"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 REPORT="$RESULTS_DIR/report-$TIMESTAMP.txt"

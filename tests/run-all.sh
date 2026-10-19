@@ -19,6 +19,8 @@ set -u
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$TESTS_DIR/.." && pwd)"
 
+node "$TESTS_DIR/prepare-runtime.js" "$ROOT" || exit 2
+
 RESULTS_DIR="$TESTS_DIR/results"
 mkdir -p "$RESULTS_DIR"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"

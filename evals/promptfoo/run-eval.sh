@@ -12,6 +12,8 @@ set -euo pipefail
 EVAL_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(cd "$EVAL_DIR/../.." && pwd -P)"
 
+node "$ROOT/tests/prepare-runtime.js" "$ROOT"
+
 PROMPTFOO="$ROOT/node_modules/.bin/promptfoo"
 if [ ! -x "$PROMPTFOO" ]; then
   if command -v promptfoo >/dev/null 2>&1; then
