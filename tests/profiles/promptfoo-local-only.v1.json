@@ -55,6 +55,7 @@
     "test-shell-syntax.sh",
     "test-skill-frontmatter.sh",
     "test-skill-workflow-markers.sh",
+    "test-source-runtime-bootstrap.sh",
     "test-state-verb-diagnostics.sh",
     "test-stop-enforcer-escapes.sh",
     "test-stop-enforcer-self-review-routing.sh",
