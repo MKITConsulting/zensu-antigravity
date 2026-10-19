@@ -16,7 +16,10 @@ bad() { FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$*"; }
 command -v node >/dev/null 2>&1 || { echo "node required"; exit 1; }
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+TMP="$(cd "$TMP" && pwd -P)"
 export HOME="$TMP/home"; mkdir -p "$HOME"
+node -e 'require("fs").writeFileSync(process.argv[1],`const os=require("os"),original=os.userInfo;os.userInfo=(...args)=>({...original(...args),homedir:${JSON.stringify(process.argv[2])}});`)' "$TMP/os-home.cjs" "$HOME"
+export NODE_OPTIONS="--require $TMP/os-home.cjs"
 WS="$TMP/ws"; mkdir -p "$WS"
 
 SBX="$TMP/sbx"
@@ -25,6 +28,10 @@ cp "$ROOT/hooks/antigravity/"*.sh "$SBX/hooks/antigravity/" 2>/dev/null
 cp "$ROOT/hooks/antigravity/"*.js "$SBX/hooks/antigravity/" 2>/dev/null
 cp "$ROOT/hooks/"*.sh "$SBX/hooks/" 2>/dev/null
 cp "$ROOT/hooks/lib/"* "$SBX/hooks/lib/" 2>/dev/null
+for part in plugin.json hooks.json.template agents skills commands docs templates scripts harness; do
+  [ -e "$ROOT/$part" ] && cp -R "$ROOT/$part" "$SBX/$part"
+done
+node -e 'const fs=require("fs"),path=require("path"),root=process.argv[1];fs.writeFileSync(path.join(root,"hooks.json"),fs.readFileSync(path.join(root,"hooks.json.template"),"utf8").split("__ZENSU_HOME__").join(root));' "$SBX"
 SBSHIM="$SBX/hooks/antigravity/antigravity-shim.sh"
 chmod +x "$SBSHIM" "$SBX/hooks/"*.sh 2>/dev/null
 
@@ -36,14 +43,14 @@ ag_payload() { # $1=command
 # Run a command through the pre-bash gate via the shim; classify the verdict.
 gate() { # $1=command -> echoes DENY|ALLOW
   printf '%s' "$(ag_payload "$1")" \
-    | env ZENSU_AG_HOOK_CONTRACT=superset bash "$SBSHIM" pre-bash-zensu-gate.sh 2>/dev/null \
+    | bash "$SBSHIM" pre-bash-zensu-gate.sh PreToolUse 2>/dev/null \
     | node -e '
         let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{
-          s=s.trim(); if(!s){process.stdout.write("ALLOW");return;}
+          s=s.trim(); if(!s){process.stdout.write("INVALID");return;}
           try{const j=JSON.parse(s);
-            const denied = j.allow_tool===false || j.decision==="deny";
-            process.stdout.write(denied?"DENY":"ALLOW");
-          }catch(_){process.stdout.write("ALLOW");}});'
+            const verdict = j.decision==="deny" ? "DENY" : ["allow","ask"].includes(j.decision) ? "ALLOW" : "INVALID";
+            process.stdout.write(verdict);
+          }catch(_){process.stdout.write("INVALID");}});'
 }
 run() { # $1=label $2=cmd $3=expected
   local out; out="$(gate "$2")"
@@ -69,7 +76,7 @@ run "AG inline ZENSU_MCP_GATE=off"  "ZENSU_MCP_GATE=off zensu security classify 
 run "AG localhost --api-url"        "zensu --api-url http://localhost:8090 security classify f1" ALLOW
 
 # The deny verdict carries a reason (plain text) through the shim.
-OUT="$(printf '%s' "$(ag_payload 'zensu security classify f1')" | env ZENSU_AG_HOOK_CONTRACT=superset bash "$SBSHIM" pre-bash-zensu-gate.sh 2>/dev/null)"
+OUT="$(printf '%s' "$(ag_payload 'zensu security classify f1')" | bash "$SBSHIM" pre-bash-zensu-gate.sh PreToolUse 2>/dev/null)"
 printf '%s' "$OUT" | grep -qiE 'state-mutating|workflow|gate' && ok "AG deny verdict carries a human reason" || bad "AG deny verdict lacks a reason: '$OUT'"
 printf '%s' "$OUT" | grep -q 'permissionDecision' && bad "AG deny leaks raw permissionDecision" || ok "AG deny reason is plain (no schema leakage)"
 

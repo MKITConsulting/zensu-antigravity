@@ -1,139 +1,163 @@
 # Browser verification rules
 
-The self-contained verification loop for `/zensu-verify-feature`. It has **two modes**, both
-first-class:
+These rules are the self-contained browser loop for `/zensu-verify-feature`. They replace
+the source skill's dependency on a personal `/test-feature` command. They are the `browser`
+driver's rule file; every other driver has its own, listed in `rules/drivers.md`.
 
-- **Mode A — driven.** The host browser driver (Antigravity's built-in browser/preview
-  tooling) supplies `NAVIGATE` + `SNAPSHOT` + `INTERACT`; the agent drives the UI.
-- **Mode B — guided manual.** No such driver this session (or `--driver=manual`). The agent
-  emits a precise numbered verification script, the user runs it, and the observations come
-  back as evidence.
+## 0. The command set on a `zensu-verify` session
 
-The mode is fixed in Phase 0 and named in the report. Both modes execute the SAME Phase 1
-matrix, assert the SAME three evidence planes, and end with the same verdict rules. Mode B is
-never an error path and never a reason to abort.
+Every call names the session the run-config helper printed, literally:
+`playwright-cli -s=<session> <command> [args] [flags]`. Run each call as its own plain Bash
+command on the main thread: exactly one `playwright-cli` call per Bash command, with no other
+command, operator, pipe, substitution, wrapper or package launcher around it. Quote an argument
+that carries `?`, `*`, `[` or `{`, or that starts with `~` or `=`. Single-quote an argument that
+carries `$`: double quotes do not help, because the gate reads a `$` outside single quotes as an
+expansion it cannot judge unless whitespace, the end of the command or a closing double quote
+follows it, so a `fill` value such as `"$12"` is denied and `'$12'` is not. The browser consent gate admits
+exactly these commands on a `zensu-verify` session, each with only the flags listed:
 
-Capability names below (`NAVIGATE`, `SNAPSHOT`, `INTERACT`, `SCREENSHOT`, `VIEWPORT`,
-`CONSOLE`, `NETWORK`, `ISOLATE`) refer to the capability contract in `SKILL.md`, never to a
-specific tool name. Resolve them against what the host advertises; if a required capability is
-absent, degrade as the contract prescribes.
+| Purpose | Commands | Flags |
+|---|---|---|
+| Session | `open [url]`, `close`, `list` | `open`: `--config=<abs path>` (required), `--headed`, `--device`, `--mobile`, `--idle-timeout`, `--browser` (Chromium channels only); `list`: `--all` |
+| Navigation | `goto <url>`, `go-back`, `go-forward`, `reload`, `tab-new [url]`, `tab-list`, `tab-select <n>`, `tab-close [n]` | none |
+| Observation | `snapshot [target]`, `find [text]`, `screenshot [target]`, `console [level]`, `requests` | `snapshot`: `--depth`, `--boxes`; `find`: `--regex`; `screenshot`: `--type`, `--full-page`, `--hires`; `console`: `--clear`; `requests`: `--static`, `--filter`, `--clear` |
+| Interaction | `click`, `dblclick`, `fill`, `type`, `press`, `keydown`, `keyup`, `hover`, `drag`, `select`, `check`, `uncheck`, `dialog-accept`, `dialog-dismiss`, `resize`, `mousemove`, `mousedown`, `mouseup`, `mousewheel` | `click`/`dblclick`: `--modifiers` (once per call); `fill`/`type`: `--submit` |
+| Emulation | `set-color-scheme`, `set-reduced-motion`, `set-forced-colors`, `set-contrast`, `set-media`, and the matching `clear-*` commands | none |
+
+`--json`, `--raw`, `--help` and `--version` are accepted on every command. Everything else is
+denied on a `zensu-verify` session, and that denial is final: `eval`, `run-code`, every cookie,
+local/session-storage and state command, `delete-data`, `route` and its siblings, `request`,
+`request-*` and `response-*`, `network-state-set`, `upload`, `drop`, `pdf`, recording,
+tracing and video, `attach`, `detach`, `install`, `install-browser`, `close-all`, `kill-all`,
+and the flags `--filename`, `--persistent` and `--profile`. A flag given twice is denied too.
+Never re-issue a denied call under another spelling, another session name, or through another
+program — with one exception, the shape denial below. A command or flag that is not available,
+an origin outside the run config or the navigation policy, a refused or unanswerable consent
+prompt, and a call from a subagent are final. So is a navigation command aimed at a network-only
+origin. A shape denial objects only to how the call is
+spelled, and the gate ends its text with the note `(shape denial: re-issue this call once as one
+plain playwright-cli call with single-quoted literal arguments; a second denial is final)`; no
+other denial carries it. Its reason asks for exactly one plain `playwright-cli` call
+(`NOT_PLAIN`), for literal arguments (`ARGUMENT_UNEXPANDED`), for the session exactly as the
+run-config helper printed it or named literally (`SESSION_UNRESOLVED`, `SESSION_UNEXPANDED`), or
+for the bare name `playwright-cli` (`CLI_NOT_BARE`), or it refuses a wrapper, a package launcher
+or an environment assignment (`WRAPPER`, `LAUNCHER`, `ENV_ASSIGNMENT`). Answer a shape denial
+once: re-issue the same call as one plain call with single-quoted literal arguments. The gate
+judges the retry exactly as it judged the first call, so no boundary loosens, and a second
+denial of that call is final.
+
+`screenshot` writes its image beneath the run directory's `browser/` folder and prints its
+path; open that file with the Read tool to inspect it. `snapshot` prints the accessibility tree
+with element refs such as `e21`; target elements by those refs. Every navigating call prints a
+`Page URL` line.
+
+## Native approval boundary
+
+The host documents `ask`/`force_ask` verdicts, and the adapter translates them. The full native permission-answer and successful-navigation receipt cycle is not yet live verified. Missing permission-mode or successful-result evidence must fail closed. Never infer consent from a missing field or from a navigation merely being attempted; use the validated parent-environment policy when the host cannot establish an answerable consent context.
 
 ## 1. Establish the observation baseline
 
-0. Before opening protected content, validate the recipe's `validate.evidenceSafety` block per
-   `local-runtime.md`: exact route coverage must prove synthetic or pre-classified
-   non-sensitive data. Enforce this fail-closed **before** navigation, login, or screenshot,
-   because a navigation result can itself carry a page snapshot. Without a valid covering
-   declaration, do not open the protected route; report PARTIAL.
-1. Confirm the target URL is on the run allowlist, navigate, then re-check the URL the driver
-   reports after redirects. Off-allowlist landing ends the row: read no evidence from it.
-2. Take a `SNAPSHOT` before interacting. Confirm the URL, title/heading, authentication state,
+0. The evidence boundary is the ORIGIN, never the route. Because `open` and `goto` print the
+   page title and write a snapshot of the page, open a page — protected or not — only on an
+   approved origin, and enforce this fail-closed origin boundary before navigation,
+   authentication, or screenshots. An origin is approved without a prompt when the
+   parent-environment policy names it as a target with `evidenceMode: declared-safe`. A
+   network-only origin the policy declares in `networkOnlyOrigins` is never approved: the pages
+   may request it, and the gate denies `open`, `goto` and `tab-new` aimed at it with its own final
+   reason. The user approves every other origin (the preflight printed `consent`) at the host's
+   permission prompt: a loopback origin (a loopback IP or `localhost`) once per session, a public
+   HTTPS origin of a remote run at every `open`, and all new origins of one `open` in one prompt.
+   In permission mode `bypassPermissions` or `dontAsk` the session cannot show the prompt, so the
+   gate denies a remote origin outside the policy and, while a policy is present, every origin it
+   does not name, and names the remedy: switch the session to Manual or Auto, or relaunch Antigravity with a policy that names the origin. In such a session, stop before booting anything when
+   the preflight adds its stderr note. Either way an approved origin covers every page on it, at any path, including routes
+   whose identifiers change on every run; no route list is declared or checked, and a recipe's
+   `validate.evidenceSafety` block no longer gates navigation. Contract v1 supports only
+   `declared-safe`; there is no trusted redaction-driver path. Wait for the user's answer;
+   a refused prompt makes that origin's rows PARTIAL.
+   Never re-issue a refused navigation and never try another spelling of the same target to avoid the prompt.
+   The FIRST `playwright-cli` call that reaches a new origin — `open` with the run config, `goto`,
+   or `tab-new` — opens the prompt. Answering it is the user's action; never answer it on their
+   behalf and never work around a refusal. The floor holds in every mode: no credentials, no query
+   or fragment in a navigation, and the browser refuses every HTTP(S) request to an origin outside
+   the run config; a WebSocket connection is not fenced by the run config, which is an open gap.
+   The session consent memory named in SKILL.md records each approved ORIGIN; a record names the
+   route that was visited, but the route steers no later decision, and the report lists every
+   record in its `Consent` block. It is yours to READ for the report and never to write, edit or
+   delete: a record you place there skips the human's prompt for that origin, so writing one grants
+   yourself the consent this gate exists to ask for. Only the PostToolUse hook writes it.
+1. Open the run-config session at the resolved base URL and route only after the policy
+   preflight passes for every origin: `declared-safe` for each origin the run navigates, and
+   `network-only` for each network-only origin.
+2. Read the `Page URL` line of every navigating call. An origin outside the run config means a
+   server redirect left the approved set, and a network-only origin means the page navigated
+   itself onto an origin the run config allows for requests only: in both cases stop driving
+   that page, collect no evidence from it, and report the scenario PARTIAL. `go-back`,
+   `go-forward`, `reload` and `tab-select` name no URL for the gate to judge, so this check is
+   the only one they get. A click can open a new tab: read `tab-list` before every `tab-select`,
+   and never select a tab whose URL is outside the run config or on a network-only origin —
+   close it with `tab-close` instead. A frame that a target page embeds from a network-only
+   origin renders inside that page and appears in its snapshot and screenshot like data the page
+   fetched: read it as that target page's content, which is evidence of the target page, and
+   never open the frame's origin with a navigation command. Only a page the browser lands on at a
+   network-only origin is never evidence. In consent mode a network-only origin passed with
+   `--origin` — loopback in local mode, public HTTPS in remote mode — is a consented origin to the
+   gate, which would admit a navigation to it: never `open`, `goto` or `tab-new` it all the same,
+   and treat a `Page URL` on it like one on a network-only origin.
+3. Take a `snapshot` before interacting. Confirm the URL, title/heading, authentication state,
    and that the page is not a generic error or login wall.
-3. Read `CONSOLE` and `NETWORK` for the baseline only when direct inspection is safe (see the
-   runtime-signals boundary below). Mark pre-existing unrelated noise separately; never use it
-   to hide a new feature error.
+4. Apply the pre-model evidence boundary below, then run `console` and `requests` to establish
+   the baseline only when direct inspection is safe. Mark pre-existing unrelated noise
+   separately; do not use it to hide a new feature error.
 
-The semantic snapshot is the primary source for structure and actionable element references.
-Screenshot pixels are for appearance. Console/network evidence is for runtime behavior. None
-of the three substitutes for the others.
+The accessibility snapshot is the primary source for structure and actionable element refs.
+Use screenshot pixels for appearance. Use network/console evidence for runtime behavior.
+None of these substitutes for the others.
 
-## 2. Interact in small observable steps (Mode A)
+## 2. Interact in small observable steps
 
 For each scenario:
 
 1. Put the app in the matrix row's declared setup state through real UI or repository-owned
    fixture paths.
-2. Take a fresh snapshot and select the next action from the current element references.
-3. Perform one meaningful interaction: click, type, select, key press, or dialog response.
-4. Wait for a specific UI or request condition, not an arbitrary delay.
-5. Snapshot again and record the changed state.
+2. Take a fresh `snapshot` and select the next action from the current refs.
+3. Perform one meaningful interaction: `click`, `fill`, `type`, `select`, `press`, or a dialog
+   response.
+4. Confirm a specific UI or request condition with a fresh `snapshot` or `find`, not an
+   arbitrary delay.
+5. Record the changed state, and repeat the `Page URL` check when the action navigated.
 6. Repeat until the scenario reaches its assertion checkpoint.
 
-Do not reuse stale element references after navigation or a material re-render. Never run
-arbitrary script inside the page, including for read-only inspection: page evaluation can read
-authenticated DOM and stored session data and step around the allowlist boundary. If snapshots
-cannot expose a required value, report that evidence plane PARTIAL. The same applies to
-file-upload-by-path and to any cookie/storage capability: report the dependent scenario PARTIAL
-instead of reaching past the boundary.
+Do not reuse stale snapshot refs after navigation or a material re-render. Never run
+`playwright-cli eval` or `run-code`, including for read-only inspection: the gate denies both
+on a `zensu-verify` session because page evaluation can read authenticated DOM/storage and
+bypass the navigation boundary. If snapshots cannot expose a required value, report that
+evidence plane PARTIAL. The gate also denies file upload. Report an upload-dependent scenario
+PARTIAL instead of working around the gate.
 
-## 3. Run the guided manual script (Mode B)
+## 3. Assert three evidence planes
 
-Render the matrix as an executable script for a human, then wait for the reply. Never fabricate
-an observation, never assume a step passed, and never continue to the report before the user
-answers.
-
-**Script format** — one block per matrix row, P0 first:
-
-```
-### S1 [P0] <scenario name>
-Setup: <exact state to start from — route, seeded record, viewport, logged-in or anonymous>
-1. <one concrete action>
-   Expect: <the single observation that proves this step>
-2. <next action>
-   Expect: <observation>
-Checkpoint: <the DOM/data fact, the visual fact, and the request effect that decide this row>
-```
-
-Rules for the script:
-
-- Preamble first: how to start the app (the resolved runtime commands, or "use the instance you
-  already have running"), the exact base URL, and how to reset between scenarios.
-- One action per numbered step, each with its own `Expect:` line. A step with no expected
-  observation is not a verification step.
-- Name concrete UI anchors (visible label, heading, row text), never CSS selectors.
-- Keep every step safe: no destructive or externally visible action without the explicit
-  confirmation the boundaries require.
-- Mark rows the user may skip (`P2`) so a short session still covers P0.
-
-**Evidence template** — ask for exactly this back, and say that anything not answered counts as
-not verified:
-
-```
-S1.1 observed: <what you saw>
-S1.2 observed: <what you saw>
-S1 visual:     <layout/styling/legibility as it actually looked>
-S1 console:    clean | <error class + short message, credentials removed>
-S1 network:    clean | <method + path + status, no query string>
-S1 result:     pass | fail
-```
-
-Ask for a screenshot only when the visual assertion needs it, and only for a screen that holds
-no credentials or personal data. Console/network lines are optional: the user copies them from
-their own browser devtools with tokens, cookies, authorization values, query strings, and
-personal data removed. Missing runtime lines make that plane PARTIAL for the row, not a
-failure.
-
-**Login in Mode B** stays credential-blind by construction: the user logs in in their own
-browser. Never request a password, token, cookie, or session export, and never accept one if it
-is volunteered — if a credential appears in the reply, do not repeat it in the report.
-
-If the driver breaks partway through Mode A, emit the Mode B script for the remaining rows and
-mark in the report which rows were driven and which were user-reported.
-
-## 4. Assert three evidence planes
-
-Every acceptance criterion needs the applicable evidence below, in either mode.
+Every acceptance criterion needs the applicable evidence below.
 
 ### DOM and data
 
 - Assert visible names, values, rows, validation messages, enabled/disabled state, focus, and
-  route changes against the post-action snapshot (Mode A) or the user's reported observation
-  (Mode B).
+  route changes against the post-action snapshot.
 - For mutations, prove the persisted result by reloading or revisiting through the real UI.
 - For loading/error/empty paths, prove both the transient/failure state and the recovery when
   the scenario requires it.
 
 ### Visual
 
-At every matrix checkpoint, capture a `SCREENSHOT` and **inspect the returned image** (Mode A)
-or collect the user's visual line (Mode B). Write a concrete observation covering:
+At every matrix checkpoint, run `screenshot` and **inspect the image file it names** with the
+Read tool. Write a concrete observation covering:
 
 - no overlap, clipping, off-screen controls, or broken stacking;
 - readable text and correct visual hierarchy;
 - expected placement, spacing, and applied styling rather than an unstyled shell;
 - the specific open/selected/error/loading state the scenario claims;
-- narrow and wide layouts when responsive behavior is relevant (`VIEWPORT`, or a second
-  manual pass at a narrow window width).
+- narrow and wide layouts when responsive behavior is relevant (`resize`, `--device`,
+  `--mobile`), and the color scheme when theming is touched (`set-color-scheme`).
 
 A screenshot filename without a description is not evidence. DOM-correct but visually
 uninspected is PARTIAL.
@@ -141,46 +165,46 @@ uninspected is PARTIAL.
 ### Runtime signals
 
 After each scenario, inspect console and network activity scoped to its actions, subject to
-this boundary: raw results reach the model before final-report redaction. Direct inspection is
-permitted only for a proven unauthenticated, synthetic, secret-free target. There is no trusted
-model-visible sanitizer for authenticated runtime signals; skip that plane and report PARTIAL
-rather than reading it on an authenticated target.
+this boundary: raw `console` and `requests` output reaches the model before final-report
+redaction. Direct inspection is permitted only for a proven unauthenticated, synthetic,
+secret-free target. Contract v1 has no trusted model-visible sanitizer for authenticated
+runtime signals; skip that plane and report PARTIAL instead of running those commands. Use
+`console --clear` and `requests --clear` to scope the next scenario.
 
 - Feature-related uncaught errors, failed resource loads, or unexpected warnings fail the
-  scenario unless explicitly expected by the criterion. Record only a bounded, sanitized error
-  class/message and source path. Redact tokens, cookies, authorization values, signed URLs,
-  query/fragment values, headers, bodies, personal data, and secret-shaped strings; never quote
-  raw console output.
-- Missing expected calls, request failures, and unexpected 4xx/5xx responses fail the scenario.
-  Record method, path without query/fragment, and status only; never include headers, bodies,
-  credentials, tokens, or personal data.
+  scenario unless explicitly expected by the criterion. Record only a bounded, sanitized
+  error class/message and source path. Redact tokens, cookies, authorization values, signed
+  URLs, query/fragment values, headers, bodies, personal data, and secret-shaped strings;
+  never quote raw console output.
+- Missing expected calls, request failures, and unexpected 4xx/5xx responses fail the
+  scenario. Record method, path without query/fragment, and status only; never include
+  headers, bodies, credentials, tokens, or personal data. The gate denies the request-detail
+  commands for that reason.
 - A deliberately tested error response passes only when both the response and the rendered
   recovery/error UI match the expectation.
 
-## 5. Scenario isolation and safety
+## 4. Scenario isolation and safety
 
 - Use unique fixture names containing the run identifier.
-- Reset filters, navigation, and record state between rows. Start a fresh `ISOLATE` context
-  when cookies/local storage or cached app state would contaminate the next row; without that
-  capability, order the rows to avoid leakage and state the residual risk.
-- Never enable a storage/session capability and never accept an auth artifact. Re-authenticate
-  visibly when a fresh context is required; otherwise report the row PARTIAL.
-- Do not screenshot credentials, tokens, personal data, or unrelated sensitive content, and do
-  not ask the user for such a screenshot.
+- Reset filters, navigation, and record state between rows. When cookies, local storage or
+  cached app state would contaminate the next row, `close` the session and `open` it again with
+  the same run config, which starts an isolated browser. In a remote run that `open` asks the
+  user again for every remote origin outside the policy.
+- Never restore browser state or accept an auth artifact. Re-authenticate visibly when a fresh
+  browser is required; otherwise report the row PARTIAL.
+- Do not screenshot credentials, tokens, personal data, or unrelated sensitive content.
 - In remote mode, stop before irreversible or externally visible mutations unless the user
   explicitly approved that exact action.
 
-## 6. Close with contemporaneous evidence
+## 5. Close with contemporaneous evidence
 
-Maintain the report table while driving — or while the user's replies arrive. For each row,
-capture:
+Maintain the report table while driving. For each row, capture:
 
-- expected and observed behavior, and whether the observation is agent-driven or user-reported;
-- the snapshot fact;
-- the screenshot and the actual visual observation;
+- expected and observed behavior;
+- semantic snapshot fact;
+- screenshot and the actual visual observation;
 - relevant console/network signals;
 - exact reproduction for a failure.
 
-Close the browser surface this run opened, even after a failed assertion or a cancelled login.
-In Mode B, tell the user which processes remain theirs to stop. The parent skill owns the
-remaining process, container, and temp-dir cleanup.
+Run `playwright-cli -s=<session> close` even after a failed assertion or cancelled login. The
+parent skill owns the remaining process, container, and temp-dir cleanup.

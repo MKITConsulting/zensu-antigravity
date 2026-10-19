@@ -10,8 +10,13 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { resultRows, rowScenarioId, rowPassed, rowReason } = require('./lib/results-shape');
 
-const EVAL_DIR = __dirname;
+// Which suite to verify. Defaults to the offline suite that lives next to this
+// file; the live suite passes its own directory so it gets the same
+// "every catalogued scenario actually ran" guarantee instead of trusting a
+// promptfoo run that evaluated nothing.
+const EVAL_DIR = process.argv[3] ? path.resolve(process.argv[3]) : __dirname;
 
 function catalogScenarioIds() {
   const configRaw = fs.readFileSync(path.join(EVAL_DIR, 'promptfooconfig.yaml'), 'utf8');
@@ -36,14 +41,10 @@ function catalogScenarioIds() {
 }
 
 function collectResults(payload) {
-  const rows = payload.results && payload.results.results ? payload.results.results : payload.results;
-  if (!Array.isArray(rows)) throw new Error('unrecognised promptfoo results shape');
-  return rows.map((row) => ({
-    id: (row.vars && row.vars.scenario_id) || '<unnamed>',
-    pass: row.success === true,
-    reason:
-      (row.gradingResult && row.gradingResult.reason) ||
-      (row.error ? String(row.error) : 'no reason reported'),
+  return resultRows(payload).map((row) => ({
+    id: rowScenarioId(row),
+    pass: rowPassed(row),
+    reason: rowReason(row),
   }));
 }
 

@@ -23,7 +23,6 @@ FILES="$(git ls-files --cached --others --exclude-standard 2>/dev/null \
     -e '^hooks/user-prompt-tdd-reminder\.sh$' \
     -e '^hooks/plan-approved-delegate\.sh$' \
     -e '^hooks/post-review-tdd-delegate\.sh$' \
-    -e '^rules/zensu-tdd\.md$' \
     -e '^AGENTS\.md$' \
     -e '^docs/' )"
 [ -n "$FILES" ] || { echo "not a git repo / no tracked files"; exit 1; }

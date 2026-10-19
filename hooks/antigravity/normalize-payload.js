@@ -1,125 +1,181 @@
 #!/usr/bin/env node
-// normalize-payload.js — translate an Antigravity hook payload (camelCase,
-// nested `toolCall.*`) into the flat snake_case shape the engine-neutral zensu
-// hook scripts read (a flat snake_case schema). This is the ONE place that knows
-// Antigravity's stdin envelope; every wrapped script stays byte-comparable to CC.
-//
-// Output (two lines on stdout):
-//   line 1: the workspace root (workspacePaths[0]) — the shim exports it as
-//           ZENSU_PROJECT_DIR so project-scoped state has a stable anchor that
-//           is NOT the command cwd (the source-write-gate's cross-worktree escape
-//           check depends on projectRoot != curdir).
-//   line 2: the normalized flat payload as single-line JSON.
-//
-// Fail-open: any parse error yields an empty workspace line + "{}" so wrapped
-// scripts simply find empty fields and no-op (never a hard error).
+'use strict';
 
-function readStdin() {
-  return new Promise((resolve) => {
-    let s = "";
-    process.stdin.on("data", (c) => (s += c));
-    process.stdin.on("end", () => resolve(s));
-    process.stdin.on("error", () => resolve(s));
-  });
-}
-
-function firstString() {
-  for (let i = 0; i < arguments.length; i++) {
-    if (typeof arguments[i] === "string" && arguments[i]) return arguments[i];
-  }
-  return "";
-}
-
-(async () => {
-  const raw = await readStdin();
-  let j = {};
+// Host translation only. Output is workspace root, then normalized JSON.
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const path = require('node:path');
+const paths = require('./session-paths.js');
+const TOOL_NAMES = Object.freeze({ run_command: 'Bash', write_to_file: 'Write',
+  replace_file_content: 'Edit', multi_replace_file_content: 'MultiEdit',
+  view_file: 'Read', grep_search: 'Grep', find_by_name: 'Glob',
+  read_url_content: 'WebFetch', search_web: 'WebSearch' });
+function firstString(...values) { return values.find((value) => typeof value === 'string' && value) || ''; }
+function object(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
+function transcriptPrompt(raw, sessionId) {
+  const file = firstString(raw.transcriptPath, raw.transcript_path);
+  if (!file || !path.isAbsolute(file) || !file.split(path.sep).includes(sessionId)) return '';
+  let descriptor;
   try {
-    j = JSON.parse(raw || "{}");
-    if (j === null || typeof j !== "object") j = {};
-  } catch (_) {
-    process.stdout.write("\n{}");
-    return;
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || fs.realpathSync.native(file) !== file) return '';
+    descriptor = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    const opened = fs.fstatSync(descriptor);
+    if (opened.dev !== stat.dev || opened.ino !== stat.ino) return '';
+    const start = Math.max(0, opened.size - 2 * 1024 * 1024);
+    const bytes = Buffer.alloc(opened.size - start);
+    fs.readSync(descriptor, bytes, 0, bytes.length, start);
+    const lines = bytes.toString('utf8').split('\n');
+    if (start) lines.shift();
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      let entry;
+      try { entry = JSON.parse(lines[index]); } catch { continue; }
+      if (entry.type !== 'USER_INPUT' || entry.source !== 'USER_EXPLICIT' || entry.status !== 'DONE'
+          || typeof entry.content !== 'string' || !Number.isSafeInteger(entry.step_index)) continue;
+      if (Number.isSafeInteger(raw.initialNumSteps) && raw.initialNumSteps > 0
+          && entry.step_index >= raw.initialNumSteps) continue;
+      return entry.content;
+    }
+  } catch { return ''; } finally { if (descriptor !== undefined) fs.closeSync(descriptor); }
+  return '';
+}
+function correlate(payload, event, options = {}) {
+  if (!['PreToolUse', 'PostToolUse'].includes(event)
+      || !Number.isSafeInteger(payload.step_idx) || payload.step_idx < 0) return payload;
+  paths.safeSessionId(payload.session_id);
+  const directory = paths.privateDirectory(options.pluginData || paths.dataRoot(), 'tool-calls');
+  const key = crypto.createHash('sha256').update(`${payload.session_id}\0${payload.step_idx}`).digest('hex');
+  const file = path.join(directory, `${key}.json`);
+  const now = options.now === undefined ? Date.now() : options.now;
+  if (event === 'PreToolUse') {
+    if (!payload.tool_name) return payload;
+    paths.writePrivateJson(file, { schema: 'zensu.antigravity.tool-call.v1',
+      session_id: payload.session_id, step_idx: payload.step_idx,
+      tool_name: payload.tool_name, tool_input: payload.tool_input,
+      native_tool_name: payload.native_tool_name, native_tool_input: payload.native_tool_input,
+      cwd: payload.cwd, workspace_root: payload.workspace_root, created_at_ms: now });
+    return payload;
   }
-
-  const tc = (j.toolCall && typeof j.toolCall === "object") ? j.toolCall : {};
-  const args = (tc.args && typeof tc.args === "object") ? tc.args : {};
-  const ti = (j.tool_input && typeof j.tool_input === "object") ? j.tool_input : {};
-  const out = {};
-
-  // tool name
-  out.tool_name = firstString(tc.name, j.tool_name, j.toolName, args.ToolName);
-
-  // tool_input.command (shell) + tool_input.file_path / .content (writers)
-  const toolInput = {};
-  const cmd = firstString(args.CommandLine, args.command, ti.command);
-  if (cmd) toolInput.command = cmd;
-  const fp = firstString(args.TargetFile, args.AbsolutePath, args.FilePath, args.file_path, ti.file_path);
-  if (fp) toolInput.file_path = fp;
-  // The write BODY — what the secret scan inspects. The arg name is
-  // host-version-dependent, so probe the plausible keys and fold in the
-  // replacement chunks of the replace-family writers. An unmatched shape simply
-  // leaves tool_input.content absent and the scan finds nothing (fail-open).
-  const bodies = [firstString(
-    args.CodeContent, args.Content, args.content, args.NewContent, args.CodeEdit, ti.content
-  )];
-  for (const arr of [args.ReplacementChunks, args.Chunks, args.Edits, ti.edits]) {
-    if (!Array.isArray(arr)) continue;
-    for (const c of arr) {
-      if (typeof c === "string") bodies.push(c);
-      else if (c && typeof c === "object") {
-        bodies.push(firstString(c.ReplacementContent, c.NewContent, c.Content, c.content, c.new_string));
-      }
+  let receipt;
+  try { receipt = paths.readPrivateJson(file); } catch (error) {
+    if (error.code === 'ENOENT') return payload;
+    throw error;
+  }
+  if (receipt.schema !== 'zensu.antigravity.tool-call.v1'
+      || receipt.session_id !== payload.session_id || receipt.step_idx !== payload.step_idx
+      || !Number.isFinite(receipt.created_at_ms) || receipt.created_at_ms > now
+      || now - receipt.created_at_ms > 24 * 60 * 60 * 1000
+      || (payload.workspace_root && receipt.workspace_root !== payload.workspace_root)
+      || (payload.tool_name && receipt.tool_name !== payload.tool_name)) {
+    throw new Error('PostToolUse receipt does not match this host invocation');
+  }
+  if (!payload.tool_name) payload.tool_name = receipt.tool_name;
+  if (!payload.native_tool_name && receipt.native_tool_name) payload.native_tool_name = receipt.native_tool_name;
+  if ((!payload.native_tool_input || Object.keys(payload.native_tool_input).length === 0) && receipt.native_tool_input) payload.native_tool_input = receipt.native_tool_input;
+  if (Object.keys(payload.tool_input).length === 0) payload.tool_input = receipt.tool_input;
+  if (!payload.cwd && receipt.cwd) payload.cwd = receipt.cwd;
+  // No exit status is inferred from missing host result metadata.
+  return payload;
+}
+function normalize(input, event = '', options = {}) {
+  const raw = object(input), call = object(raw.toolCall), args = object(call.args);
+  const prior = object(raw.tool_input), out = {};
+  if (Object.prototype.hasOwnProperty.call(raw, 'conversationId')) out.native_payload = true;
+  const nativeName = firstString(call.name, raw.tool_name, raw.toolName, args.ToolName);
+  out.tool_name = TOOL_NAMES[nativeName] || nativeName;
+  if (nativeName) out.native_tool_name = nativeName;
+  out.native_tool_input = { ...args };
+  const ti = { ...prior };
+  const command = firstString(args.CommandLine, args.command, prior.command);
+  if (command) ti.command = command;
+  const file = firstString(args.TargetFile, args.AbsolutePath, args.FilePath, args.file_path, prior.file_path);
+  if (file) ti.file_path = file;
+  if (nativeName === 'grep_search') {
+    if (Object.prototype.hasOwnProperty.call(args, 'SearchPath')) ti.path = args.SearchPath;
+    if (Object.prototype.hasOwnProperty.call(args, 'Query')) ti.pattern = args.Query;
+    if (Object.prototype.hasOwnProperty.call(args, 'Includes') && (!Array.isArray(args.Includes) || args.Includes.length)) ti.include = args.Includes;
+  }
+  if (nativeName === 'find_by_name') {
+    if (Object.prototype.hasOwnProperty.call(args, 'SearchDirectory')) ti.path = args.SearchDirectory;
+    if (Object.prototype.hasOwnProperty.call(args, 'Pattern')) ti.pattern = args.Pattern;
+    if (Object.prototype.hasOwnProperty.call(args, 'Excludes') && (!Array.isArray(args.Excludes) || args.Excludes.length)) ti.exclude = args.Excludes;
+    if (Object.prototype.hasOwnProperty.call(args, 'Extensions') && (!Array.isArray(args.Extensions) || args.Extensions.length)) ti.include = args.Extensions;
+    // An absolute-path glob is a broader grammar than the canonical lease.
+    // Preserve it as an unsafe pattern so the lease gate refuses it explicitly.
+    if (args.FullPath === true && typeof args.Pattern === 'string') ti.glob = args.Pattern;
+  }
+  if (nativeName === 'send_message') {
+    if (Object.prototype.hasOwnProperty.call(args, 'Recipient')) ti.recipient = args.Recipient;
+    if (Object.prototype.hasOwnProperty.call(args, 'Message')) ti.message = args.Message;
+  }
+  const content = firstString(args.CodeContent, args.Content, args.content, args.NewContent, args.CodeEdit, prior.content);
+  if (content) ti.content = content;
+  const replacement = firstString(args.ReplacementContent, args.NewContent, args.new_string, prior.new_string);
+  if (replacement) ti.new_string = replacement;
+  const old = firstString(args.TargetContent, args.old_string, prior.old_string);
+  if (old) ti.old_string = old;
+  const edits = [];
+  for (const chunks of [args.ReplacementChunks, args.Chunks, args.Edits]) {
+    if (!Array.isArray(chunks)) continue;
+    for (const chunk of chunks) {
+      if (typeof chunk === 'string') edits.push({ new_string: chunk });
+      else if (chunk && typeof chunk === 'object') edits.push({
+        old_string: firstString(chunk.TargetContent, chunk.old_string),
+        new_string: firstString(chunk.ReplacementContent, chunk.NewContent, chunk.Content, chunk.content, chunk.new_string) });
     }
   }
-  const body = bodies.filter(Boolean).join("\n");
-  if (body) toolInput.content = body;
-  out.tool_input = toolInput;
-
-  // command cwd (DISTINCT from the workspace root / project dir)
-  const ccwd = firstString(args.Cwd, args.cwd, j.cwd);
-  if (ccwd) out.cwd = ccwd;
-
-  // tool_response (PostToolUse result) — witness reads exit_code/stdout/interrupted
-  const tr = (j.toolResponse && typeof j.toolResponse === "object") ? j.toolResponse
-    : (j.tool_response && typeof j.tool_response === "object") ? j.tool_response
-    : (j.result && typeof j.result === "object") ? j.result
-    : {};
-  const resp = {};
-  const ec = [tr.exit_code, tr.exitCode, tr.ExitCode, tr.code].find((v) => typeof v === "number");
-  if (typeof ec === "number") resp.exit_code = ec;
-  const so = firstString(tr.stdout, tr.Output, tr.output, tr.result, (typeof tr === "string" ? tr : ""));
-  if (so) resp.stdout = so;
-  if (tr.interrupted === true || j.interrupted === true) resp.interrupted = true;
-  if (Object.keys(resp).length) out.tool_response = resp;
-
-  // session id + transcript
-  out.session_id = firstString(j.session_id, j.sessionId);
-  const tp = firstString(j.transcript_path, j.transcriptPath);
-  if (tp) out.transcript_path = tp;
-
-  // user prompt (PreInvocation) — field name is host-version-dependent; probe
-  // the plausible keys. Absent prompt -> the advisory hooks self-no-op.
-  const prompt = firstString(
-    j.prompt, j.userMessage, j.user_message, j.message, j.ephemeralMessage,
-    j.text, (j.input && j.input.text)
-  );
+  if (edits.length) ti.edits = edits;
+  const bodies = [content, replacement, ...edits.map((edit) => edit.new_string)].filter(Boolean);
+  if (bodies.length) ti.content = bodies.join('\n');
+  if (out.tool_name === 'Edit' && !ti.new_string && content) ti.new_string = content;
+  out.tool_input = ti;
+  const workspaces = Array.isArray(raw.workspacePaths) ? raw.workspacePaths : raw.workspace_paths;
+  out.workspace_root = firstString(Array.isArray(workspaces) && workspaces[0], raw.workspaceRoot, raw.workspace_root);
+  const cwd = firstString(args.Cwd, args.cwd, raw.cwd, out.workspace_root);
+  if (cwd) out.cwd = cwd;
+  // The documented conversationId outranks compatibility aliases.
+  out.session_id = firstString(raw.conversationId, raw.conversation_id, raw.session_id, raw.sessionId);
+  out.host_session_id = out.session_id;
+  const transcript = firstString(raw.transcriptPath, raw.transcript_path);
+  if (transcript) out.transcript_path = transcript;
+  const prompt = firstString(raw.prompt, raw.userMessage, raw.user_message, raw.message,
+    raw.ephemeralMessage, raw.text, object(raw.input).text,
+    event === 'PreInvocation' ? transcriptPrompt(raw, out.session_id) : '');
   if (prompt) out.prompt = prompt;
-
-  // agent identity (spawned-subagent detection for the Stop guard)
-  const aid = firstString(j.agent_id, j.agentId);
-  if (aid) out.agent_id = aid;
-  const at = firstString(j.agent_type, j.agentType);
-  if (at) out.agent_type = at;
-
-  // hook event name
-  const hev = firstString(j.hook_event_name, j.hookEventName);
-  if (hev) out.hook_event_name = hev;
-
-  // workspace root (line 1)
-  let ws = "";
-  if (Array.isArray(j.workspacePaths) && typeof j.workspacePaths[0] === "string") ws = j.workspacePaths[0];
-  else if (Array.isArray(j.workspace_paths) && typeof j.workspace_paths[0] === "string") ws = j.workspace_paths[0];
-  else if (typeof j.workspaceRoot === "string") ws = j.workspaceRoot;
-
-  process.stdout.write(ws + "\n" + JSON.stringify(out));
-})();
+  const step = raw.stepIdx === undefined ? raw.step_idx : raw.stepIdx;
+  if (Number.isSafeInteger(step) && step >= 0) out.step_idx = step;
+  if (event) out.hook_event_name = event === 'PreInvocation' ? 'UserPromptSubmit' : event;
+  else if (typeof raw.hook_event_name === 'string') out.hook_event_name = raw.hook_event_name;
+  const response = object(raw.toolResponse || raw.tool_response || raw.result), result = {};
+  const exitCode = [response.exit_code, response.exitCode, response.ExitCode, response.code]
+    .find((value) => typeof value === 'number' && Number.isFinite(value));
+  if (exitCode !== undefined) result.exit_code = exitCode;
+  const stdout = firstString(response.stdout, response.Output, response.output, response.result);
+  if (stdout) result.stdout = stdout;
+  if (response.interrupted === true || raw.interrupted === true) result.interrupted = true;
+  if (Object.keys(result).length) out.tool_response = result;
+  if (typeof raw.error === 'string' && raw.error) out.error = raw.error;
+  if (typeof raw.terminationReason === 'string') out.termination_reason = raw.terminationReason;
+  if (typeof raw.fullyIdle === 'boolean') out.fully_idle = raw.fullyIdle;
+  if (Number.isSafeInteger(raw.executionNum)) out.execution_num = raw.executionNum;
+  // Never fabricate native worker identities. Preserve malformed reported
+  // fields too, so an unknown identity cannot silently gain main authority.
+  for (const [flat, camel] of [['agent_id', 'agentId'], ['agent_type', 'agentType']]) {
+    if (Object.prototype.hasOwnProperty.call(raw, camel)) out[flat] = raw[camel];
+    else if (Object.prototype.hasOwnProperty.call(raw, flat)) out[flat] = raw[flat];
+  }
+  if (options.correlate !== false && event && out.session_id) correlate(out, event, options);
+  return out;
+}
+function main() {
+  try {
+    const raw = fs.readFileSync(0);
+    if (raw.length > 1024 * 1024) throw new Error('Hook payload is too large');
+    const out = normalize(JSON.parse(raw.toString('utf8') || '{}'), process.argv[2] || '');
+    process.stdout.write(`${out.workspace_root}\n${JSON.stringify(out)}`);
+  } catch (error) {
+    process.stdout.write(`\n${JSON.stringify({ normalization_error: error.message })}`);
+  }
+}
+if (require.main === module) main();
+module.exports = { TOOL_NAMES, normalize, correlate, transcriptPrompt, main };

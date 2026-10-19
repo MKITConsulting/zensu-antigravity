@@ -1,240 +1,349 @@
 #!/usr/bin/env bash
-# zensu-antigravity installer. Google Antigravity discovers a whole plugin
-# DIRECTORY at a fixed path, so this stages the ENTIRE plugin subtree into the
-# plugin dirs:
+# zensu-antigravity installer.
 #
-#   ~/.gemini/config/plugins/zensu/            IDE plugins   (the ZENSU_HOME runtime)
-#   ~/.gemini/antigravity-cli/plugins/zensu/   CLI plugins
-#   ~/.zensu/plugin-root                       runtime-home pointer the libs read
-#   ~/.zensu/config.json                       seeded from config.example.json if missing
+# The host owns the installed tree. `agy plugin install <dir>` COPIES the given
+# directory into its own plugin root and registers the components it finds; it
+# does not render templates and it does not filter anything out. Three facts
+# follow, and this script is built around them:
 #
-# Antigravity's hooks.json `command` MUST be an absolute path and has no
-# documented ${VAR} expansion, so install renders the tracked hooks.json.template
-# (placeholder __ZENSU_HOME__) into a real hooks.json at EACH dest, with every
-# command pointing at the SINGLE ZENSU_HOME runtime (the IDE dest) so one hook
-# runtime + one FSM state root is authoritative even when both dests are staged.
+#   1. Hand-placing files inside the host's plugin directory does NOT register
+#      the plugin — `agy plugin list` stays empty and no command exists.
+#   2. Pointing the importer at a directory INSIDE the host's plugin root makes
+#      source and destination the same path, and the copy truncates the plugin's
+#      own files to zero bytes. There is no guard on the host side, so there is
+#      one here — applied to every path this script would write to.
+#   3. Importing the repository directly would copy `node_modules/`, `tests/`,
+#      `evals/` and the local `.zensu/` runtime state into the plugin.
+#
+# So: build a CURATED staging tree outside the plugin root, render hooks.json
+# into it with the FINAL destination baked in (the importer will not expand a
+# placeholder later), then hand that tree to the host importer.
 #
 # Usage:
-#   install.sh [--target ide|cli|both] [--uninstall] [--dry-run] [--force]
+#   install.sh [--dry-run] [--uninstall] [--stage-only <dir>]
 #
-# Idempotent via a plain-TSV manifest (path<TAB>sha256) per dest: unchanged files
-# are NOOP on re-run, user-modified files are SKIPped on every upgrade (the prior
-# record is carried forward; --force overwrites), re-running the same version is a
-# NOOP. --uninstall removes only manifest-recorded files under the allowed plugin
-# roots, refusing any path with parent traversal; ~/.zensu user data is left
-# untouched. No node JSON surgery (no MCP merge) — only `sed` renders hooks.json.
+# ~/.zensu user data (config.json) is never removed by --uninstall.
+
 set -u
 
-SRC="$(cd "$(dirname "$0")" && pwd)"
-TARGET="both"
-DRY=0
-FORCE=0
-UNINSTALL=0
+PLUGIN_NAME="zensu"
+SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+DEST="$HOME/.gemini/config/plugins/$PLUGIN_NAME"
+# The previous installer staged into this second root by default, so an upgrade
+# has to clean it even though the current design never writes there.
+LEGACY_CLI_DEST="$HOME/.gemini/antigravity-cli/plugins/$PLUGIN_NAME"
+ZENSU_HOME_DIR="$HOME/.zensu"
+ZENSU_HOST_HOME_DIR="$ZENSU_HOME_DIR/antigravity"
+PLUGIN_PARENTS=("$HOME/.gemini/config/plugins" "$HOME/.gemini/antigravity-cli/plugins")
 
-while [ $# -gt 0 ]; do
+DRY=0; UNINSTALL=0; STAGE_ONLY=""; STAGE_ONLY_SET=0
+while [ "$#" -gt 0 ]; do
   case "$1" in
-    --target)
-      [ $# -ge 2 ] || { echo "FATAL: --target needs a value (ide|cli|both)" >&2; exit 2; }
-      TARGET="$2"; shift 2 ;;
-    --uninstall) UNINSTALL=1; shift ;;
-    --dry-run) DRY=1; shift ;;
-    --force) FORCE=1; shift ;;
-    -h|--help) sed -n '2,33p' "$0"; exit 0 ;;
-    *) echo "unknown flag: $1" >&2; exit 2 ;;
+    --dry-run)    DRY=1 ;;
+    --uninstall)  UNINSTALL=1 ;;
+    --stage-only)
+      # A missing value used to fall through to a REAL install, and a following
+      # flag was swallowed as the directory name.
+      [ "$#" -ge 2 ] || { echo "install.sh: --stage-only needs a directory" >&2; exit 2; }
+      [ -n "$2" ] || { echo "install.sh: --stage-only needs a NON-EMPTY directory" >&2; exit 2; }
+      case "$2" in -*) echo "install.sh: --stage-only needs a directory, got '$2'" >&2; exit 2 ;; esac
+      shift; STAGE_ONLY="$1"; STAGE_ONLY_SET=1
+      ;;
+    -h|--help)    sed -n '2,25p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) echo "install.sh: unknown argument '$1'" >&2; exit 2 ;;
   esac
+  shift
 done
 
-case "$TARGET" in ide|cli|both) ;; *) echo "FATAL: --target must be ide, cli, or both" >&2; exit 2 ;; esac
+say()  { printf '%s\n' "$*"; }
+step() { printf '%-8s %s\n' "$1" "$2"; }
+die()  { printf 'install.sh: %s\n' "$*" >&2; exit 1; }
 
-if command -v shasum >/dev/null 2>&1; then
-  sha()       { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1; }
-  sha_stdin() { shasum -a 256 | cut -d' ' -f1; }
-elif command -v sha256sum >/dev/null 2>&1; then
-  sha()       { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
-  sha_stdin() { sha256sum | cut -d' ' -f1; }
-else
-  echo "FATAL: neither shasum nor sha256sum found (manifest integrity needs one)" >&2
-  exit 1
-fi
-
-IDE_DEST="$HOME/.gemini/config/plugins/zensu"
-CLI_DEST="$HOME/.gemini/antigravity-cli/plugins/zensu"
-# ZENSU_HOME is the single absolute runtime root substituted into hooks.json
-# `command` paths at BOTH dests, so one hook runtime + one FSM state root is
-# authoritative even when both IDE and CLI plugins are installed.
-ZENSU_HOME="$IDE_DEST"
-
-# Which dests to act on for this --target.
-DESTS=""
-case "$TARGET" in
-  ide)  DESTS="$IDE_DEST" ;;
-  cli)  DESTS="$CLI_DEST" ;;
-  both) DESTS="$IDE_DEST $CLI_DEST" ;;
-esac
-
-say() { printf '%s\n' "$*"; }
-
-manifest_path() { printf '%s/.zensu-install-manifest.tsv' "$1"; }
-
-manifest_lookup() { # $1=manifest-file $2=abs-path -> recorded hash or empty
-  [ -f "$1" ] || return 0
-  # plain TSV: path<TAB>hash ; exact path match on the first field
-  awk -F'\t' -v p="$2" '$1==p {print $2; exit}' "$1" 2>/dev/null
-}
-
-# Allowed deletion root: a manifest entry may only be removed when it is an
-# absolute path under one of the plugin dirs AND contains no parent traversal.
-# The trailing slash keeps sibling prefixes (…/zensu-evil) out.
-path_allowed() { # $1=abs path
-  case "$1" in
-    *..*) return 1 ;;
-    "$IDE_DEST/"*|"$CLI_DEST/"*) return 0 ;;
-  esac
-  return 1
-}
-
-# install_file <src-abs> <dst-abs> <list-file> [render]
-#   render: sed-substitute __ZENSU_HOME__ -> $ZENSU_HOME (for hooks.json)
-install_file() {
-  local src="$1" dst="$2" list="$3" render="${4:-no}" content tmp old want recorded
-  if [ "$render" = "render" ]; then
-    content="$(sed "s|__ZENSU_HOME__|$ZENSU_HOME|g" "$src")"
-  else
-    content="$(cat "$src")"
-  fi
-  want="$(printf '%s\n' "$content" | sha_stdin)"
-  if [ -f "$dst" ]; then
-    old="$(sha "$dst")"
-    if [ "$old" = "$want" ]; then
-      say "NOOP    $dst"
-      printf '%s\t%s\n' "$dst" "$want" >> "$list"
-      return 0
-    fi
-    recorded="$(manifest_lookup "$MANIFEST" "$dst")"
-    if [ "$FORCE" -ne 1 ] && { { [ -n "$recorded" ] && [ "$old" != "$recorded" ]; } || [ -z "$recorded" ]; }; then
-      say "SKIP    $dst (pre-existing/user-modified; --force to overwrite)"
-      # Carry our previous record forward so the guard survives the manifest
-      # rewrite. FOREIGN file (no record): record NOTHING.
-      [ -n "$recorded" ] && printf '%s\t%s\n' "$dst" "$recorded" >> "$list"
-      return 0
-    fi
-    say "UPDATE  $dst"
-  else
-    say "CREATE  $dst"
-  fi
-  [ "$DRY" -eq 1 ] && { printf '%s\t%s\n' "$dst" "$want" >> "$list"; return 0; }
-  mkdir -p "$(dirname "$dst")"
-  tmp="$(mktemp "$(dirname "$dst")/.zensu-install.XXXXXX")" || return 1
-  if printf '%s\n' "$content" > "$tmp" && mv "$tmp" "$dst"; then
-    case "$dst" in *.sh) chmod +x "$dst" ;; esac
-    printf '%s\t%s\n' "$dst" "$want" >> "$list"
-  else
-    rm -f "$tmp" 2>/dev/null
-    say "ERROR   $dst (write failed; not recorded)"
-    INSTALL_FAILED=1
-    return 1
-  fi
-}
-
-# ── Uninstall ────────────────────────────────────────────────────────
-if [ "$UNINSTALL" -eq 1 ]; then
-  REMOVED_ANY=0
-  for DEST in $DESTS; do
-    MANIFEST="$(manifest_path "$DEST")"
-    [ -f "$MANIFEST" ] || { say "nothing to uninstall at $DEST (no manifest)"; continue; }
-    REMOVED_ANY=1
-    while IFS="$(printf '\t')" read -r p hash; do
-      [ -n "$p" ] || continue
-      if ! path_allowed "$p"; then
-        say "REFUSE  $p (outside allowed plugin roots)"
-        continue
-      fi
-      [ -f "$p" ] || continue
-      cur="$(sha "$p")"
-      if [ "$cur" = "$hash" ] || [ "$FORCE" -eq 1 ]; then
-        say "REMOVE  $p"
-        [ "$DRY" -eq 1 ] || rm -f "$p"
-      else
-        say "KEEP    $p (user-modified)"
-      fi
-    done < "$MANIFEST"
-    if [ "$DRY" -ne 1 ]; then
-      rm -f "$MANIFEST"
-      # prune now-empty dirs under this dest only
-      find "$DEST" -type d -empty -delete 2>/dev/null || true
-    fi
+# --- Guard: never write to (or import from) the host's plugin root -----------
+# The hazard is not only "source == destination": any path this script deletes
+# or builds inside a plugin root can clobber a live installation.
+guard_plugin_root() { # $1 = candidate path, $2 = what it is used for
+  local candidate="$1" role="$2" parent resolved probe
+  probe="$candidate"
+  # Resolve the nearest existing ancestor so a not-yet-created target is judged
+  # by where it WOULD land, not skipped for being absent.
+  while [ -n "$probe" ] && [ ! -d "$probe" ]; do probe="$(dirname "$probe")"; [ "$probe" = "/" ] && break; done
+  [ -d "$probe" ] || return 0
+  probe="$(cd "$probe" && pwd -P 2>/dev/null)" || return 0
+  local suffix="${candidate#"${probe}"}"
+  local full="$probe$suffix"
+  for parent in "${PLUGIN_PARENTS[@]}"; do
+    [ -d "$parent" ] || continue
+    # Compare physically-resolved paths on BOTH sides: SRC comes from `pwd -P`,
+    # so a $HOME traversing a symlink (macOS /var -> /private/var) would never
+    # match the raw string and the guard would silently pass.
+    resolved="$(cd "$parent" && pwd -P 2>/dev/null)" || continue
+    case "$full/" in
+      "$resolved"/*)
+        die "refusing to use '$candidate' as the $role: it is inside the host plugin root ($parent).
+     The host copies a plugin directory onto itself there, truncating the plugin's own files.
+     Run install.sh from the repository checkout and stage somewhere outside that root."
+        ;;
+    esac
   done
-  [ "$REMOVED_ANY" -eq 1 ] || exit 0
-  say "uninstalled (target=$TARGET). ~/.zensu user data (config + state) left untouched."
+}
+
+# --- Curated stage -----------------------------------------------------------
+# Only what the plugin needs at runtime. `tests/`, `evals/`, `node_modules/` and
+# the local `.zensu/` state stay out. `docs/`, `README.md`, `CHANGELOG.md` and
+# `LICENSE` DO ship: several skills and the plm agent read them by path at
+# runtime (skills/docs and agents/zensu-plm require docs/documentation-guide.md;
+# skills/zensu-help routes topics to README.md and docs/architecture.md), so
+# excluding them would leave documented prerequisites unreachable once installed.
+STAGE_ENTRIES="plugin.json config.example.json skills agents commands rules templates hooks docs scripts harness README.md CHANGELOG.md LICENSE"
+
+require_node() {
+  command -v node >/dev/null 2>&1 \
+    || die "node is required to render and validate hooks.json"
+}
+
+build_stage() { # $1 = stage root; sets STAGE (no subshell: `die` must reach the caller)
+  require_node
+  local stage_root="$1" entry
+  STAGE="$stage_root/$PLUGIN_NAME"
+  guard_plugin_root "$STAGE" "staging directory"
+  rm -rf -- "$STAGE"
+  mkdir -p -- "$STAGE" || die "cannot create staging dir '$STAGE'"
+  for entry in $STAGE_ENTRIES; do
+    [ -e "$SRC/$entry" ] || continue
+    cp -R "$SRC/$entry" "$STAGE/" || die "staging failed for '$entry'"
+  done
+  # hooks.json carries absolute command paths and the host expands nothing, so
+  # render it against the FINAL destination, not against the staging path.
+  [ -f "$SRC/hooks.json.template" ] || die "hooks.json.template is missing — the staged plugin would declare hooks that do not exist"
+  render_hooks_json "$SRC/hooks.json.template" "$STAGE/hooks.json"
+}
+
+render_hooks_json() { # $1 = template, $2 = output
+  # The output becomes the command strings the host EXECUTES on every tool call,
+  # so the substitution must be LITERAL. Neither `sed` nor `awk` gives that: sed
+  # interprets the delimiter, `&` and `\` in its replacement, and awk's `gsub`
+  # replacement expands `&` to the matched text — swapping one for the other only
+  # changes which character bites (a destination containing `&` came out with
+  # `__ZENSU_HOME__` re-inserted). node is already a hard requirement here, and
+  # split/join has no metacharacter semantics at all.
+  #
+  # The rendered value lands mid-word in an UNQUOTED command string that the host
+  # shell-splits: `bash <DEST>/hooks/antigravity/antigravity-shim.sh <script>.sh`.
+  # A denylist of JSON metacharacters is the wrong shape for that consumer — a
+  # plain SPACE is enough to split the path so all 8 hooks resolve to nothing
+  # while JSON.parse and `agy plugin validate` both still pass. An allowlist
+  # covers the JSON, shell and control-character cases in one rule.
+  case "$DEST" in
+    *[!A-Za-z0-9/._-]*)
+      die "the install destination contains a character that cannot be embedded safely in a
+     hook command string: $DEST
+     Only letters, digits and / . _ - are safe here, because the host shell-splits the
+     rendered command. Install under a path without spaces or punctuation." ;;
+  esac
+  DEST="$DEST" node -e '
+    const fs = require("fs");
+    const out = fs.readFileSync(process.argv[1], "utf8").split("__ZENSU_HOME__").join(process.env.DEST);
+    fs.writeFileSync(process.argv[2], out);
+  ' "$1" "$2" || die "rendering hooks.json failed"
+}
+
+verify_stage() { # $1 = staged plugin dir
+  local stage="$1" script
+  [ -f "$stage/plugin.json" ] || die "staged tree has no plugin.json"
+  [ -f "$stage/rules/AGENTS.md" ] && [ ! -L "$stage/rules/AGENTS.md" ] \
+    || die "staged tree has no regular plugin-owned rules/AGENTS.md"
+  [ -f "$stage/hooks.json" ] || die "staged tree has no rendered hooks.json"
+  # `grep -q`, not `grep -c`: with no match `grep -c` prints 0 AND exits 1, so a
+  # `|| echo 0` fallback appends a second line and the comparison never holds.
+  ! grep -q '__ZENSU_HOME__' "$stage/hooks.json" 2>/dev/null \
+    || die "hooks.json still contains unexpanded __ZENSU_HOME__ placeholders"
+  command -v node >/dev/null 2>&1 \
+    || die "node is required to validate the rendered hooks.json"
+  node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$stage/hooks.json" \
+    2>/dev/null || die "rendered hooks.json is not valid JSON"
+  # Every command the host will run must resolve inside the staged tree, or the
+  # gates silently disappear while the installer still reports success.
+  [ -f "$stage/hooks/antigravity/antigravity-shim.sh" ] \
+    || die "staged tree has no hooks/antigravity/antigravity-shim.sh — every hook would resolve to nothing"
+  while IFS= read -r script; do
+    [ -n "$script" ] || continue
+    case "$script" in
+      pre-tool-chain.sh|post-tool-chain.sh|pre-invocation-chain.sh|stop-chain.sh)
+        local handler listed
+        for tool in Bash Write Edit MultiEdit Read Agent NotebookEdit; do
+          listed="$(bash "$stage/hooks/antigravity/antigravity-shim.sh" --list-handlers "$script" "$tool")" \
+            || die "cannot resolve chain '$script' for '$tool'"
+          [ -n "$listed" ] || die "chain '$script' is empty for '$tool'"
+          while IFS= read -r handler; do
+            [ -f "$stage/hooks/$handler" ] || die "chain '$script' references missing '$handler'"
+          done <<EOF_HANDLERS
+$listed
+EOF_HANDLERS
+        done
+        ;;
+      *) [ -f "$stage/hooks/$script" ] || die "hooks.json wraps '$script', which is not in the staged tree" ;;
+    esac
+  done < <(grep -oE 'antigravity-shim\.sh [A-Za-z0-9._-]+\.sh' "$stage/hooks.json" | awk '{print $2}' | sort -u)
+
+  # The event argument decides which verdict dialect emit-verdict speaks. Without it
+  # the shim blanks HOOK_EVENT and every deny collapses to {} — a silent allow on all
+  # four gates. A rendered hooks.json that lost it must never pass verification.
+  command -v node >/dev/null 2>&1 || return 0
+  local ev_problems
+  ev_problems="$(node -e '
+    const fs = require("fs");
+    let t;
+    try { t = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch (_) { process.stdout.write("unparseable hooks.json"); process.exit(0); }
+    const EVENTS = new Set(["PreToolUse","PostToolUse","PreInvocation","PostInvocation","Stop"]);
+    const bad = [];
+    const check = (event, h) => {
+      const m = String((h && h.command) || "").match(/antigravity-shim\.sh\s+(\S+)(?:\s+(\S+))?\s*$/);
+      if (!m) return;
+      const declared = m[2] || "";
+      if (!declared) bad.push(m[1] + ":no-event");
+      else if (!EVENTS.has(declared)) bad.push(m[1] + ":unknown-event-" + declared);
+      else if (declared !== event) bad.push(m[1] + ":" + declared + "-under-" + event);
+    };
+    for (const events of Object.values(t || {}))
+      for (const [event, arr] of Object.entries(events || {})) {
+        if (!Array.isArray(arr)) continue;
+        for (const e of arr) {
+          if (Array.isArray(e && e.hooks)) e.hooks.forEach(h => check(event, h));
+          else check(event, e);
+        }
+      }
+    process.stdout.write(bad.join(" "));
+  ' "$stage/hooks.json" 2>/dev/null)"
+  [ -z "$ev_problems" ] || die "rendered hooks.json has bad event argument(s), which would make every gate deny nothing: $ev_problems"
+}
+
+# Deliberately removing OUR OWN installed tree is the intended cleanup, not the
+# hazard the guard exists for — so this does not consult it. Instead it refuses
+# anything that is not one of the two fixed, $HOME-derived paths this script
+# owns, which is a tighter constraint than a path-prefix check.
+remove_tree() { # $1 = path, $2 = label
+  case "$1" in
+    "$DEST"|"$LEGACY_CLI_DEST") ;;
+    *) die "internal error: refusing to remove '$1' — not a plugin path this installer owns" ;;
+  esac
+  [ -d "$1" ] || return 0
+  rm -rf -- "$1" && step REMOVE "$2"
+}
+
+# --- Uninstall ---------------------------------------------------------------
+if [ "$UNINSTALL" -eq 1 ]; then
+  if [ "$DRY" -eq 1 ]; then
+    step DRY "agy plugin uninstall $PLUGIN_NAME"
+    step DRY "rm -rf $DEST"
+    step DRY "rm -rf $LEGACY_CLI_DEST  (populated by the previous installer)"
+    step DRY "rm $ZENSU_HOST_HOME_DIR/plugin-root"
+    say ""
+    say "dry-run: nothing was written. ~/.zensu/config.json is never removed."
+    exit 0
+  fi
+  if command -v agy >/dev/null 2>&1; then
+    if agy plugin uninstall "$PLUGIN_NAME" >/dev/null 2>&1; then
+      step REMOVE "registered plugin '$PLUGIN_NAME'"
+    else
+      say "note: 'agy plugin uninstall $PLUGIN_NAME' did not succeed — it may not have been registered; continuing with the filesystem cleanup"
+    fi
+  fi
+  remove_tree "$DEST" "$DEST"
+  remove_tree "$LEGACY_CLI_DEST" "$LEGACY_CLI_DEST (previous installer's CLI copy)"
+  [ -f "$ZENSU_HOST_HOME_DIR/plugin-root" ] && rm -f "$ZENSU_HOST_HOME_DIR/plugin-root" && step REMOVE "$ZENSU_HOST_HOME_DIR/plugin-root"
+  say ""
+  say "done. ~/.zensu/config.json was kept (user data)."
   exit 0
 fi
 
-# ── Install ──────────────────────────────────────────────────────────
-say "zensu-antigravity installer -> target=$TARGET$([ "$DRY" -eq 1 ] && echo ' (dry-run)')"
-INSTALL_FAILED=0
+# --- Install -----------------------------------------------------------------
+guard_plugin_root "$SRC" "install source"
 
-# Stage list (relative to SRC). Plugin RUNTIME only — meta/test files excluded.
-#   plugin.json, skills/, rules/, workflows/, agents/, templates/, hooks/
-#   (RECURSIVE incl. hooks/antigravity + hooks/lib), config.example.json
-stage_into() { # $1=dest plugin root
-  local DEST="$1" LIST f rel
-  MANIFEST="$(manifest_path "$DEST")"
-  LIST="$(mktemp)"
+say "zensu-antigravity installer -> $DEST$([ "$DRY" -eq 1 ] && echo ' (dry-run)')"
 
-  # top-level runtime files
-  for f in plugin.json config.example.json; do
-    [ -f "$SRC/$f" ] && install_file "$SRC/$f" "$DEST/$f" "$LIST"
+# --stage-only must honour --dry-run: it used to run a real `rm -rf` on a
+# caller-supplied path even when a no-write preview was requested.
+if [ "$STAGE_ONLY_SET" -eq 1 ] && [ "$DRY" -eq 1 ]; then
+  guard_plugin_root "$STAGE_ONLY/$PLUGIN_NAME" "staging directory"
+  step DRY "rm -rf $STAGE_ONLY/$PLUGIN_NAME"
+  step DRY "stage: $STAGE_ENTRIES"
+  step DRY "render hooks.json (__ZENSU_HOME__ -> $DEST)"
+  say ""
+  say "dry-run: nothing was written."
+  exit 0
+fi
+
+if [ "$STAGE_ONLY_SET" -eq 1 ]; then
+  build_stage "$STAGE_ONLY"
+  verify_stage "$STAGE"
+  step STAGE "$STAGE"
+  say ""
+  say "staged only. Register it with:  agy plugin install \"$STAGE\""
+  exit 0
+fi
+
+if [ "$DRY" -eq 1 ]; then
+  for entry in $STAGE_ENTRIES; do
+    [ -e "$SRC/$entry" ] && step STAGE "$entry"
   done
+  step RENDER "hooks.json (__ZENSU_HOME__ -> $DEST)"
+  step CLEAR  "$DEST (removed before import so a stale layout cannot survive)"
+  step IMPORT "agy plugin install <staged tree>"
+  step WRITE  "$ZENSU_HOST_HOME_DIR/plugin-root -> $DEST"
+  step SEED   "$ZENSU_HOME_DIR/config.json (only if missing)"
+  say ""
+  say "dry-run: nothing was written."
+  exit 0
+fi
 
-  # recursive subtrees: skills, rules, workflows, agents, templates, hooks
-  # (hooks incl. antigravity + lib). templates/ carries the artifact skeletons
-  # zensu-overlay.sh --template resolves at runtime, so it must ship.
-  while IFS= read -r f; do
-    rel="${f#"$SRC"/}"
-    install_file "$f" "$DEST/$rel" "$LIST"
-  done < <(find "$SRC/skills" "$SRC/rules" "$SRC/workflows" "$SRC/agents" "$SRC/templates" "$SRC/hooks" -type f 2>/dev/null | sort)
+command -v agy >/dev/null 2>&1 \
+  || die "the 'agy' CLI is not on PATH. Install Antigravity first — hand-copying the
+     plugin directory does NOT register it, so no /zensu-<name> command would exist."
 
-  # generated hooks.json (absolute paths, rendered from the template into THIS dest)
-  if [ -f "$SRC/hooks.json.template" ]; then
-    install_file "$SRC/hooks.json.template" "$DEST/hooks.json" "$LIST" render
-  fi
+STAGE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/zensu-stage-XXXXXX")" || die "cannot create a staging dir"
+trap 'rm -rf "$STAGE_ROOT"' EXIT
+trap 'rm -rf "$STAGE_ROOT"; exit 130' INT
+trap 'rm -rf "$STAGE_ROOT"; exit 143' TERM
+build_stage "$STAGE_ROOT"
+verify_stage "$STAGE"
+step STAGE "$(find "$STAGE" -type f | wc -l | tr -d ' ') files (curated)"
 
-  # write the manifest (plain TSV) for this dest
-  if [ "$DRY" -ne 1 ]; then
-    mkdir -p "$DEST"
-    sort -u "$LIST" > "$MANIFEST"
-    say "WRITE   $MANIFEST"
-  fi
-  rm -f "$LIST"
-}
+# Clear the previous install first: the importer copies INTO the destination, so
+# an upgrade would otherwise keep files the new layout no longer ships — exactly
+# obsolete files from earlier layouts, including unshipped rules and workflows.
+remove_tree "$DEST" "$DEST (previous install)"
+remove_tree "$LEGACY_CLI_DEST" "$LEGACY_CLI_DEST (previous installer's CLI copy)"
 
-for DEST in $DESTS; do
-  stage_into "$DEST"
-done
+agy plugin install "$STAGE" || die "the host importer rejected the staged tree"
+step IMPORT "registered as '$PLUGIN_NAME'"
 
-# ~/.zensu seeding (pointer + config; never overwrite an existing config)
-if [ "$DRY" -ne 1 ]; then
-  mkdir -p "$HOME/.zensu"
-  printf '%s\n' "$ZENSU_HOME" > "$HOME/.zensu/plugin-root"
-  say "WRITE   $HOME/.zensu/plugin-root -> $ZENSU_HOME"
-  if [ ! -f "$HOME/.zensu/config.json" ]; then
-    cp "$SRC/config.example.json" "$HOME/.zensu/config.json"
-    say "SEED    $HOME/.zensu/config.json (from config.example.json)"
-  fi
-  # ensure the entry scripts are executable at the runtime (defensive: the
-  # source may be checked out without the +x bit on some platforms)
-  for s in "$ZENSU_HOME/hooks/antigravity/antigravity-shim.sh" \
-           "$ZENSU_HOME/hooks/antigravity/lazy-init.sh"; do
-    [ -f "$s" ] && chmod +x "$s" 2>/dev/null || true
-  done
+# DEST is an assumption about the host's layout, so verify it rather than
+# writing a pointer and hook paths that would be dead.
+[ -f "$DEST/plugin.json" ] && [ -f "$DEST/hooks/antigravity/antigravity-shim.sh" ] \
+  || die "the host did not install to $DEST — the rendered hooks.json paths and the
+     plugin-root pointer would both be dead. Inspect 'agy plugin list' and re-run."
+
+mkdir -p "$ZENSU_HOST_HOME_DIR" || die "cannot create $ZENSU_HOME_DIR"
+printf '%s\n' "$DEST" > "$ZENSU_HOST_HOME_DIR/plugin-root" || die "cannot write the plugin-root pointer"
+step WRITE "$ZENSU_HOST_HOME_DIR/plugin-root -> $DEST"
+
+if [ -f "$ZENSU_HOME_DIR/config.json" ]; then
+  step KEEP "$ZENSU_HOME_DIR/config.json (existing user config untouched)"
+elif [ -f "$SRC/config.example.json" ]; then
+  cp "$SRC/config.example.json" "$ZENSU_HOME_DIR/config.json" \
+    || die "seeding $ZENSU_HOME_DIR/config.json failed"
+  step SEED "$ZENSU_HOME_DIR/config.json"
+else
+  say "note: no config.example.json to seed from — the plugin will use its built-in defaults"
 fi
 
 say ""
+agy plugin validate "$DEST" >/dev/null 2>&1 \
+  || die "'agy plugin validate $DEST' did not report ok — the install is not trustworthy"
+step VERIFY "agy plugin validate $DEST -> ok"
+
+say ""
 say "done. Next steps:"
-say "  restart Antigravity so it discovers the freshly-staged plugin dir"
-say "  /zensu-help          # orientation; /zensu-tdd for gate-enforced TDD"
-if [ "$INSTALL_FAILED" -ne 0 ]; then
-  echo "install completed WITH ERRORS (see ERROR lines above)" >&2
-  exit 1
-fi
-exit 0
+say "  restart Antigravity so the IDE picks up the newly registered plugin"
+say "  /zensu-help          # orientation; /zensu-tdd for the gate-enforced TDD build"

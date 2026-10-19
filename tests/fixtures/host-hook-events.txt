@@ -1,0 +1,25 @@
+# Hook events agy accepts in a plugin hooks.json, and the entry structure each one
+# requires. SINGLE SOURCE OF TRUTH — consumed by tests/structure/test-hooks-json-shape.sh
+# and the promptfoo host-contract catalog. Keep it in lockstep with the host's own
+# specification and with what a live install actually accepts.
+#
+# Source: ~/.gemini/antigravity-cli/builtin/skills/agy-customizations/docs/hooks.md
+#         ("Supported Event Types" table), agy 1.1.10.
+#
+# Format: <EventName> <structure>
+#   grouped -> array of {matcher, hooks:[handler,...]} wrappers; matcher is a tool-name regex
+#   flat    -> array of handler objects directly; a matcher is ignored by the host
+#
+# Why this matters: shipping a grouped entry for a flat event does NOT warn at
+# install time and does NOT show up in `agy plugin validate`. The host logs
+#   hooks.go:66 Failed to parse hooks for plugin <name>: invalid hook "<group>":
+#   command hook must specify 'command'
+# to its own CLI log and then runs WITHOUT that hook group. zensu shipped exactly
+# that defect for PreInvocation and Stop, so the intent router, the TDD reminder
+# and the Stop chain-enforcer were silently inert on every run.
+
+PreToolUse grouped
+PostToolUse grouped
+PreInvocation flat
+PostInvocation flat
+Stop flat

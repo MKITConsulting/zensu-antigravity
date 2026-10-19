@@ -1,4 +1,4 @@
-WARGAME ORDER. You are not executing this mission, you are wargaming it. A cheaper executor (a mid-tier model) runs the brief below later. Your job is the route it will follow.
+WARGAME ORDER. You are not executing this mission, you are wargaming it. A cheaper executor (Antigravity on a cheaper model) runs the brief below later. Your job is the route it will follow.
 
 Recon first, read-only: the whole repo, trace the core flows.
 

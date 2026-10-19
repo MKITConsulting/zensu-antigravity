@@ -1,34 +1,40 @@
 #!/bin/bash
 set -u
 
-# Structure + functional test for the secret scan.
-#
-# Two hooks share one engine: pre-write-secret-scan.sh covers the Antigravity
-# file writers (write_to_file / replace_file_content / multi_replace_file_content)
-# and pre-bash-source-write-gate.sh runs the same decider as its second step on
-# raw run_command writes (heredoc / redirect / tee / sed -i / dd of=). Pinned
-# here: the files exist and parse; the SoT chain hook -> secret-scan-decide.js ->
-# secret-patterns.js + bash-source-write-parse.js; the config flag (secretScan)
-# and env bypass (ZENSU_SECRET_SCAN) on both hooks; fail-open on a scanner
-# error; the engine per credential class incl. placeholder suppression; the
-# write-channel probe; and hook-level verdicts on synthetic normalized payloads,
-# including the shim's normalize step feeding tool_input.content.
-#
-# hooks.json.template wiring is NOT asserted here — registration is owned by the
-# template + the sibling hooks-json-shape / readme-hook-count tests.
-#
-# Synthetic token literals below are SPLIT with '' (bash string concatenation)
-# so the committed file never contains a full provider-shaped token: the test
-# feeds the joined value to the gate at runtime, while external secret scanners
-# reading the raw file see only fragments.
+# zensu-doctor-home-exempt: this suite never RUNS the doctor. It only names
+# hooks/lib/zensu-doctor.sh inside a `{"command": ...}` payload handed to the
+# secret-scan gate, to check that the gate admits that command shape.
+# Structure + functional test for the secret-scan gate (pre-write-secret-scan.sh).
+# Pins: the hook exists, is executable, and is wired in hooks.json under all
+# THREE PreToolUse matcher groups (Edit|Write|MultiEdit, NotebookEdit, Bash —
+# verified structurally, not by occurrence count); secret-patterns.js and
+# secret-scan-decide.js exist, parse (node --check), and are the SoT the hook
+# references; the config flag (secretScan) and env bypass (ZENSU_SECRET_SCAN)
+# are honored; fail-open is documented; the README carries the hook-table row,
+# the config row, the Secret Scan section, and the hook inventory header. Unit level:
+# the engine CLI (stdin -> JSON) per rule incl. placeholder suppression and
+# entropy negative; detectChannels per channel incl. fd-dup negative. Hook
+# level: synthetic-payload invocations (including the unregistered-session group
+# F14-F19: a channel-less Bash call and an over-detected redirect pass, a real
+# secret on any channel and a foreign-installation record still deny) under a hermetic
+# ZENSU_CONFIG with ambient ZENSU_SECRET_SCAN/BSWG_MODE neutralized, incl.
+# deny-reason content, the per-alternative path allowlist, a second-tool
+# exemption case, and a node-shim scanner-crash fail-open case. It
+# intentionally does NOT assert version sync or the README hook-count
+# arithmetic — those are owned by sibling tests.
 
+# Synthetic token literals below are SPLIT with '' (bash string concatenation)
+# so the committed blob never contains a full provider-shaped token: the test
+# feeds the joined value to the gate at runtime, but external secret scanners
+# (e.g. GitHub push protection) scanning the raw file see only fragments.
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOK="$PLUGIN_DIR/hooks/pre-write-secret-scan.sh"
-BASH_GATE="$PLUGIN_DIR/hooks/pre-bash-source-write-gate.sh"
 ENGINE="$PLUGIN_DIR/hooks/lib/secret-patterns.js"
 DECIDE="$PLUGIN_DIR/hooks/lib/secret-scan-decide.js"
 PARSER="$PLUGIN_DIR/hooks/lib/bash-source-write-parse.js"
-NORMALIZE="$PLUGIN_DIR/hooks/antigravity/normalize-payload.js"
+HOOKS_JSON="$PLUGIN_DIR/hooks/hooks.json"
+CONFIG_DOC="$PLUGIN_DIR/docs/configuration.md"
+GATES_DOC="$PLUGIN_DIR/docs/gates.md"
 
 PASS=0; FAIL=0
 check() {
@@ -36,268 +42,383 @@ check() {
   if [ "$cond" = "PASS" ]; then echo "  PASS  $label"; PASS=$((PASS+1));
   else echo "  FAIL  $label"; FAIL=$((FAIL+1)); fi
 }
-finish() {
-  echo "----"
-  echo "test-secret-scan: $PASS PASS / $FAIL FAIL"
-  [ "$FAIL" -eq 0 ]
-}
 
-command -v node >/dev/null 2>&1 || { echo "node required"; exit 1; }
-
-for f in "$HOOK" "$BASH_GATE" "$ENGINE" "$DECIDE" "$PARSER" "$NORMALIZE"; do
+for f in "$HOOK" "$ENGINE" "$DECIDE" "$PARSER" "$HOOKS_JSON" "$CONFIG_DOC" "$GATES_DOC"; do
   if [ ! -f "$f" ]; then
-    check "S0 required file exists: $f" FAIL
-    finish; exit 1
+    check "P0 required file exists: $f" FAIL
+    echo "----"
+    echo "test-secret-scan-gate: $PASS PASS / $FAIL FAIL"
+    exit 1
   fi
 done
-check "S0 all six target files exist" PASS
+check "P0 all six target files exist" PASS
 
-bash -n "$HOOK" 2>/dev/null && check "S1 pre-write-secret-scan.sh bash -n syntax" PASS \
-  || check "S1 pre-write-secret-scan.sh bash -n syntax" FAIL
-{ node --check "$ENGINE" && node --check "$DECIDE" && node --check "$PARSER"; } 2>/dev/null \
-  && check "S2 engine/decider/parser pass node --check" PASS \
-  || check "S2 engine/decider/parser pass node --check" FAIL
-
-{ grep -qF 'secret-scan-decide.js' "$HOOK" && grep -qF 'secret-patterns.js' "$DECIDE" \
-  && grep -qF 'bash-source-write-parse.js' "$DECIDE"; } \
-  && check "S3 SoT chain: hook -> decider -> engine + shared parser" PASS \
-  || check "S3 SoT chain: hook -> decider -> engine + shared parser" FAIL
-
-grep -qF 'secret-scan-decide.js' "$BASH_GATE" \
-  && check "S4 raw-run_command writes reuse the same decider" PASS \
-  || check "S4 raw-run_command writes reuse the same decider" FAIL
-
-for h in "$HOOK" "$BASH_GATE"; do
-  n="$(basename "$h")"
-  { grep -qF 'zensu_hook_enabled secretScan' "$h" && grep -qF 'ZENSU_SECRET_SCAN' "$h"; } \
-    && check "S5 $n honors hooks.secretScan + ZENSU_SECRET_SCAN" PASS \
-    || check "S5 $n honors hooks.secretScan + ZENSU_SECRET_SCAN" FAIL
-done
-
-{ grep -qiF 'FAIL OPEN' "$HOOK" && grep -qF 'failing open' "$HOOK"; } \
-  && check "S6 fail-open documented + implemented in the writer hook" PASS \
-  || check "S6 fail-open documented + implemented in the writer hook" FAIL
-
-{ grep -qF 'stripHeredocs(cmd).split' "$DECIDE" && grep -qF '"ZENSU_SECRET_SCAN"' "$DECIDE" \
-  && grep -qF '=== "off"' "$DECIDE"; } \
-  && check "S7 inline escape decided on heredoc-stripped env tokens (code, not prose)" PASS \
-  || check "S7 inline escape decided on heredoc-stripped env tokens (code, not prose)" FAIL
-
-{ grep -qF 'detectChannels' "$PARSER" && grep -qF 'detectChannels' "$DECIDE"; } \
-  && check "S8 write-channel probe reuses the shared parser (detectChannels)" PASS \
-  || check "S8 write-channel probe reuses the shared parser (detectChannels)" FAIL
-
-# ── Engine unit cases (stdin -> JSON), one per credential class ───────
-engine() { printf '%s' "$1" | node "$ENGINE" 2>/dev/null; }
-
-OUT="$(engine 'k = "AKIA''IOSFODNN7RGY4Q2B"')"
-case "$OUT" in *'"aws-access-key-id"'*) check "U1 engine: AWS access key id" PASS;; *) check "U1 engine: AWS access key id" FAIL;; esac
-
-OUT="$(engine 'aws_secret_access_key = wJalrXUtnFEMIK7MDENG''bPxRfiCY1234567890Zq')"
-case "$OUT" in *'"aws-secret-access-key"'*) check "U2 engine: AWS secret assignment" PASS;; *) check "U2 engine: AWS secret assignment" FAIL;; esac
-
-OUT="$(engine 'ghs_''123456789012345678901234567890123456')"
-case "$OUT" in *'"github-token"'*) check "U3 engine: GitHub token" PASS;; *) check "U3 engine: GitHub token" FAIL;; esac
-
-OUT="$(engine 'github_pat_''11ABCDEFG0123456789abc')"
-case "$OUT" in *'"github-fine-grained-pat"'*) check "U4 engine: GitHub fine-grained PAT" PASS;; *) check "U4 engine: GitHub fine-grained PAT" FAIL;; esac
-
-OUT="$(engine 'xox''b-1234567890-abcdefghij')"
-case "$OUT" in *'"slack-token"'*) check "U5 engine: Slack token" PASS;; *) check "U5 engine: Slack token" FAIL;; esac
-
-OUT="$(engine 'rk_''live_abcdef1234567890XY')"
-case "$OUT" in *'"stripe-live-key"'*) check "U6 engine: Stripe live key" PASS;; *) check "U6 engine: Stripe live key" FAIL;; esac
-
-OUT="$(engine '-----BEGIN PRIVATE KEY-----')"
-case "$OUT" in *'"private-key-pem"'*) check "U7 engine: PEM private-key header" PASS;; *) check "U7 engine: PEM private-key header" FAIL;; esac
-
-OUT="$(engine 'api_token = "f8Zk2pQ9xL4mNv7wRs3TuY6bE1cD5gHj"')"
-case "$OUT" in *'"high-entropy-assignment"'*'"line":1'*) check "U8 engine: high-entropy assignment + line number" PASS;; *) check "U8 engine: high-entropy assignment + line number" FAIL;; esac
-
-OUT="$(engine 'password = "aaaaaaaaaaaaaaaa1"')"
-[ "$OUT" = '{"matches":[]}' ] && check "U9 engine: low-entropy value stays clean" PASS || check "U9 engine: low-entropy value stays clean" FAIL
-
-OUT="$(engine 'k = "AKIA''IOSFODNN7EXAMPLE"')"
-[ "$OUT" = '{"matches":[]}' ] && check "U10 engine: placeholder suppresses provider rule (EXAMPLE)" PASS || check "U10 engine: placeholder suppresses provider rule (EXAMPLE)" FAIL
-
-OUT="$(engine 'api_key = "XXXX9aB3kZpQ7Lm2XXXX"')"
-[ "$OUT" = '{"matches":[]}' ] && check "U11 engine: placeholder suppresses entropy value (XXXX)" PASS || check "U11 engine: placeholder suppresses entropy value (XXXX)" FAIL
-
-OUT="$(engine 'plain prose, nothing secret here')"
-[ "$OUT" = '{"matches":[]}' ] && check "U12 engine: clean input -> empty matches" PASS || check "U12 engine: clean input -> empty matches" FAIL
-
-# ── Write-channel probe (module import; require.main guard keeps it silent) ──
-detect() { CMD="$1" node -e '
-  const { detectChannels } = require(process.argv[1]);
-  process.stdout.write(detectChannels(process.env.CMD));
-' "$PARSER" 2>/dev/null; }
-
-OUT="$(detect 'printf foo >> notes.txt')"
-case "$OUT" in *redirect*) check "D1 channel: >> redirect" PASS;; *) check "D1 channel: >> redirect" FAIL;; esac
-OUT="$(detect 'echo hi | tee out.log')"
-case "$OUT" in *tee*) check "D2 channel: tee" PASS;; *) check "D2 channel: tee" FAIL;; esac
-OUT="$(detect "sed -i '' s/a/b/ f.txt")"
-case "$OUT" in *"sed -i"*) check "D3 channel: sed -i" PASS;; *) check "D3 channel: sed -i" FAIL;; esac
-OUT="$(detect 'dd if=/dev/zero of=img.bin bs=1')"
-case "$OUT" in *"dd of="*) check "D4 channel: dd of=" PASS;; *) check "D4 channel: dd of=" FAIL;; esac
-OUT="$(detect "$(printf 'cat > x.txt <<EOF\nbody\nEOF\n')")"
-case "$OUT" in *heredoc*) check "D5 channel: heredoc" PASS;; *) check "D5 channel: heredoc" FAIL;; esac
-OUT="$(detect 'ls -la 2>&1')"
-[ -z "$OUT" ] && check "D6 channel: fd-dup 2>&1 is not a write" PASS || check "D6 channel: fd-dup 2>&1 is not a write (got '$OUT')" FAIL
-OUT="$(detect 'git status && ls')"
-[ -z "$OUT" ] && check "D7 channel: read-only command -> none" PASS || check "D7 channel: read-only command -> none" FAIL
-
-# ── Hook-level cases on synthetic normalized payloads ─────────────────
-TMPD="$(mktemp -d)"
-trap 'rm -rf "$TMPD"' EXIT
-printf '%s' '{"hooks":{}}'                     > "$TMPD/config-on.json"
-printf '%s' '{"hooks":{"secretScan":false}}'   > "$TMPD/config-off.json"
-
-write_payload() {
-  T="$1" FP="$2" BODY="$3" node -e '
-    const o = { hook_event_name: "PreToolUse", tool_name: process.env.T,
-                tool_input: { file_path: process.env.FP, content: process.env.BODY },
-                session_id: "secret-scan-test" };
-    process.stdout.write(JSON.stringify(o));
-  '
-}
-cmd_payload() {
-  CMD="$1" CWD="$TMPD" node -e '
-    const o = { hook_event_name: "PreToolUse", tool_name: "run_command",
-                tool_input: { command: process.env.CMD }, cwd: process.env.CWD,
-                session_id: "secret-scan-test" };
-    process.stdout.write(JSON.stringify(o));
-  '
-}
-classify() {
-  node -e '
-    let s=""; process.stdin.on("data",c=>s+=c);
-    process.stdin.on("end",()=>{
-      s=s.trim();
-      if(!s){process.stdout.write("ALLOW");return;}
-      try{const j=JSON.parse(s);const d=j.hookSpecificOutput&&j.hookSpecificOutput.permissionDecision;process.stdout.write(d==="deny"?"DENY":(d||"OTHER"));}
-      catch(_){process.stdout.write("BADJSON");}
-    });
-  '
-}
-run_hook() {
-  local script="$1" payload="$2" cfg="${3:-$TMPD/config-on.json}"
-  printf '%s' "$payload" | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_PROJECT_DIR="$TMPD" \
-    ZENSU_CONFIG="$cfg" ZENSU_SECRET_SCAN= bash "$script" 2>/dev/null
-}
-expect() {
-  local label="$1" out="$2" exp="$3"
-  local got; got="$(printf '%s' "$out" | classify)"
-  [ "$got" = "$exp" ] && check "$label -> $exp" PASS || check "$label (got '$got' want '$exp')" FAIL
-}
-
-OUT="$(run_hook "$HOOK" "$(write_payload write_to_file /x/src/app.ts 'const k = "AKIA''IOSFODNN7RGY4Q2B";')")"
-expect "F1 write_to_file with AWS access key" "$OUT" DENY
-case "$OUT" in *aws-access-key-id*zensu-secret-allow*) check "F1b deny reason names the rule + the remediation" PASS;; *) check "F1b deny reason names the rule + the remediation" FAIL;; esac
-
-OUT="$(run_hook "$HOOK" "$(write_payload replace_file_content /x/src/n.go 't := "xox''b-1234567890-abcdefghij"')")"
-expect "F2 replace_file_content with Slack token" "$OUT" DENY
-
-OUT="$(run_hook "$HOOK" "$(write_payload multi_replace_file_content /x/src/pay.rb 'k = "sk_''live_abcdef1234567890XY"')")"
-expect "F3 multi_replace_file_content with Stripe key" "$OUT" DENY
-
-OUT="$(run_hook "$HOOK" "$(write_payload write_to_file /x/src/id_rsa.pem '-----BEGIN RSA PRIVATE KEY-----')")"
-expect "F4 write_to_file with a PEM private key" "$OUT" DENY
-
-OUT="$(run_hook "$HOOK" "$(write_payload write_to_file /x/docs/notes.md 'Plain documentation text, nothing secret in here at all.')")"
-expect "F5 benign file content" "$OUT" ALLOW
-
-OUT="$(run_hook "$HOOK" "$(write_payload write_to_file /x/src/cfg.py 'k = "AKIA''IOSFODNN7EXAMPLE"')")"
-expect "F6 false-positive-prone placeholder token (EXAMPLE)" "$OUT" ALLOW
-
-OUT="$(run_hook "$HOOK" "$(write_payload write_to_file /x/src/cfg.py 'cfg = "AKIA''IOSFODNN7RGY4Q2B" zensu-secret-allow')")"
-expect "F7 inline zensu-secret-allow marker" "$OUT" ALLOW
-
-OUT="$(run_hook "$HOOK" "$(write_payload write_to_file /x/tests/unit/aws.txt 'AKIA''IOSFODNN7RGY4Q2B')")"
-expect "F8 tests/ path exemption" "$OUT" ALLOW
-
-OUT="$(run_hook "$HOOK" "$(write_payload write_to_file /x/src/config.example.json 'AKIA''IOSFODNN7RGY4Q2B')")"
-expect "F9 *.example.* filename exemption" "$OUT" ALLOW
-
-OUT="$(run_hook "$HOOK" "$(write_payload write_to_file /x/src/a.ts 'AKIA''IOSFODNN7RGY4Q2B')" "$TMPD/config-off.json")"
-expect "F10 hooks.secretScan:false" "$OUT" ALLOW
-
-OUT="$(printf '%s' "$(write_payload write_to_file /x/src/a.ts 'AKIA''IOSFODNN7RGY4Q2B')" \
-  | env ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$TMPD/config-on.json" \
-    ZENSU_SECRET_SCAN=off bash "$HOOK" 2>/dev/null)"
-expect "F11 ZENSU_SECRET_SCAN=off env bypass" "$OUT" ALLOW
-
-OUT="$(run_hook "$HOOK" 'this is not json at all')"
-expect "F12 malformed payload fails open" "$OUT" ALLOW
-OUT="$(run_hook "$HOOK" '')"
-expect "F13 empty payload fails open" "$OUT" ALLOW
-
-OUT="$(run_hook "$HOOK" '{"tool_name":"read_file","tool_input":{"file_path":"/x/src/a.ts"}}')"
-expect "F14 non-writer tool is not scanned" "$OUT" ALLOW
-
-OUT="$(run_hook "$HOOK" '{"tool_name":"run_command","tool_input":{"command":"ZENSU_SECRET_SCAN=off printf x > a.env"}}')"
-expect "F14b __bypass__ verdict is never denied as a rule name" "$OUT" ALLOW
-
-# Scanner crash -> fail open (node shim that fails only for the decider).
-mkdir -p "$TMPD/shim"
-REAL_NODE="$(command -v node)"
-{
-  printf '#!/bin/bash\n'
-  printf 'for a in "$@"; do case "$a" in *secret-scan-decide.js*) exit 1;; esac; done\n'
-  printf 'exec %s "$@"\n' "$REAL_NODE"
-} > "$TMPD/shim/node"
-chmod +x "$TMPD/shim/node" 2>/dev/null
-if [ -x "$TMPD/shim/node" ] && ! "$TMPD/shim/node" "$DECIDE" </dev/null >/dev/null 2>&1; then
-  OUT="$(printf '%s' "$(write_payload write_to_file /x/src/a.ts 'AKIA''IOSFODNN7RGY4Q2B')" \
-    | env PATH="$TMPD/shim:$PATH" ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_PROJECT_DIR="$TMPD" \
-      ZENSU_CONFIG="$TMPD/config-on.json" ZENSU_SECRET_SCAN= bash "$HOOK" 2>/dev/null)"
-  expect "F15 scanner crash fails open" "$OUT" ALLOW
+if [ -x "$HOOK" ]; then
+  check "P0b hook is executable (hooks.json invokes it directly)" PASS
 else
-  check "F15 scanner crash fails open (shim not executable — skipped)" PASS
+  check "P0b hook is executable (hooks.json invokes it directly)" FAIL
+fi
+if node --check "$ENGINE" >/dev/null 2>&1 && node --check "$DECIDE" >/dev/null 2>&1 && node --check "$PARSER" >/dev/null 2>&1; then
+  check "P0c engine/decide/parser pass node --check" PASS
+else
+  check "P0c engine/decide/parser pass node --check" FAIL
 fi
 
-# ── Raw-shell writes go through the source-write gate's second step ───
-# The shell commands below are assembled inside DOUBLE quotes, where a '' split
-# would stay literal and defuse the token — so the fragments are joined once
-# here, in single-quoted assignments, and only the joined variable is embedded.
-TOK_AWS='AKIA''IOSFODNN7RGY4Q2B'
-TOK_GH='ghp_''123456789012345678901234567890123456'
+# P1 — structural wiring: one entry under each expected PreToolUse matcher
+WIRING="$(node -e '
+  const h = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const groups = (h.hooks && h.hooks.PreToolUse) || [];
+  const has = (m) => groups.some((g) =>
+    g.matcher === m &&
+    (g.hooks || []).some((x) => typeof x.command === "string" && x.command.indexOf("pre-write-secret-scan.sh") !== -1)
+  );
+  process.stdout.write([has("Edit|Write|MultiEdit"), has("NotebookEdit"), has("Bash")].join(","));
+' "$HOOKS_JSON" 2>/dev/null)"
+TIMEOUTS="$(node -e '
+  const h = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const found = [];
+  for (const g of (h.hooks && h.hooks.PreToolUse) || []) {
+    for (const x of g.hooks || []) {
+      if (typeof x.command === "string" && x.command.indexOf("pre-write-secret-scan.sh") !== -1) {
+        found.push(g.matcher + "=" + (typeof x.timeout === "number" ? x.timeout : "none"));
+      }
+    }
+  }
+  process.stdout.write(found.sort().join(" "));
+' "$HOOKS_JSON" 2>/dev/null)"
+if [ "$TIMEOUTS" = "Bash=60 Edit|Write|MultiEdit=60 NotebookEdit=60" ]; then
+  check "P1b every registration carries the 60 s gate timeout ($TIMEOUTS)" PASS
+else
+  check "P1b every registration carries the 60 s gate timeout (got: $TIMEOUTS)" FAIL
+fi
+if [ "$WIRING" = "true,true,true" ]; then
+  check "P1 hook wired under Edit|Write|MultiEdit + NotebookEdit + Bash matchers" PASS
+else
+  check "P1 hook wired under all three matchers (got: $WIRING)" FAIL
+fi
 
-HEREDOC="$(printf 'cat > %s/creds.env <<EOF\n%s\nEOF\n' "$TMPD" "$TOK_GH")"
-OUT="$(run_hook "$BASH_GATE" "$(cmd_payload "$HEREDOC")")"
-expect "B1 raw heredoc write carrying a GitHub token" "$OUT" DENY
-case "$OUT" in *github-token*) check "B1b bash deny reason names the rule" PASS;; *) check "B1b bash deny reason names the rule" FAIL;; esac
+# P2 — SoT references: hook delegates to decide.js; decide.js uses engine + parser
+if grep -qF 'secret-scan-decide.js' "$HOOK" && grep -qF 'secret-patterns.js' "$DECIDE" && grep -qF 'bash-source-write-parse.js' "$DECIDE"; then
+  check "P2 hook -> decide.js -> engine + shared parser (SoT chain)" PASS
+else
+  check "P2 hook -> decide.js -> engine + shared parser (SoT chain)" FAIL
+fi
 
-OUT="$(run_hook "$BASH_GATE" "$(cmd_payload "printf '$TOK_AWS' > $TMPD/creds.env")")"
-expect "B2 raw redirect carrying an AWS access key" "$OUT" DENY
+# P3 — config flag + env bypass honored
+if grep -qF 'zensu_hook_enabled secretScan' "$HOOK" && grep -qF 'ZENSU_SECRET_SCAN' "$HOOK"; then
+  check "P3 hook honors hooks.secretScan config + ZENSU_SECRET_SCAN env" PASS
+else
+  check "P3 hook honors hooks.secretScan config + ZENSU_SECRET_SCAN env" FAIL
+fi
 
-OUT="$(run_hook "$BASH_GATE" "$(cmd_payload "echo $TOK_GH")")"
-expect "B3 no write channel -> not scanned" "$OUT" ALLOW
+# P4 — fail-open documented; inline Bash escape hatch documented
+if grep -qiF 'FAIL OPEN' "$HOOK" && grep -qF 'failing open' "$HOOK"; then
+  check "P4a fail-open behavior documented + implemented in the hook" PASS
+else
+  check "P4a fail-open behavior documented + implemented in the hook" FAIL
+fi
+if grep -qF 'stripHeredocs(cmd).split' "$DECIDE" && grep -qF '"ZENSU_SECRET_SCAN"' "$DECIDE" && grep -qF '=== "off"' "$DECIDE"; then
+  check "P4b inline escape decided on heredoc-stripped segment-leading env tokens (code, not prose)" PASS
+else
+  check "P4b inline escape decided on heredoc-stripped segment-leading env tokens (code, not prose)" FAIL
+fi
 
-ESCAPED="$(printf 'ZENSU_SECRET_SCAN=off cat > %s/creds.env <<EOF\n%s\nEOF\n' "$TMPD" "$TOK_GH")"
-OUT="$(run_hook "$BASH_GATE" "$(cmd_payload "$ESCAPED")")"
-expect "B4 inline ZENSU_SECRET_SCAN=off prefix" "$OUT" ALLOW
+# P5 — shared parser exposes detectChannels for the secret path; deny caller pins the mode
+if grep -qF 'detectChannels' "$PARSER" && grep -qF 'detectChannels' "$DECIDE"; then
+  check "P5a write-channel detection reuses the shared parser (detectChannels)" PASS
+else
+  check "P5a write-channel detection reuses the shared parser (detectChannels)" FAIL
+fi
+if grep -qF 'BSWG_MODE= PAYLOAD=' "$PLUGIN_DIR/hooks/pre-bash-source-write-gate.sh"; then
+  check "P5b source-write gate pins BSWG_MODE= at its call site" PASS
+else
+  check "P5b source-write gate pins BSWG_MODE= at its call site" FAIL
+fi
 
-SMUGGLED="$(printf 'cat > %s/creds.env <<EOF\nZENSU_SECRET_SCAN=off is only the escape hatch\n%s\nEOF\n' "$TMPD" "$TOK_GH")"
-OUT="$(run_hook "$BASH_GATE" "$(cmd_payload "$SMUGGLED")")"
-expect "B5 escape token smuggled inside the heredoc body" "$OUT" DENY
+# P6 — docs: header exists, hook-table row, config row, Secret Scan section
+if grep -qxF '## Hook inventory' "$CONFIG_DOC"; then
+  check "P6a docs/configuration.md has the hook inventory header (count owned by sibling test)" PASS
+else
+  check "P6a docs/configuration.md has the hook inventory header (count owned by sibling test)" FAIL
+fi
+if grep -qF '| `pre-write-secret-scan.sh` |' "$CONFIG_DOC"; then
+  check "P6b docs/configuration.md hook table carries the secret-scan row" PASS
+else
+  check "P6b docs/configuration.md hook table carries the secret-scan row" FAIL
+fi
+if grep -qF '| `secretScan` | `pre-write-secret-scan.sh` |' "$CONFIG_DOC"; then
+  check "P6c docs/configuration.md config table carries the secretScan row" PASS
+else
+  check "P6c docs/configuration.md config table carries the secretScan row" FAIL
+fi
+if grep -qxF '## Secret Scan' "$GATES_DOC"; then
+  check "P6d docs/gates.md has the Secret Scan section" PASS
+else
+  check "P6d docs/gates.md has the Secret Scan section" FAIL
+fi
 
-OUT="$(run_hook "$BASH_GATE" "$(cmd_payload "printf 'plain notes' > $TMPD/notes.txt")")"
-expect "B6 benign raw write" "$OUT" ALLOW
+# U — engine CLI unit cases (stdin -> JSON), one per rule + suppressions
+engine_rules() { printf '%s' "$1" | node "$ENGINE" 2>/dev/null; }
 
-OUT="$(run_hook "$BASH_GATE" "$(cmd_payload "printf '$TOK_AWS' > $TMPD/creds.env")" "$TMPD/config-off.json")"
-expect "B7 hooks.secretScan:false on the raw-shell path" "$OUT" ALLOW
+OUT="$(engine_rules 'k = "AKIA''IOSFODNN7RGY4Q2B"')"
+case "$OUT" in *'"aws-access-key-id"'*) check "U1 engine: AWS access key id" PASS;; *) check "U1 engine: AWS access key id" FAIL;; esac
 
-# ── Shim normalize step actually carries the write body ───────────────
-AG_PAYLOAD="$(BODY='const k = "AKIA''IOSFODNN7RGY4Q2B";' node -e '
-  const o = { toolCall: { name: "write_to_file",
-              args: { TargetFile: "/x/src/app.ts", CodeContent: process.env.BODY } },
-              workspacePaths: ["/x"] };
-  process.stdout.write(JSON.stringify(o));
-')"
-NORMALIZED="$(printf '%s' "$AG_PAYLOAD" | node "$NORMALIZE" 2>/dev/null | sed -n '2p')"
-case "$NORMALIZED" in *'"content"'*) check "N1 normalize maps the writer body -> tool_input.content" PASS;; *) check "N1 normalize maps the writer body -> tool_input.content" FAIL;; esac
-OUT="$(run_hook "$HOOK" "$NORMALIZED")"
-expect "N2 normalized Antigravity writer payload end-to-end" "$OUT" DENY
+OUT="$(engine_rules 'aws_secret_access_key = wJalrXUtnFEMIK7MDENG''bPxRfiCY1234567890Zq')"
+case "$OUT" in *'"aws-secret-access-key"'*) check "U2 engine: AWS secret assignment" PASS;; *) check "U2 engine: AWS secret assignment" FAIL;; esac
 
-finish
+OUT="$(engine_rules 'ghs_''123456789012345678901234567890123456')"
+case "$OUT" in *'"github-token"'*) check "U3 engine: GitHub sibling prefix ghs_" PASS;; *) check "U3 engine: GitHub sibling prefix ghs_" FAIL;; esac
+
+OUT="$(engine_rules 'github_pat_''11ABCDEFG0123456789abc')"
+case "$OUT" in *'"github-fine-grained-pat"'*) check "U4 engine: GitHub fine-grained PAT" PASS;; *) check "U4 engine: GitHub fine-grained PAT" FAIL;; esac
+
+OUT="$(engine_rules 'xox''b-1234567890-abcdefghij')"
+case "$OUT" in *'"slack-token"'*) check "U5 engine: Slack token" PASS;; *) check "U5 engine: Slack token" FAIL;; esac
+
+OUT="$(engine_rules 'rk_''live_abcdef1234567890XY')"
+case "$OUT" in *'"stripe-live-key"'*) check "U6 engine: Stripe restricted live key" PASS;; *) check "U6 engine: Stripe restricted live key" FAIL;; esac
+
+OUT="$(engine_rules '-----BEGIN PRIVATE KEY-----')"
+case "$OUT" in *'"private-key-pem"'*) check "U7 engine: PKCS#8 PEM header" PASS;; *) check "U7 engine: PKCS#8 PEM header" FAIL;; esac
+
+# windowed scan: a secret PAST the 2048-char per-line window must still be caught
+# (old code truncated the line to 2048 and missed it)
+LONGLINE="$(printf 'a%.0s' $(seq 1 2100))\"AKIA""IOSFODNN7RGY4Q2B\""
+OUT="$(engine_rules "$LONGLINE")"
+case "$OUT" in *'"aws-access-key-id"'*) check "U8 engine: secret past column 2048 is caught (window scan)" PASS;; *) check "U8 engine: secret past column 2048 is caught (window scan)" FAIL;; esac
+
+OUT="$(engine_rules 'api_token = "f8Zk2pQ9xL4mNv7wRs3TuY6bE1cD5gHj"')"
+case "$OUT" in *'"high-entropy-assignment"'*'"line":1'*) check "U8 engine: quoted high-entropy assignment + line number" PASS;; *) check "U8 engine: quoted high-entropy assignment + line number" FAIL;; esac
+
+OUT="$(engine_rules 'DB_PASSWORD=f8Zk2pQ9xL4mNv7wRs3TuY6bE1cD5gHj')"
+case "$OUT" in *'"high-entropy-assignment"'*) check "U9 engine: unquoted .env-style assignment" PASS;; *) check "U9 engine: unquoted .env-style assignment" FAIL;; esac
+
+OUT="$(engine_rules 'password = "aaaaaaaaaaaaaaaa1"')"
+[ "$OUT" = '{"matches":[]}' ] && check "U10 engine: low-entropy value stays clean" PASS || check "U10 engine: low-entropy value stays clean" FAIL
+
+OUT="$(engine_rules 'k = "AKIA''IOSFODNN7EXAMPLE"')"
+[ "$OUT" = '{"matches":[]}' ] && check "U11 engine: placeholder suppresses provider rule (EXAMPLE)" PASS || check "U11 engine: placeholder suppresses provider rule (EXAMPLE)" FAIL
+
+OUT="$(engine_rules 'api_key = "XXXX9aB3kZpQ7Lm2XXXX"')"
+[ "$OUT" = '{"matches":[]}' ] && check "U12 engine: placeholder suppresses entropy value (XXXX)" PASS || check "U12 engine: placeholder suppresses entropy value (XXXX)" FAIL
+
+OUT="$(engine_rules 'plain text, nothing secret here')"
+[ "$OUT" = '{"matches":[]}' ] && check "U13 engine: clean input -> empty matches" PASS || check "U13 engine: clean input -> empty matches" FAIL
+
+# D — detectChannels unit cases (direct parser invocation, BSWG_MODE=detect)
+detect() { PAYLOAD="{\"tool_input\":{\"command\":$1}}" BSWG_MODE=detect node "$PARSER" 2>/dev/null; }
+
+OUT="$(detect '"printf foo >> notes.txt"')"
+case "$OUT" in *redirect*) check "D1 detect: >> redirect" PASS;; *) check "D1 detect: >> redirect" FAIL;; esac
+
+OUT="$(detect '"echo hi | tee out.log"')"
+case "$OUT" in *tee*) check "D2 detect: tee" PASS;; *) check "D2 detect: tee" FAIL;; esac
+
+OUT="$(detect '"sed -i s/a/b/ f.txt"')"
+case "$OUT" in *"sed -i"*) check "D3 detect: sed -i" PASS;; *) check "D3 detect: sed -i" FAIL;; esac
+
+OUT="$(detect '"dd if=/dev/zero of=img.bin bs=1"')"
+case "$OUT" in *"dd of="*) check "D4 detect: dd of=" PASS;; *) check "D4 detect: dd of=" FAIL;; esac
+
+OUT="$(detect '"cat > x.txt <<EOF\nbody\nEOF"')"
+case "$OUT" in *heredoc*) check "D5 detect: heredoc" PASS;; *) check "D5 detect: heredoc" FAIL;; esac
+
+OUT="$(detect '"ls -la 2>&1"')"
+[ -z "$OUT" ] && check "D6 detect: fd-dup 2>&1 is NOT a channel" PASS || check "D6 detect: fd-dup 2>&1 is NOT a channel (got: $OUT)" FAIL
+
+OUT="$(detect '"echo token123>creds.env"')"
+case "$OUT" in *redirect*) check "D7 detect: glued redirect" PASS;; *) check "D7 detect: glued redirect" FAIL;; esac
+
+OUT="$(detect '"git status && ls"')"
+[ -z "$OUT" ] && check "D8 detect: read-only command -> no channel" PASS || check "D8 detect: read-only command -> no channel" FAIL
+
+# F — hook functional cases. Hermetic: ZENSU_CONFIG temp override, ambient
+# ZENSU_SECRET_SCAN/BSWG_MODE neutralized (empty is not "off"); extra env
+# pairs after the fixed ones win (env last-assignment semantics).
+TMPD="$(mktemp -d)"
+trap 'rm -rf "$TMPD"' EXIT
+printf '{"hooks":{}}' > "$TMPD/config-on.json"
+printf '{"hooks":{"secretScan":false}}' > "$TMPD/config-off.json"
+export ZENSU_PROJECT_DIR="$TMPD"
+export ZENSU_TEST_PLUGIN_DATA="$TMPD/plugin-data"
+# shellcheck disable=SC1091
+source "$PLUGIN_DIR/tests/session-control/initialize-baseline.sh" secret-scan-test
+
+run_hook() {
+  local payload="$1"; shift
+  if [[ "$payload" = \{* ]]; then
+    payload="$(printf '%s' "$payload" | node -e '
+      let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{
+        const j=JSON.parse(s);j.hook_event_name="PreToolUse";j.session_id="secret-scan-test";j.cwd=process.argv[1];
+        process.stdout.write(JSON.stringify(j));
+      });
+    ' "$TMPD")"
+  fi
+  printf '%s' "$payload" | env -u ZENSU_RUNTIME_PLUGIN_ROOT -u ZENSU_SESSION_KEY \
+    -u ZENSU_SESSION_CONTEXT -u ZENSU_RUNTIME_DIGEST -u ZENSU_PROJECT_ROOT \
+    ZENSU_PLUGIN_ROOT="$PLUGIN_DIR" ZENSU_CONFIG="$TMPD/config-on.json" ZENSU_SECRET_SCAN= BSWG_MODE= \
+    STATE_DIR="$TMPD/state" ZENSU_PROJECT_DIR="$TMPD" ${1+"$@"} bash "$HOOK" 2>/dev/null
+}
+
+DENY='permissionDecision":"deny'
+
+is_deny() {
+  printf '%s' "$1" | node -e '
+    let s = "";
+    process.stdin.on("data", (d) => (s += d));
+    process.stdin.on("end", () => {
+      try {
+        const j = JSON.parse(s);
+        process.exit(j.hookSpecificOutput && j.hookSpecificOutput.permissionDecision === "deny" ? 0 : 1);
+      } catch (e) { process.exit(1); }
+    });
+  ' 2>/dev/null
+}
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/src/app.ts","content":"const k = \"AKIA''IOSFODNN7RGY4Q2B\";"}}')"
+if is_deny "$OUT"; then check "F1 Write with AWS access key -> deny (parsed JSON verdict)" PASS; else check "F1 Write with AWS access key -> deny (parsed JSON verdict)" FAIL; fi
+case "$OUT" in *aws-access-key-id*zensu-secret-allow*) check "F1b deny reason names the rule + remediation" PASS;; *) check "F1b deny reason names the rule + remediation" FAIL;; esac
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/tests/unit/aws.txt","content":"AKIA''IOSFODNN7RGY4Q2B"}}')"
+[ -z "$OUT" ] && check "F2a tests/ path exemption" PASS || check "F2a tests/ path exemption" FAIL
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/evals/case/aws.txt","content":"AKIA''IOSFODNN7RGY4Q2B"}}')"
+[ -z "$OUT" ] && check "F2b evals/ path exemption" PASS || check "F2b evals/ path exemption" FAIL
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/fixtures/aws.txt","content":"AKIA''IOSFODNN7RGY4Q2B"}}')"
+[ -z "$OUT" ] && check "F2c fixtures/ path exemption" PASS || check "F2c fixtures/ path exemption" FAIL
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/src/config.example.json","content":"AKIA''IOSFODNN7RGY4Q2B"}}')"
+[ -z "$OUT" ] && check "F2d *.example.* filename exemption" PASS || check "F2d *.example.* filename exemption" FAIL
+
+OUT="$(run_hook '{"tool_name":"Edit","tool_input":{"file_path":"/x/__tests__/cfg.spec.py","new_string":"k = \"AKIA''IOSFODNN7RGY4Q2B\""}}')"
+[ -z "$OUT" ] && check "F2e Edit-tool path exemption (__tests__/)" PASS || check "F2e Edit-tool path exemption (__tests__/)" FAIL
+
+OUT="$(run_hook '{"tool_name":"Edit","tool_input":{"file_path":"/x/src/cfg.py","new_string":"k = \"AKIA''IOSFODNN7EXAMPLE\""}}')"
+[ -z "$OUT" ] && check "F3 placeholder suppression (AWS doc key EXAMPLE) -> allow" PASS || check "F3 placeholder suppression (AWS doc key EXAMPLE) -> allow" FAIL
+
+OUT="$(run_hook '{"tool_name":"Edit","tool_input":{"file_path":"/x/src/cfg.py","new_string":"cfg = \"AKIA''IOSFODNN7RGY4Q2B\" zensu-secret-allow"}}')"
+[ -z "$OUT" ] && check "F4 inline zensu-secret-allow marker -> allow" PASS || check "F4 inline zensu-secret-allow marker -> allow" FAIL
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/src/a.ts","content":"AKIA''IOSFODNN7RGY4Q2B"}}' ZENSU_SECRET_SCAN=off)"
+[ -z "$OUT" ] && check "F5 ZENSU_SECRET_SCAN=off env -> allow" PASS || check "F5 ZENSU_SECRET_SCAN=off env -> allow" FAIL
+
+OUT="$(run_hook 'this is not json')"
+if is_deny "$OUT"; then check "F6 broken payload cannot bind a hook session -> deny" PASS; else check "F6 broken payload binding deny" FAIL; fi
+
+OUT="$(run_hook '{"tool_name":"Bash","tool_input":{"command":"cat > creds.env <<EOF\nghp_''123456789012345678901234567890123456\nEOF"}}')"
+case "$OUT" in *"$DENY"*github-token*) check "F7 Bash heredoc with GitHub token -> deny (rule named)" PASS;; *) check "F7 Bash heredoc with GitHub token -> deny (rule named)" FAIL;; esac
+
+OUT="$(run_hook '{"tool_name":"Bash","tool_input":{"command":"ZENSU_SECRET_SCAN=off cat > creds.env <<EOF\nghp_''123456789012345678901234567890123456\nEOF"}}')"
+[ -z "$OUT" ] && check "F7b inline ZENSU_SECRET_SCAN=off prefix on Bash -> allow" PASS || check "F7b inline ZENSU_SECRET_SCAN=off prefix on Bash -> allow" FAIL
+
+OUT="$(run_hook '{"tool_name":"Bash","tool_input":{"command":"cat > creds.env <<EOF\nZENSU_SECRET_SCAN=off is the escape hatch\nghp_''123456789012345678901234567890123456\nEOF"}}')"
+if is_deny "$OUT"; then check "F7c escape token inside heredoc BODY does not disable the scan" PASS; else check "F7c escape token inside heredoc BODY does not disable the scan" FAIL; fi
+
+OUT="$(run_hook '{"tool_name":"Bash","tool_input":{"command":"echo ghp_''123456789012345678901234567890123456"}}')"
+[ -z "$OUT" ] && check "F8 Bash without write channel -> allow" PASS || check "F8 Bash without write channel -> allow" FAIL
+
+OUT="$(run_hook '{"tool_name":"MultiEdit","tool_input":{"file_path":"/x/src/n.go","edits":[{"new_string":"ok"},{"new_string":"t := \"xox''b-1234567890-abcdefghij\""}]}}')"
+case "$OUT" in *"$DENY"*slack-token*) check "F9 MultiEdit with Slack token -> deny (rule named)" PASS;; *) check "F9 MultiEdit with Slack token -> deny (rule named)" FAIL;; esac
+
+OUT="$(run_hook '{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"/x/nb/analysis.ipynb","new_source":"key = \"sk_''live_abcdef1234567890XY\""}}')"
+case "$OUT" in *"$DENY"*stripe-live-key*) check "F10 NotebookEdit with Stripe key -> deny (rule named)" PASS;; *) check "F10 NotebookEdit with Stripe key -> deny (rule named)" FAIL;; esac
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/src/a.ts","content":"AKIA''IOSFODNN7RGY4Q2B"}}' ZENSU_CONFIG="$TMPD/config-off.json")"
+[ -z "$OUT" ] && check "F11 hooks.secretScan:false -> allow" PASS || check "F11 hooks.secretScan:false -> allow" FAIL
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/src/readme.md","content":"plain documentation text, nothing secret"}}')"
+[ -z "$OUT" ] && check "F12 clean content -> allow" PASS || check "F12 clean content -> allow" FAIL
+
+mkdir -p "$TMPD/shim"
+cat > "$TMPD/shim/node" <<'SHIM'
+#!/bin/bash
+for a in "$@"; do
+  case "$a" in *secret-scan-decide.js*) exit 1;; esac
+done
+exec "$REAL_NODE_BIN" "$@"
+SHIM
+chmod +x "$TMPD/shim/node" 2>/dev/null
+REAL_NODE_DIR="$(dirname "$(command -v node)")"
+# Effectiveness probe: this case needs a chmod +x'd script to be executable by
+# bare name off PATH. Filesystems that ignore the Unix exec bit (Windows
+# git-bash, some mounts) can't simulate the node shim, so skip rather than fail.
+printf '#!/bin/bash\necho SHIMOK\n' > "$TMPD/shim/_probe"
+chmod +x "$TMPD/shim/_probe" 2>/dev/null
+if [ "$(PATH="$TMPD/shim:/usr/bin:/bin" _probe 2>/dev/null)" = "SHIMOK" ]; then
+  OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/src/a.ts","content":"AKIA''IOSFODNN7RGY4Q2B"}}' \
+    REAL_NODE_BIN="$REAL_NODE_DIR/node" PATH="$TMPD/shim:$REAL_NODE_DIR:/usr/bin:/bin")"
+  [ -z "$OUT" ] && check "F13 scanner crash (node shim rc=1) -> fail-open allow" PASS || check "F13 scanner crash (node shim rc=1) -> fail-open allow" FAIL
+else
+  check "F13 scanner crash -> fail-open allow (skipped: FS ignores exec bit)" PASS
+fi
+rm -f "$TMPD/shim/_probe" 2>/dev/null
+
+# --- unregistered session (the 0.17.0 upgrade state) -----------------------
+# This hook matches Bash as well as Edit/Write, and it denied on the session bind
+# BEFORE inspecting anything — so on a session Session Control never registered it
+# blocked every Bash call, including /zensu-doctor, and neither secretScan:false
+# nor ZENSU_SECRET_SCAN=off could reach far enough to release it. Only a Bash
+# payload with no write channel is relaxed.
+UNREG_DATA="$TMPD/unregistered-plugin-data"
+mkdir -p "$UNREG_DATA"
+chmod 700 "$UNREG_DATA"
+OUT="$(run_hook '{"tool_name":"Bash","tool_input":{"command":"bash hooks/lib/zensu-doctor.sh"}}' ZENSU_PLUGIN_DATA="$UNREG_DATA")"
+[ -z "$OUT" ] && check "F14 unregistered session: a channel-less Bash call passes (doctor stays reachable)" PASS \
+  || check "F14 unregistered channel-less Bash (got '$OUT')" FAIL
+
+# A command that merely CONTAINS a redirect character must not be mistaken for a
+# write: the channel detector deliberately over-detects, which is harmless when it
+# only widens what gets scanned but would be a false deny if it decided alone.
+OUT="$(run_hook '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fix: a > b\""}}' ZENSU_PLUGIN_DATA="$UNREG_DATA")"
+[ -z "$OUT" ] && check "F15 unregistered session: an over-detected redirect is not a false deny" PASS \
+  || check "F15 unregistered over-detected redirect (got '$OUT')" FAIL
+
+# The relaxed state reaches the ORDINARY scan decision, which needs no binding —
+# so a real secret is still caught on every channel rather than waved through,
+# and Edit/Write content is scanned rather than blanket-denied.
+OUT="$(run_hook '{"tool_name":"Bash","tool_input":{"command":"printf AKIA''IOSFODNN7RGY4Q2B > /x/src/a.ts"}}' ZENSU_PLUGIN_DATA="$UNREG_DATA")"
+case "$OUT" in *"$DENY"*) check "F16 unregistered session: a real secret on a Bash write channel is still denied" PASS ;;
+  *) check "F16 unregistered Bash secret (got '$OUT')" FAIL ;; esac
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/src/a.ts","content":"AKIA''IOSFODNN7RGY4Q2B"}}' ZENSU_PLUGIN_DATA="$UNREG_DATA")"
+case "$OUT" in *"$DENY"*) check "F17 unregistered session: a real secret in Write content is still denied" PASS ;;
+  *) check "F17 unregistered Write secret (got '$OUT')" FAIL ;; esac
+
+OUT="$(run_hook '{"tool_name":"Write","tool_input":{"file_path":"/x/src/a.ts","content":"const x = 1;"}}' ZENSU_PLUGIN_DATA="$UNREG_DATA")"
+[ -z "$OUT" ] && check "F18 unregistered session: clean Write content passes, never blanket-denied" PASS \
+  || check "F18 unregistered clean Write (got '$OUT')" FAIL
+
+# The relaxation covers TWO states — the one exercised above, and a record whose
+# recorded project root no longer exists (a deleted or recycled worktree), which
+# is pinned against a real minted record in
+# tests/structure/test-orphaned-project-root.sh (O21a drives every hook on the
+# Bash matcher, this gate included). Neither covers the case below: a record
+# minted against another installation is a security signal and must keep denying
+# at this gate too.
+FOREIGN_DATA="$TMPD/foreign-plugin-data"
+FOREIGN_PLUG="$TMPD/foreign-plugin"
+mkdir -p "$FOREIGN_DATA/session-control/v1/records" "$FOREIGN_DATA/session-control/v1/locks" \
+  "$FOREIGN_PLUG/.runtime-plugin" "$FOREIGN_PLUG/hooks"
+chmod 700 "$FOREIGN_DATA" "$FOREIGN_DATA/session-control" "$FOREIGN_DATA/session-control/v1" \
+  "$FOREIGN_DATA/session-control/v1/records" "$FOREIGN_DATA/session-control/v1/locks"
+printf '{"name":"zensu","version":"9.9.9"}\n' > "$FOREIGN_PLUG/plugin.json"
+printf '{"hooks":{}}\n' > "$FOREIGN_PLUG/hooks/hooks.json"
+if node -e '
+  const path = require("path");
+  const [corePath, data, plug, project, sessionId] = process.argv.slice(1);
+  require(corePath).registerContext({
+    recordsDir: path.join(data, "session-control", "v1", "records"),
+    host: "native", sessionId, projectRoot: project, pluginRoot: plug, pluginData: data,
+  });
+' "$PLUGIN_DIR/hooks/lib/session-control-core-v1.js" "$FOREIGN_DATA" "$FOREIGN_PLUG" "$TMPD" "secret-scan-test" 2>/dev/null; then
+  OUT="$(run_hook '{"tool_name":"Bash","tool_input":{"command":"bash hooks/lib/zensu-doctor.sh"}}' ZENSU_PLUGIN_DATA="$FOREIGN_DATA")"
+  case "$OUT" in *"$DENY"*) check "F19 a record from another installation stays fail-closed here too" PASS ;;
+    *) check "F19 foreign-installation record (got '$OUT')" FAIL ;; esac
+else
+  check "F19 foreign-installation fixture could not be minted" FAIL
+fi
+
+echo "----"
+echo "test-secret-scan-gate: $PASS PASS / $FAIL FAIL"
+[ "$FAIL" -eq 0 ]

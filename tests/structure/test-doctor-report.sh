@@ -35,37 +35,31 @@ SB="$(mktemp -d -t zdoctor-XXXXXX)"
 trap 'rm -rf "$SB"' EXIT
 
 PLUG="$SB/plugin"
-mkdir -p "$PLUG/hooks/antigravity" "$PLUG/hooks/lib"
+mkdir -p "$PLUG/hooks"
+cp -R "$ROOT/hooks/lib" "$PLUG/hooks/lib"
 printf '{ "name": "zensu", "version": "0.1.0" }\n' > "$PLUG/plugin.json"
-: > "$PLUG/hooks/antigravity/antigravity-shim.sh"
+printf 'version-0.1.0-blue\n' > "$PLUG/README.md"
+printf '## [0.1.0]\n' > "$PLUG/CHANGELOG.md"
 : > "$PLUG/hooks/pre-bash-zensu-gate.sh"
 : > "$PLUG/hooks/orphan-hook.sh"
-cat > "$PLUG/hooks.json" <<'JSON'
-{
-  "zensu-pre-bash": {
-    "PreToolUse": [
-      {
-        "matcher": "run_command",
-        "hooks": [
-          { "type": "command", "command": "bash /opt/zensu/hooks/antigravity/antigravity-shim.sh pre-bash-zensu-gate.sh" },
-          { "type": "command", "command": "bash /opt/zensu/hooks/antigravity/antigravity-shim.sh ghost-hook.sh" }
-        ]
-      }
-    ]
-  }
-}
+cat > "$PLUG/hooks/hooks.json" <<'JSON'
+{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[
+  {"type":"command","command":"bash /opt/zensu/hooks/pre-bash-zensu-gate.sh"},
+  {"type":"command","command":"bash /opt/zensu/hooks/ghost-hook.sh"}
+]}]}}
 JSON
-
 mkdir -p "$SB/home/.zensu"
-printf '%s\n' "$PLUG" > "$SB/home/.zensu/plugin-root"
 
 PROJ="$SB/proj"
 mkdir -p "$PROJ/.zensu/state"
-printf '{ "phase": "green", "chainDone": false }\n' > "$PROJ/.zensu/state/tdd-phase-abc.json"
-printf '{ "count": 2\n'                             > "$PROJ/.zensu/state/tdd-phase-broken.json"
-printf '{ "count": 1 }\n'                           > "$PROJ/.zensu/state/rounds-abc.json"
-printf '{ "files": [] }\n'                          > "$PROJ/.zensu/state/pending-review.json"
-printf 'abc\n'                                      > "$PROJ/.zensu/state/session-id-123.txt"
+node - "$PLUG" "$PROJ" <<'NODE'
+const fs = require('node:fs'), path = require('node:path');
+const core = require(path.join(process.argv[2], 'hooks/lib/session-control-core-v1.js'));
+const projectRoot = process.argv[3];
+core.initializeWorkflowState({ projectRoot, sessionId: 'doctor-valid' });
+fs.writeFileSync(core.adoptionWorkflowStatePath(projectRoot, 'doctor-corrupt'), '{broken', { mode: 0o600 });
+fs.writeFileSync(path.join(projectRoot, '.zensu/state/pending-review.json'), '{"files":[]}');
+NODE
 
 EMPTY_PROJ="$SB/empty"
 mkdir -p "$EMPTY_PROJ"
@@ -84,7 +78,8 @@ run_report() { # $1 = ZDOC_ZENSU verdict
     ZENSU_DOCTOR_PLUGIN_DIR="$RR_PLUGIN" \
     ZDOC_ZENSU="$1" \
     ZDOC_NODE="v20.11.0" \
-    ZDOC_AGY="/usr/local/bin/agy" \
+    ZENSU_REVIEW_EXECUTION="delegated" \
+    ZDOC_BINDING="unbound" \
     ZDOC_FORGE_PROVIDER="github" \
     ZDOC_FORGE_CLI="gh" \
     ZDOC_FORGE_STATE="ready" \
@@ -93,10 +88,18 @@ run_report() { # $1 = ZDOC_ZENSU verdict
     node "$REPORT_JS" 2>&1
 }
 
-snapshot() { # every file under the sandbox with its byte size
-  find "$SB" -type f 2>/dev/null | LC_ALL=C sort | while IFS= read -r f; do
-    printf '%s %s\n' "$(wc -c < "$f" 2>/dev/null | tr -d ' ')" "$f"
-  done
+snapshot() { # Compare content and mode, not merely file sizes.
+  node - "$SB" <<'NODE'
+const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
+function walk(dir) {
+  for (const name of fs.readdirSync(dir).sort()) {
+    const file = path.join(dir, name), stat = fs.lstatSync(file);
+    if (stat.isDirectory()) walk(file);
+    else if (stat.isFile()) console.log(`${stat.mode} ${crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')} ${file}`);
+  }
+}
+walk(process.argv[2]);
+NODE
 }
 
 # ── A: healthy run renders all four blocks ───────────────────────────
@@ -109,12 +112,14 @@ assert_has "$OUT_A" 'Session state'    "A5 block 4 'Session state' renders"
 assert_has "$OUT_A" 'Summary:'         "A6 summary line renders"
 assert_has "$OUT_A" 'zensu CLI: installed and authenticated' "A7 authed zensu CLI reported OK"
 assert_has "$OUT_A" 'node: v20.11.0'   "A8 injected node version reported"
-assert_has "$OUT_A" 'agy host: found at /usr/local/bin/agy' "A9 agy host row reports the resolved path"
+assert_has "$OUT_A" 'review execution: delegated mode selected' "A9 native review capability is reported honestly"
 assert_has "$OUT_A" 'GitHub CLI (gh): installed and authenticated' "A10 forge CLI row names the detected provider CLI"
 
 # ── B: plugin integrity ──────────────────────────────────────────────
-assert_has "$OUT_A" 'plugin.json: zensu v0.1.0'  "B1 plugin.json version reported"
-assert_has "$OUT_A" "plugin-root pointer: $PLUG" "B2 plugin-root pointer resolved"
+assert_has "$OUT_A" 'version sync: plugin.json, README badge and CHANGELOG agree (0.1.0)' "B1 all three release versions agree"
+assert_lacks "$OUT_A" 'plugin-root pointer' "B2 no shared plugin-root pointer is trusted"
+assert_has "$OUT_A" 'The mode alone proves no independent execution' "B2b native capability requires adapter evidence"
+assert_lacks "$OUT_A" 'permissions.allow' "B2c native delegated mode does not inspect foreign permission rules"
 assert_has "$OUT_A" 'ghost-hook.sh'              "B3 hooks.json entry with no file on disk is named"
 assert_has "$OUT_A" '❌' "B4 a missing wired hook produces the failure marker"
 assert_has "$OUT_A" 'orphan-hook.sh'             "B5 on-disk hook not wired in hooks.json is named"
@@ -123,7 +128,7 @@ RR_PLUGIN="$SB/noversion"
 mkdir -p "$RR_PLUGIN"
 printf '{ "name": "zensu" }\n' > "$RR_PLUGIN/plugin.json"
 OUT_NV="$(run_report authed)"
-assert_has "$OUT_NV" 'plugin.json: no version field' "B6 plugin.json without a version is a failure row"
+assert_has "$OUT_NV" 'version sync: required release files are unreadable' "B6 incomplete release metadata is a failure row"
 assert_has "$OUT_NV" 'Summary:'                      "B7 missing version still renders a full report"
 RR_PLUGIN="$PLUG"
 
@@ -131,10 +136,10 @@ RR_PLUGIN="$PLUG"
 OUT_C="$(run_report absent)"; RC_C=$?
 [ "$RC_C" -eq 0 ] && check "C1 missing zensu CLI still exits 0 (no crash)" PASS || check "C1 missing zensu CLI exit (got $RC_C)" FAIL
 assert_has "$OUT_C" 'zensu CLI: not found on PATH' "C2 missing zensu CLI is reported"
-if contains "$OUT_C" '❌  zensu CLI: not found on PATH'; then
-  check "C3 missing zensu CLI carries the ❌ failure marker" PASS
+if contains "$OUT_C" '⚠️  zensu CLI: not found on PATH'; then
+  check "C3 missing optional zensu CLI carries the warning marker" PASS
 else
-  check "C3 missing zensu CLI carries the ❌ failure marker" FAIL
+  check "C3 missing optional zensu CLI carries the warning marker" FAIL
 fi
 assert_has "$OUT_C" 'Session state' "C4 later blocks still render after the CLI failure"
 assert_lacks "$OUT_C" 'renderer failed' "C5 no renderer exception on a missing CLI"
@@ -163,15 +168,15 @@ assert_lacks "$OUT_D5" 'renderer failed'     "D8 no renderer exception on malfor
 rm -f "$SB/home/.zensu/config.json"
 
 # ── E: session state ─────────────────────────────────────────────────
-assert_has "$OUT_A" 'is writable'                        "E1 writable state dir reported"
-assert_has "$OUT_A" 'unparseable TDD phase document'     "E2 unparseable phase document is a failure row"
-assert_has "$OUT_A" 'auto-fix round counter'             "E3 round counters reported"
+assert_has "$OUT_A" '1 validated CAS workflow document(s)' "E1 valid bound-format state is validated"
+assert_has "$OUT_A" '1 invalid CAS workflow document(s)' "E2 corrupt CAS document is a failure row"
+assert_has "$OUT_A" 'reviewRound/stopBlockCount/implStopCount are integrated fields' "E3 counters use validated CAS fields"
 assert_has "$OUT_A" 'within its 6h TTL'                  "E4 fresh pending-review within TTL"
 
 RR_NOW="$NOW_FUTURE"
 OUT_E="$(run_report authed)"
 assert_has "$OUT_E" 'expired, safe to clear'  "E5 expired pending-review surfaced"
-assert_has "$OUT_E" 'older than 7 days'       "E6 stale session-id pointer surfaced"
+assert_lacks "$OUT_E" 'session-id pointer' "E6 no obsolete current-session pointer is read"
 RR_NOW="$NOW_EARLY"
 
 RR_PROJECT="$EMPTY_PROJ"
@@ -210,7 +215,8 @@ OUT_G="$(env -i PATH="$PATH" \
   HOME="$SB/home" \
   ZENSU_PROJECT_DIR="$PROJ" \
   ZENSU_DOCTOR_PLUGIN_DIR="$PLUG" \
-  ZDOC_ZENSU="authed" ZDOC_NODE="v20.11.0" ZDOC_AGY="/usr/local/bin/agy" \
+  ZDOC_ZENSU="authed" ZDOC_NODE="v20.11.0" ZENSU_REVIEW_EXECUTION="delegated" \
+    ZDOC_BINDING="unbound" \
   ZDOC_FORGE_PROVIDER="github" ZDOC_FORGE_CLI="gh" ZDOC_FORGE_STATE="ready" \
   ZDOC_TTL_HOURS="6" ZDOC_NOW_MS="$NOW_EARLY" \
   bash "$DOCTOR_SH" 2>&1)"; RC_G=$?

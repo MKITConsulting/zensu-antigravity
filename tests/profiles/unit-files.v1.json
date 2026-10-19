@@ -1,0 +1,529 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "tests/host/native-agent-provenance.test.js",
+      "registered": 22,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native agent provenance: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/host/native-reviewer-outcome.test.js",
+      "registered": 18,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native reviewer outcomes: authenticated parent and launch correlation, actual child success, negative-only policy refusal, bounded retries, safe reads and forged-outcome rejection."
+    },
+    {
+      "path": "tests/host/test-native-agent-lifecycle.js",
+      "registered": 6,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native agent lifecycle: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/host/test-native-agent-shim.js",
+      "registered": 5,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native agent shim: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/host/test-native-doctor.js",
+      "registered": 8,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native Doctor registration and capability audits, actual permission-policy reporting and refusal of missing or unsafe host evidence."
+    },
+    {
+      "path": "tests/host/test-native-review.js",
+      "registered": 10,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native review: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/host/test-native-rules-worker-probes.js",
+      "registered": 2,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native rule and worker probes reject tools, missing completion, mismatched responses and uncorrelated shared logs."
+    },
+    {
+      "path": "tests/host/test-native-spawn-allow.js",
+      "registered": 5,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native spawn allow: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/host/test-review-worker.js",
+      "registered": 8,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native review worker: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/host/test-session-adapter.js",
+      "registered": 22,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native session adapter: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/host/test-stop-session-state.js",
+      "registered": 4,
+      "runs": [
+        {
+          "driver": "tests/structure/test-stop-enforcer.sh"
+        }
+      ],
+      "summary": "Native stop session state: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/structure/acceptance-verify-v1.test.js",
+      "registered": 26,
+      "runs": [
+        {
+          "driver": "tests/structure/test-acceptance-gate.sh"
+        }
+      ],
+      "summary": "Acceptance records: the record schema and store, the verify-feature driver ids, criteria from the shared lister, the chain anchor, criterion and gate verdicts, and retention."
+    },
+    {
+      "path": "tests/structure/antigravity-chain.test.js",
+      "registered": 1,
+      "runs": [
+        {
+          "driver": "tests/structure/test-antigravity-chain.sh"
+        }
+      ],
+      "summary": "Native antigravity chain: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/structure/aspect-activation-v1.test.js",
+      "registered": 21,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "Review-aspect activation: which review perspectives a round activates for a given change."
+    },
+    {
+      "path": "tests/structure/chain-recovery-v1.test.js",
+      "registered": 21,
+      "runs": [
+        {
+          "driver": "tests/structure/test-chain-recover.sh"
+        }
+      ],
+      "summary": "The chain shape lattice and the rearm-receipt predicate."
+    },
+    {
+      "path": "tests/structure/evidence-run-v1.test.js",
+      "registered": 80,
+      "skips": {
+        "win32": 3
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        },
+        {
+          "driver": "tests/structure/test-post-bash-witness.sh"
+        }
+      ],
+      "summary": "The evidence runner: the record schema and store, the tree fingerprint, verdict states, retention and the run directory."
+    },
+    {
+      "path": "tests/structure/external-review-v1.test.js",
+      "registered": 41,
+      "skips": {
+        "win32": 3
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "External review import: the Workflow launch record, its bounds and retention, the template staged inside the working directory, and the freshness check against changed files."
+    },
+    {
+      "path": "tests/structure/finding-verify-v1.test.js",
+      "registered": 28,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The finding-verification grading module."
+    },
+    {
+      "path": "tests/structure/fixture-mutation-watch.test.js",
+      "registered": 19,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "Fixture mutation-event classification for the Promptfoo wrapper, routed through one decision for both watch backends."
+    },
+    {
+      "path": "tests/structure/full-suite-ci-v1.test.js",
+      "registered": 28,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "Full-suite CI deferral: the workflow scan, the remote proof, the verification cache, the policy ladder and the deferred-ci verdict."
+    },
+    {
+      "path": "tests/structure/git-repo-escape.test.js",
+      "registered": 45,
+      "runs": [
+        {
+          "driver": "tests/structure/test-bash-source-write-gate.sh"
+        }
+      ],
+      "summary": "The pure half of source-write rule (C): gitTargets() repository resolution and the git mutation and option lattice."
+    },
+    {
+      "path": "tests/structure/native-review-artifacts.test.js",
+      "registered": 5,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-skill-adapters.sh"
+        }
+      ],
+      "summary": "Native review artifacts: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/structure/native-skill-content.test.js",
+      "registered": 7,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-skill-adapters.sh"
+        }
+      ],
+      "summary": "Native skill content: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/structure/native-worker-witness.test.js",
+      "registered": 5,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-skill-adapters.sh"
+        }
+      ],
+      "summary": "Native worker startup witnesses and real launcher-to-child client identity through Pulse and blocked-event emissions.",
+      "skips": {
+        "win32": 1
+      }
+    },
+    {
+      "path": "tests/structure/owned-process.test.js",
+      "registered": 4,
+      "skips": {
+        "win32": 4
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The owned-process lifecycle, including a signal-killed child reported as 128 plus its signal number."
+    },
+    {
+      "path": "tests/structure/plan-payload-v1.test.js",
+      "registered": 20,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The plan-source precedence table, the hardened plan-file reader refusals and the O_NOFOLLOW fallback."
+    },
+    {
+      "path": "tests/structure/playwright-cli-version-v1.test.js",
+      "registered": 14,
+      "skips": {
+        "win32": 12
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The installed playwright-cli version identity, read from its package manifest without running the binary."
+    },
+    {
+      "path": "tests/structure/plugin-data-guard-v1.test.js",
+      "registered": 37,
+      "skips": {
+        "win32": 4
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "Plugin-data containment: the separator classes, the resolution bounds, the truncated-walk refusal and the realpath fast path."
+    },
+    {
+      "path": "tests/structure/process-supervisor.test.js",
+      "registered": 7,
+      "skips": {
+        "linux": 1,
+        "root": 1
+      },
+      "notRunOn": {
+        "win32": "test-harness-launcher.sh skips native Windows before grading, because the launcher stops its session through POSIX process groups"
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The process supervisor the work-order launcher loads: process-tree teardown, the macOS zombie-only stop and the unreachable-endpoint exit code."
+    },
+    {
+      "path": "tests/structure/prompt-listing-v1.test.js",
+      "registered": 6,
+      "guards": [
+        "native index correlates exact cache identity and transcript without claiming liveness",
+        "handoff reads native turn kinds and retains the untrusted-data boundary",
+        "takeover records lineage but never creates an ownership receipt; no-record is read-only",
+        "short selectors and unsupported host operations fail explicitly",
+        "transcript listing bounds recent turns and rejects symlink aliases",
+        "ambiguous prefixes fail rather than selecting the newest conversation"
+      ],
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        },
+        {
+          "driver": "tests/structure/test-native-skill-adapters.sh"
+        }
+      ],
+      "summary": "Native session history and handoff provenance, bounded transcript reads, explicit unsupported operations and ambiguous-selector rejection."
+    },
+    {
+      "path": "tests/structure/review-ledger-v1.test.js",
+      "registered": 42,
+      "runs": [
+        {
+          "driver": "tests/structure/test-review-convergence.sh"
+        }
+      ],
+      "summary": "The review findings ledger: latest-wins, generations, carried open entries and fail-open verdicts."
+    },
+    {
+      "path": "tests/structure/review-round-scope-v1.test.js",
+      "registered": 24,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "Delta-scoped review rounds: which files and findings a fix round reviews."
+    },
+    {
+      "path": "tests/structure/reviewer-spawn-denial-v1.test.js",
+      "registered": 37,
+      "skips": {
+        "win32": 2
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-stop-enforcer-self-review-routing.sh"
+        }
+      ],
+      "summary": "Neutral reviewer-spawn denial scanner: structural result correlation, error-prefix matching, safe bounded reads, retained-window detection and CLI diagnostics; native host behavior is verified separately."
+    },
+    {
+      "path": "tests/structure/rule-block-v1.test.js",
+      "registered": 10,
+      "skips": {
+        "win32": 2
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The marker-block reader both rule carriers share: marker position, the size ceilings and the short-read and swapped-file refusals."
+    },
+    {
+      "path": "tests/structure/session-adopt-report-v1.test.js",
+      "registered": 59,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The adoption report payload: the safe() folding, the pair-forgery guard and the rendered rows."
+    },
+    {
+      "path": "tests/structure/session-auto-adopt-v1.test.js",
+      "registered": 44,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "Automatic adoption across a lineage break: the ladder, every refusal and unavailable arm, and the lock."
+    },
+    {
+      "path": "tests/structure/session-control-lineage.test.js",
+      "registered": 15,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The runtime-lineage axis: same major (same minor while the major is 0), never backwards, and a sibling plugin root."
+    },
+    {
+      "path": "tests/structure/subagent-shell-guard-v1.test.js",
+      "registered": 25,
+      "skips": {
+        "win32": 2
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The subagent shell guard: the accident rules, the shell parser and command walker, the config layers that withdraw the grant, and Windows spellings."
+    },
+    {
+      "path": "tests/structure/unit-registry.test.js",
+      "registered": 31,
+      "runs": [
+        {
+          "driver": "tests/structure/test-unit-registry.sh"
+        }
+      ],
+      "summary": "Registry schema, source census, exact TAP totals, skip ceilings, cancelled/missing cases, driver reachability and generated overview consistency."
+    },
+    {
+      "path": "tests/structure/verify-browser-config.test.js",
+      "registered": 21,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The playwright-cli run-config helper: the isolated origin-restricted config and the address pins of a remote run."
+    },
+    {
+      "path": "tests/structure/verify-consent-v1.test.js",
+      "registered": 125,
+      "skips": {
+        "win32": 2
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The verify-feature browser consent gate: the command allowlist, the shell lexer and every refused indirection."
+    },
+    {
+      "path": "tests/structure/verify-free-port.test.js",
+      "registered": 3,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The free loopback port helper: argument parsing, occupied and excluded ports and the CLI contract."
+    },
+    {
+      "path": "tests/structure/verify-navigation-floor-v1.test.js",
+      "registered": 21,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The navigation floor the consent gate and the run-config helper share: local hosts, address classes and URL refusals."
+    },
+    {
+      "path": "tests/structure/work-order-v1.test.js",
+      "registered": 38,
+      "notRunOn": {
+        "win32": "test-work-order-runtime.sh skips native Windows before grading, because Node cannot start the file's shell-script fake zensu there"
+      },
+      "runs": [
+        {
+          "driver": "tests/structure/test-work-order-runtime.sh"
+        }
+      ],
+      "summary": "The work-order runtime: the CLI error grammar, the ledger-to-stage mapping, lease renewal and expiry, the inert context outside the mode, the DONE delivery order, the gate and the takeover release plan."
+    },
+    {
+      "path": "tests/structure/zen-anchor-assertions.test.js",
+      "registered": 12,
+      "runs": [
+        {
+          "driver": "tests/structure/test-zen-mode.sh"
+        }
+      ],
+      "summary": "The zen-mode eval graders: every assertion body compiled and a pinned pass and fail vector."
+    },
+    {
+      "path": "tests/structure/zen-anchor-v1.test.js",
+      "registered": 25,
+      "runs": [
+        {
+          "driver": "tests/structure/test-zen-mode.sh"
+        }
+      ],
+      "summary": "The zen-mode chain anchor: the shape-to-line mapping, the failed mark and the closed chain."
+    },
+    {
+      "path": "tests/structure/zensu-doctor-invocation.test.js",
+      "registered": 27,
+      "runs": [
+        {
+          "driver": "tests/structure/test-semantic-units.sh"
+        }
+      ],
+      "summary": "The /zensu-doctor invocation allowlist."
+    }
+  ]
+}

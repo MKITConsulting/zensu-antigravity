@@ -39,12 +39,16 @@ function readVars() {
 }
 
 function makeSandbox() {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'zensu-pf-'));
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'zensu-pf-')));
   const project = path.join(base, 'project');
-  const data = path.join(base, 'data');
+  const data = path.join(base, 'home', '.zensu', 'antigravity', 'plugin-data');
   const home = path.join(base, 'home');
-  for (const dir of [project, data, home]) fs.mkdirSync(dir, { recursive: true });
-  return { base, project, data, home };
+  for (const dir of [project, data, home]) fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // Test-only OS identity seam: exercise shipped adapter code with an isolated
+  // home while production continues to ignore caller-controlled HOME selectors.
+  const identity = path.join(base, 'os-identity.cjs');
+  fs.writeFileSync(identity, `const os=require('node:os'),original=os.userInfo;os.userInfo=(...args)=>({...original(...args),homedir:${JSON.stringify(home)}});`);
+  return { base, project, data, home, identity };
 }
 
 function writeFixtures(sandbox, files) {
@@ -64,9 +68,12 @@ function baseEnv(sandbox, vars) {
   }
   env.HOME = sandbox.home;
   env.ZENSU_PLUGIN_ROOT = ROOT;
-  env.ZENSU_PLUGIN_DATA_OVERRIDE = sandbox.data;
+  env.ZENSU_PLUGIN_DATA = sandbox.data;
+  env.ZENSU_TEST_PLUGIN_DATA = sandbox.data;
+  env.NODE_OPTIONS = `--require ${sandbox.identity}`;
+  env.ZENSU_REVIEW_EXECUTION = 'in-thread';
   env.ZENSU_PROJECT_DIR = sandbox.project;
-  env.ZENSU_SESSION_ID = vars.session_id || 'pf-session';
+  env.ZENSU_HOST_SESSION_ID = vars.session_id || vars.payload?.conversationId || vars.payload?.session_id || 'pf-session';
   if (vars.env && typeof vars.env === 'object') {
     for (const [key, value] of Object.entries(vars.env)) {
       if (value === null) delete env[key];
@@ -84,6 +91,8 @@ function expandTokens(text, sandbox) {
     .join(sandbox.project)
     .split('__DATA__')
     .join(sandbox.data)
+    .split('__SESSION__')
+    .join(sandbox.session || 'pf-session')
     .split('__HOME__')
     .join(sandbox.home);
 }
@@ -96,14 +105,83 @@ function renderPayload(vars, sandbox) {
   return '';
 }
 
+// The shim's second argument is the hook EVENT, and it selects the output
+// dialect. Resolving it from hooks.json.template rather than from a table in
+// here means a scenario always exercises the event the plugin really wires the
+// hook to: re-wire a hook in the template and every scenario follows. A scenario
+// can still pass `event:` explicitly to cover a mis-wiring on purpose.
+let TEMPLATE_EVENTS = null;
+function eventForHook(hook) {
+  if (!TEMPLATE_EVENTS) {
+    TEMPLATE_EVENTS = new Map();
+    try {
+      const tpl = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks.json.template'), 'utf8'));
+      const note = (event, handler) => {
+        const m = String((handler && handler.command) || '').match(/antigravity-shim\.sh\s+(\S+)/);
+        if (!m) return;
+        // Collect ALL events a hook is wired to. Keeping only the first would let a
+        // hook registered on two events silently collapse to whichever JSON key
+        // iterates first, and the shim explicitly anticipates that case.
+        if (!TEMPLATE_EVENTS.has(m[1])) TEMPLATE_EVENTS.set(m[1], new Set());
+        TEMPLATE_EVENTS.get(m[1]).add(event);
+      };
+      for (const group of Object.values(tpl || {}))
+        for (const [event, arr] of Object.entries(group || {})) {
+          if (!Array.isArray(arr)) continue;
+          for (const entry of arr) {
+            if (Array.isArray(entry && entry.hooks)) entry.hooks.forEach(h => note(event, h));
+            else note(event, entry);
+          }
+        }
+      const engine = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks/hooks.json'), 'utf8'));
+      for (const [neutralEvent, groups] of Object.entries(engine.hooks)) {
+        const event = {UserPromptSubmit:'PreInvocation',SessionStart:'PreInvocation'}[neutralEvent] || neutralEvent;
+        for (const group of groups) for (const handler of group.hooks) {
+          const hook = handler.command.match(/\/([^/]+\.sh)"$/)?.[1];
+          if (!hook) continue;
+          if (!TEMPLATE_EVENTS.has(hook)) TEMPLATE_EVENTS.set(hook, new Set());
+          TEMPLATE_EVENTS.get(hook).add(event);
+        }
+      }
+    } catch (error) { fail(`invalid hook inventory: ${error.message}`); }
+  }
+  const events = TEMPLATE_EVENTS.get(hook);
+  if (!events || events.size === 0) {
+    fail(`hook ${hook} is not wired in hooks.json.template — pass an explicit \`event:\` var, ` +
+         `or the scenario would silently run the no-event dialect and only ever observe {}`);
+  }
+  if (events.size > 1) {
+    fail(`hook ${hook} is wired to ${[...events].join(', ')} — the scenario must name one with \`event:\``);
+  }
+  return [...events][0];
+}
+
+function initializeSession(sandbox, vars) {
+  const env = baseEnv(sandbox, vars);
+  sandbox.session = env.ZENSU_HOST_SESSION_ID;
+  fs.appendFileSync(path.join(sandbox.project, '.gitignore'), '\n.zensu/\n');
+  for (const args of [['init','-q'], ['config','user.email','offline@example.invalid'],
+    ['config','user.name','Offline Fixture'], ['add','.'], ['commit','-qm','Offline baseline','--allow-empty']]) {
+    const result=spawnSync('git', args, {cwd:sandbox.project, env, encoding:'utf8'});
+    if(result.status!==0) throw Error(`fixture Git baseline failed: ${result.stderr}`);
+  }
+  const result=spawnSync('node',[path.join(ROOT,'hooks/antigravity/session-bootstrap.js'),'--event','PreInvocation'], {
+    input:JSON.stringify({session_id:sandbox.session,workspace_root:sandbox.project,cwd:sandbox.project}),
+    env,cwd:sandbox.project,encoding:'utf8',timeout:30000});
+  if(result.status!==0) throw Error(`fixture bootstrap failed: ${result.stdout} ${result.stderr}`);
+}
+
 function runHook(vars, sandbox) {
   const hook = String(vars.hook || '');
   if (!/^[A-Za-z0-9._-]+\.sh$/.test(hook)) fail(`invalid hook name: ${hook}`);
   const dialect = vars.dialect || 'antigravity';
+  const event = vars.event === undefined ? eventForHook(hook) : String(vars.event);
   const entry =
     dialect === 'flat'
       ? [path.join(ROOT, 'hooks', hook)]
-      : [path.join(ROOT, 'hooks', 'antigravity', 'antigravity-shim.sh'), hook];
+      : [path.join(ROOT, 'hooks', 'antigravity', 'antigravity-shim.sh'), hook, event].filter(
+          (part, index) => index < 2 || part !== ''
+        );
   if (!fs.existsSync(entry[0])) fail(`missing hook entry: ${entry[0]}`);
   const env = baseEnv(sandbox, vars);
   // A stateful scenario arms the session first (a TDD phase, a review chain),
@@ -138,6 +216,7 @@ function runHook(vars, sandbox) {
     kind: 'hook',
     hook,
     dialect,
+    event,
     exit_code: result.status === null ? -1 : result.status,
     stdout: result.stdout || '',
     stderr: result.stderr || '',
@@ -147,7 +226,8 @@ function runHook(vars, sandbox) {
 function runShell(vars, sandbox) {
   const script = String(vars.script || '');
   if (!script) fail('shell scenario requires a script');
-  const result = spawnSync('bash', ['-c', expandTokens(script, sandbox)], {
+  const bound = vars.bind_session ? '. "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"; zensu_bind_model_session || exit $?;\n' : '';
+  const result = spawnSync('bash', ['-c', bound + expandTokens(script, sandbox)], {
     env: baseEnv(sandbox, vars),
     cwd: sandbox.project,
     encoding: 'utf8',
@@ -197,6 +277,7 @@ function main() {
         typeof vars.config === 'string' ? vars.config : JSON.stringify(vars.config)
       );
     }
+    if (kind === 'hook' || vars.bind_session) initializeSession(sandbox, vars);
     const envelope = kind === 'shell' ? runShell(vars, sandbox) : runHook(vars, sandbox);
     process.stdout.write(JSON.stringify(envelope));
   } catch (error) {

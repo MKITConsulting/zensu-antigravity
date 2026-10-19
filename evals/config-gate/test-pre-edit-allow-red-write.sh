@@ -4,6 +4,7 @@ set -u
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$PLUGIN_DIR/hooks/pre-edit-tdd-reminder.sh"
 LIB="$PLUGIN_DIR/hooks/lib/zensu-tdd-phase.sh"
+BASELINE="$PLUGIN_DIR/tests/session-control/initialize-baseline.sh"
 
 PASS=0; FAIL=0
 check() {
@@ -13,25 +14,29 @@ check() {
 }
 
 export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
-TDD_STATE_DIR="$(mktemp -d)"
-export TDD_STATE_DIR
+WORK_DIR="$(mktemp -d)"
+export ZENSU_PROJECT_DIR="$WORK_DIR/project"
+export STATE_DIR="$WORK_DIR/retired-state"
+mkdir -p "$ZENSU_PROJECT_DIR" "$STATE_DIR"
 unset ZENSU_TDD_GATE
 
-cleanup() { rm -rf "$TDD_STATE_DIR"; }
+cleanup() { rm -rf "$WORK_DIR"; }
 trap cleanup EXIT
 
 source "$LIB"
 
-# 0.4.0+: the gate activates on chain-state (active=true), set by /zensu:tdd
+# 0.4.0+: the gate activates on chain-state (active=true), set by /zensu-tdd
 # --tdd-begin. Shim phase setup to also mark each session active (the legacy
-# ZENSU_AGENT_TYPE=zensu:tdd-manager activation was removed).
+# ZENSU_AGENT_TYPE=zensu-tdd-manager activation was removed).
 eval "$(declare -f tdd_write_phase | sed '1s/^tdd_write_phase/_zensu_orig_write_phase/')"
 tdd_write_phase() { tdd_set_flag "$1" active true >/dev/null 2>&1; _zensu_orig_write_phase "$@"; }
 
 SID="s-red-write-1"
+# shellcheck disable=SC1090
+source "$BASELINE" "$SID"
 tdd_write_phase "$SID" "S1" "RED_WRITE" "" >/dev/null
 
-PAYLOAD='{"tool_name":"write_to_file","tool_input":{"file_path":"src/strings.test.ts"},"session_id":"'$SID'"}'
+PAYLOAD='{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"src/strings.test.ts"},"session_id":"'$SID'"}'
 OUT=$(echo "$PAYLOAD" | "$SCRIPT" 2>/dev/null)
 EXIT=$?
 
@@ -41,7 +46,7 @@ else
   check "RED_WRITE + test file: empty stdout + exit 0 (got: '$OUT' exit=$EXIT)" FAIL
 fi
 
-PAYLOAD2='{"tool_name":"write_to_file","tool_input":{"file_path":"src/strings.ts"},"session_id":"'$SID'"}'
+PAYLOAD2='{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"src/strings.ts"},"session_id":"'$SID'"}'
 OUT2=$(echo "$PAYLOAD2" | "$SCRIPT" 2>/dev/null)
 EXIT2=$?
 
@@ -51,7 +56,7 @@ else
   check "RED_WRITE + production file: empty stdout (got: '$OUT2' exit=$EXIT2)" FAIL
 fi
 
-PAYLOAD_WRITE='{"tool_name":"write_to_file","tool_input":{"file_path":"src/foo.test.ts"},"session_id":"'$SID'"}'
+PAYLOAD_WRITE='{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"src/foo.test.ts"},"session_id":"'$SID'"}'
 OUT_W=$(echo "$PAYLOAD_WRITE" | "$SCRIPT" 2>/dev/null)
 if [ -z "$OUT_W" ]; then
   check "RED_WRITE + Write tool on test file: allowed" PASS
@@ -59,7 +64,7 @@ else
   check "RED_WRITE + Write tool on test file: allowed (got: '$OUT_W')" FAIL
 fi
 
-PAYLOAD_MULTI='{"tool_name":"multi_replace_file_content","tool_input":{"file_path":"src/bar.spec.ts"},"session_id":"'$SID'"}'
+PAYLOAD_MULTI='{"hook_event_name":"PreToolUse","tool_name":"MultiEdit","tool_input":{"file_path":"src/bar.spec.ts"},"session_id":"'$SID'"}'
 OUT_M=$(echo "$PAYLOAD_MULTI" | "$SCRIPT" 2>/dev/null)
 if [ -z "$OUT_M" ]; then
   check "RED_WRITE + MultiEdit tool on test file: allowed" PASS

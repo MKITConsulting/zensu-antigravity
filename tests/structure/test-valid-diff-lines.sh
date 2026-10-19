@@ -20,7 +20,9 @@ set -u
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$PLUGIN_DIR/hooks/lib/valid-diff-lines.js"
-SKILL_MD="$PLUGIN_DIR/skills/pr-team-review/SKILL.md"
+. "$PLUGIN_DIR/tests/structure/lib-skill-text.sh"
+SKILL_MD="$(skill_text_file "$PLUGIN_DIR/skills/pr-team-review")" || exit 1
+trap 'rm -f "$SKILL_MD"' EXIT
 PUBLISH_MD="$PLUGIN_DIR/skills/pr-team-review/rules/github-publish.md"
 GITLAB_MD="$PLUGIN_DIR/skills/pr-team-review/rules/gitlab-publish.md"
 WORKFLOW_MD="$PLUGIN_DIR/skills/pr-team-review/rules/workflow.md"
@@ -57,7 +59,7 @@ fi
 # rules file cannot silently break the pin.
 PUBLISH_FLAT="$(tr '\n' ' ' < "$PUBLISH_MD" | tr -s '[:space:]' ' ')"
 if printf '%s' "$PUBLISH_FLAT" | grep -qiE 'fold the finding into the (overall|review)( review)? body' \
-   && grep -qF 'Findings without a diff anchor' "$PUBLISH_MD"; then
+   && grep -qF 'no inline comment' "$PUBLISH_MD" && grep -qF 'It keeps its ID and its line' "$PUBLISH_MD"; then
   check "P3c none-case folds the finding into the review body" PASS
 else
   check "P3c none-case folds the finding into the review body" FAIL
@@ -97,7 +99,9 @@ if grep -qF 'valid-diff-lines.js' "$WORKFLOW_MD" && grep -qiF 'anchor validation
 else
   check "P3j workflow.md Phase D repeats the mandatory anchor gate" FAIL
 fi
-if grep -qF 'valid-diff-lines.js' "$GITLAB_MD"; then
+if grep -qF 'valid-diff-lines.js' "$PLUGIN_DIR/skills/pr-team-review/references/publish.md" \
+  && grep -qF 'on GitLab' "$PLUGIN_DIR/skills/pr-team-review/references/publish.md" \
+  && grep -qF 'positionless' "$GITLAB_MD"; then
   check "P3k gitlab-publish.md reuses the forge-agnostic validator" PASS
 else
   check "P3k gitlab-publish.md reuses the forge-agnostic validator" FAIL

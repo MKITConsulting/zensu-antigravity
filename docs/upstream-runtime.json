@@ -1,0 +1,628 @@
+{
+  "source": "zensu-claude-code",
+  "version": "0.27.0",
+  "commit": "65d6aba7e3f6c0d98af2a02c9b4854c1f0c78980",
+  "adaptation": "Engine-neutral environment, manifest and command namespace; native transport lives in hooks/antigravity.",
+  "files": [
+    {
+      "source": "hooks/pre-write-secret-scan.sh",
+      "target": "hooks/pre-write-secret-scan.sh",
+      "sha256": "336d4c2415a5459c288bdb17cf811204300d46d0c17a689e1aa2b7ba8385e18f"
+    },
+    {
+      "source": "hooks/pre-edit-tdd-reminder.sh",
+      "target": "hooks/pre-edit-tdd-reminder.sh",
+      "sha256": "f91b2373f0012abbe555be5d56e8352164df7ce6dbc176f0dc9fe6063a27820c"
+    },
+    {
+      "source": "hooks/pre-bash-zensu-gate.sh",
+      "target": "hooks/pre-bash-zensu-gate.sh",
+      "sha256": "047454189ba7f9f3c2cc50ede88c850e477761c9e05a12fa0cacf9e35b693774"
+    },
+    {
+      "source": "hooks/post-workflow-launch.sh",
+      "target": "hooks/post-workflow-launch.sh",
+      "sha256": "0b12d9983427b062d99e61ce7e30f5aae56fbc2f14b99189db44e56680b75fee"
+    },
+    {
+      "source": "hooks/session-end-worktree-keep.sh",
+      "target": "hooks/session-end-worktree-keep.sh",
+      "sha256": "dc72c805ad60320108687739d04acb173207d1d1b8137186bbf4e0b96377ce8e"
+    },
+    {
+      "source": "hooks/session-start-worktree-keep.sh",
+      "target": "hooks/session-start-worktree-keep.sh",
+      "sha256": "811461d824d175f04fec684914ed048546d551436c60256418183004a4427b0a"
+    },
+    {
+      "source": "hooks/pre-agent-reviewer-allow.sh",
+      "target": "hooks/pre-agent-reviewer-allow.sh",
+      "sha256": "32871281509d29570fa087b996b97e5ab818ca76e5a232202ef24fbf40c37355"
+    },
+    {
+      "source": "hooks/session-start-evidence-discipline.sh",
+      "target": "hooks/session-start-evidence-discipline.sh",
+      "sha256": "9bda8637ba07505697c399e13b57c3fa75c965c4758348159b59d1f7ce3bc3a8"
+    },
+    {
+      "source": "hooks/session-start-pulse.sh",
+      "target": "hooks/session-start-pulse.sh",
+      "sha256": "7e02fbb1e21dab40c873100719cdea8ad8687ea50cd81c3e49f45df0e102a869"
+    },
+    {
+      "source": "hooks/plan-approved-delegate.sh",
+      "target": "hooks/plan-approved-delegate.sh",
+      "sha256": "e5eed353ea5527749181a7d414131e939a67307316675b73cf4c3a2536fbe607"
+    },
+    {
+      "source": "hooks/pre-browser-navigation-consent.sh",
+      "target": "hooks/pre-browser-navigation-consent.sh",
+      "sha256": "05e2e4b4d3c1bfbf0996116fe42c20d92b82027f7b04ddef7963c33c9e685d4c"
+    },
+    {
+      "source": "hooks/stop-chain-enforcer.sh",
+      "target": "hooks/stop-chain-enforcer.sh",
+      "sha256": "36cc7f6ffc7402b634d3dcd4e75c04177a5133ac1315b4b8e82586521114fa4f"
+    },
+    {
+      "source": "hooks/pre-write-plugin-data-guard.sh",
+      "target": "hooks/pre-write-plugin-data-guard.sh",
+      "sha256": "5ccdc9dd0f5bade2775dc7cf4f5eaf53ed2da3d375af3c994c37ac427e5c43da"
+    },
+    {
+      "source": "hooks/user-prompt-intent-router.sh",
+      "target": "hooks/user-prompt-intent-router.sh",
+      "sha256": "633e32e50a1d7337b7bbf079d44348d857815aa3627c3675cc2bc30da99cbfd4"
+    },
+    {
+      "source": "hooks/session-start-primer.sh",
+      "target": "hooks/session-start-primer.sh",
+      "sha256": "bed2f6df04c3a12f239d32f122fd970c305204a004815b95086fd98037ccd87f"
+    },
+    {
+      "source": "hooks/user-prompt-tdd-reminder.sh",
+      "target": "hooks/user-prompt-tdd-reminder.sh",
+      "sha256": "e5a314a82eb27697e0dc105c7f884d59deae9a8997316083b74255423a01c0a0"
+    },
+    {
+      "source": "hooks/session-start-session-control.sh",
+      "target": "hooks/session-start-session-control.sh",
+      "sha256": "7d2a197fb0b977576fd837b3386e0013346530b505f98c0eb62fec8ddcf9fc20"
+    },
+    {
+      "source": "hooks/pre-reviewer-capability-gate.sh",
+      "target": "hooks/pre-reviewer-capability-gate.sh",
+      "sha256": "e4876b99705ed17381146e397fa6c3b0a71addc030856c20566c80c090c7e267"
+    },
+    {
+      "source": "hooks/post-work-order.sh",
+      "target": "hooks/post-work-order.sh",
+      "sha256": "e2c02f40942205bcd7281c747e0a3a629422a7c7a5aa60c17f8b24f5e7790ab4"
+    },
+    {
+      "source": "hooks/post-artifact-redact.sh",
+      "target": "hooks/post-artifact-redact.sh",
+      "sha256": "9bff16aaaba7ea76ec081ab8ca3c54c999395c1b892702b94018933bcb2624a5"
+    },
+    {
+      "source": "hooks/user-prompt-zen-mode.sh",
+      "target": "hooks/user-prompt-zen-mode.sh",
+      "sha256": "003160e8729c065d270d9b32bc49853c4bd5cf5914fb78e294ee9dbe9010cd74"
+    },
+    {
+      "source": "hooks/post-browser-navigation-consent.sh",
+      "target": "hooks/post-browser-navigation-consent.sh",
+      "sha256": "039983a0454b57033f2edcbd3b9d2a884f779235e3f22f6adec1673562ba5694"
+    },
+    {
+      "source": "hooks/pre-work-order-gate.sh",
+      "target": "hooks/pre-work-order-gate.sh",
+      "sha256": "5b16ee50d7afce69e0a6b1c8b33ed0d8545d3c2809f6b4f83764c993e5a27a4c"
+    },
+    {
+      "source": "hooks/session-start-prompt-ledger.sh",
+      "target": "hooks/session-start-prompt-ledger.sh",
+      "sha256": "1b05ee08dc21d97f71aaf2e718ae5677117fa1775fe11cdf16a00891cdcdcab1"
+    },
+    {
+      "source": "hooks/review-evidence-subagent-stop.sh",
+      "target": "hooks/review-evidence-subagent-stop.sh",
+      "sha256": "7d5218c9bf5df95d5ab5e71708bffbf6b8ee75a4ac3156d7f4c503e16350e1c4"
+    },
+    {
+      "source": "hooks/pre-bash-source-write-gate.sh",
+      "target": "hooks/pre-bash-source-write-gate.sh",
+      "sha256": "8887b92d6becd0e202a56b627123f025bbdfce1f9728f61dfc9dfade7dd3814e"
+    },
+    {
+      "source": "hooks/session-start-banner.sh",
+      "target": "hooks/session-start-banner.sh",
+      "sha256": "5d2c844e5d8399ddcbb1089f6f02010f71a2612f85b682d6143d4ae5e9bd3f1b"
+    },
+    {
+      "source": "hooks/session-start-autopilot-resume.sh",
+      "target": "hooks/session-start-autopilot-resume.sh",
+      "sha256": "cbc9c93c0ddc6be40f7eccce52a5ab30da03929a638d18fca55af4182f895937"
+    },
+    {
+      "source": "hooks/review-evidence-subagent-start.sh",
+      "target": "hooks/review-evidence-subagent-start.sh",
+      "sha256": "7516844d015f128efd70faa19b0081f40ffe12c7e9bc31cb031995a7ba5968c4"
+    },
+    {
+      "source": "hooks/user-prompt-worktree-keep.sh",
+      "target": "hooks/user-prompt-worktree-keep.sh",
+      "sha256": "fa9a104527bf7cec16d69596b1acd343bb5fbff34a837c87cadd58e0c9b0bea1"
+    },
+    {
+      "source": "hooks/user-prompt-best-solution-first.sh",
+      "target": "hooks/user-prompt-best-solution-first.sh",
+      "sha256": "ad87cb8dcb043d1cc96be12f0350b0328bed6bf4a43dbbb24c9bb123ef420e57"
+    },
+    {
+      "source": "hooks/stop-work-order.sh",
+      "target": "hooks/stop-work-order.sh",
+      "sha256": "b393aff806023f030b353d493be8a8c1ba5bfecfff8518060a56edf23760e249"
+    },
+    {
+      "source": "hooks/post-review-tdd-delegate.sh",
+      "target": "hooks/post-review-tdd-delegate.sh",
+      "sha256": "7b9bc7d62de8865962a1007fe7eecab283d4d58efb6fadd55b6de2e3b0d70760"
+    },
+    {
+      "source": "hooks/user-prompt-session-hub-receipt.sh",
+      "target": "hooks/user-prompt-session-hub-receipt.sh",
+      "sha256": "03d87e9bb2d0cc335ecfeb9c89b4e1f1d390b9a8bd556bd284b73141265dae8d"
+    },
+    {
+      "source": "hooks/user-prompt-context-nudge.sh",
+      "target": "hooks/user-prompt-context-nudge.sh",
+      "sha256": "6846e7e1e2462d83be14b7cadd8de85892ad775f3bcabe69825858644c72a615"
+    },
+    {
+      "source": "hooks/lib/session-control-core-v1.js",
+      "target": "hooks/lib/session-control-core-v1.js",
+      "sha256": "5c69dd1ee6b70b9afa899a6de3a50c9db341a8c7dd079f7805f8d42896ffe856"
+    },
+    {
+      "source": "hooks/lib/zensu-agent-context.sh",
+      "target": "hooks/lib/zensu-agent-context.sh",
+      "sha256": "86a82e54df7cb7bcf7c22bf2c531c0711e9dd240c8a4c7ef8faa3dc9d7a50b19"
+    },
+    {
+      "source": "hooks/lib/review-ledger-v1.js",
+      "target": "hooks/lib/review-ledger-v1.js",
+      "sha256": "7225ce553ac5a607a9ac184eb52b539c47551b72cc73c2b63f525bb33acf7d9f"
+    },
+    {
+      "source": "hooks/lib/verify-navigation-floor-v1.js",
+      "target": "hooks/lib/verify-navigation-floor-v1.js",
+      "sha256": "eacb6ba8a30e88a2a05ffd9e1144075b304cfdb53f87fa3cd5ea2f38afafac5b"
+    },
+    {
+      "source": "hooks/lib/full-suite-policy-v1.js",
+      "target": "hooks/lib/full-suite-policy-v1.js",
+      "sha256": "baa97efc6109b759097fc18827cfe3bee231b24cd54ee9ba482699dd08a8a982"
+    },
+    {
+      "source": "hooks/lib/zen-anchor-v1.js",
+      "target": "hooks/lib/zen-anchor-v1.js",
+      "sha256": "af713411fc7de18a0c5f087259f9ff772841f6b8066b7c923747e10b511e4248"
+    },
+    {
+      "source": "hooks/lib/external-review-v1.js",
+      "target": "hooks/lib/external-review-v1.js",
+      "sha256": "4ccbdcd84856880cbc173295bf930370a17a8bdedd4101d5c7c017b354470ab8"
+    },
+    {
+      "source": "hooks/lib/zensu-safe-render.sh",
+      "target": "hooks/lib/zensu-safe-render.sh",
+      "sha256": "b238e9b061d9cae3b3e6cc1953b55998912f321eb05034f628cb2eaeaba9565f"
+    },
+    {
+      "source": "hooks/lib/zensu-host-path.sh",
+      "target": "hooks/lib/zensu-host-path.sh",
+      "sha256": "37bf971823996439c0f680050684b66d0f5a1c1ff05f451aa9240ecbe9a46c66"
+    },
+    {
+      "source": "hooks/lib/zensu-full-suite-transport.sh",
+      "target": "hooks/lib/zensu-full-suite-transport.sh",
+      "sha256": "3ec00d40cedd64754642af83086a3667b866d72c9c53b1c6a5262c1af383913d"
+    },
+    {
+      "source": "hooks/lib/reviewer-capability-v1.js",
+      "target": "hooks/lib/reviewer-capability-v1.js",
+      "sha256": "0359772170d86690d599eb11ef2757c9a18c27cfd9943b146dbae807967596fd"
+    },
+    {
+      "source": "hooks/lib/zensu-directive.sh",
+      "target": "hooks/lib/zensu-directive.sh",
+      "sha256": "ca7b934d2c45bef676c55f41331e7c0ab737c80b6da934c662b29cfdfce7e796"
+    },
+    {
+      "source": "hooks/lib/zensu-config.sh",
+      "target": "hooks/lib/zensu-config.sh",
+      "sha256": "6f43530ffd5ce184012c10d392307190b3568d4f8e4f1c8921f0ff460baf624e"
+    },
+    {
+      "source": "hooks/lib/claude-session-control-v1.js",
+      "target": "hooks/lib/runtime-session-control-v1.js",
+      "sha256": "cd5424a060ac95c7e9fc070e00ed556d3b61749e0f82e6e02bb38e9fda2ea014"
+    },
+    {
+      "source": "hooks/lib/session-auto-adopt-v1.js",
+      "target": "hooks/lib/session-auto-adopt-v1.js",
+      "sha256": "e3ac62e48def96f28d1f09bdfbe9febdd49b6b680f6ea0c87a0d0cf5ade322aa"
+    },
+    {
+      "source": "hooks/lib/session-hub-receipt-v1.mjs",
+      "target": "hooks/lib/session-hub-receipt-v1.mjs",
+      "sha256": "d6913bfb54890d71c2bf922de73374967ce6db7753e7ab26ed9979e3ed7a966a"
+    },
+    {
+      "source": "hooks/lib/zensu-log.sh",
+      "target": "hooks/lib/zensu-log.sh",
+      "sha256": "ea4b7beb5ca5fb5a5c5e3dba89fb395dee6e5cad95499f4ab40ac11e8f2f37f2"
+    },
+    {
+      "source": "hooks/lib/subagent-shell-guard-v1.js",
+      "target": "hooks/lib/subagent-shell-guard-v1.js",
+      "sha256": "dbb8cad0db0d760341d0f4fcbefca1777fe9944280f43da6fe9d9fb9da267443"
+    },
+    {
+      "source": "hooks/lib/zensu-delivery-route.sh",
+      "target": "hooks/lib/zensu-delivery-route.sh",
+      "sha256": "bf2e885efa5aa06b6c6914759ca01c5b656749c0484782c4ac7e07a963213819"
+    },
+    {
+      "source": "hooks/lib/claude-path-v1.js",
+      "target": "hooks/lib/runtime-path-v1.js",
+      "sha256": "2387b04047484001c74f55c672ce8fc903c4e58e4a36dc1499cb24b50944dd64"
+    },
+    {
+      "source": "hooks/lib/verify-consent-v1.js",
+      "target": "hooks/lib/verify-consent-v1.js",
+      "sha256": "42e8e483f9d4d6437c76af182744278e2fbdea1b9678b38ff85fec61426d7ce5"
+    },
+    {
+      "source": "hooks/lib/chain-recovery-v1.js",
+      "target": "hooks/lib/chain-recovery-v1.js",
+      "sha256": "60100d71b28ac50f7c2d0097caab72287c74e59d5c1bd80e522035ded95a4f5d"
+    },
+    {
+      "source": "hooks/lib/plan-payload-v1.js",
+      "target": "hooks/lib/plan-payload-v1.js",
+      "sha256": "ca5ead8717b25fb0f7be1a91fbc6b26c7615fa47588fef2d6d38c9beb1ac3c4f"
+    },
+    {
+      "source": "hooks/lib/playwright-cli-version-v1.js",
+      "target": "hooks/lib/playwright-cli-version-v1.js",
+      "sha256": "3c3707eb2d31f9d88d59813d8de1448169b64aeb35884d18c8d260de59cdd545"
+    },
+    {
+      "source": "hooks/lib/zensu-plan-requirements.sh",
+      "target": "hooks/lib/zensu-plan-requirements.sh",
+      "sha256": "4900ca4425609b22d50335955729a010cf0c6ffe883bc3fd352e11af6fe11d99"
+    },
+    {
+      "source": "hooks/lib/zensu-doctor-report.js",
+      "target": "hooks/lib/zensu-doctor-report.js",
+      "sha256": "a43546e14d0a1c2bfe447be9b932ee9cbbf9f7fd56af22b7c4d06f90e2190fa0"
+    },
+    {
+      "source": "hooks/lib/zensu-tdd-mode.sh",
+      "target": "hooks/lib/zensu-tdd-mode.sh",
+      "sha256": "a9256ba48a044dfc51f3c300a7fe586485d1c0912e44d32e8a8c00cc662bd41b"
+    },
+    {
+      "source": "hooks/lib/review-evidence-sweep-v1.js",
+      "target": "hooks/lib/review-evidence-sweep-v1.js",
+      "sha256": "3ad94403bee7914e64fb022242fe4d2b7a77c6276da504f89188437a284a3095"
+    },
+    {
+      "source": "hooks/lib/edit-landing-receipt-v1.js",
+      "target": "hooks/lib/edit-landing-receipt-v1.js",
+      "sha256": "77008ac4193c804785400f1c66a3ff4d2026a9758a991b3cdd4328cac40c4639"
+    },
+    {
+      "source": "hooks/lib/zensu-work-order-hook.sh",
+      "target": "hooks/lib/zensu-work-order-hook.sh",
+      "sha256": "c16a206189fb46df643956607e732d0205586c94cfcbf600af825cb0b68d5cd1"
+    },
+    {
+      "source": "hooks/lib/zensu-worktree-keep.sh",
+      "target": "hooks/lib/zensu-worktree-keep.sh",
+      "sha256": "a94471e17b93091e217ce232218dc310b0c08f7ded1fcff13d0d868c3bda44af"
+    },
+    {
+      "source": "hooks/lib/zensu-prompt-origin.sh",
+      "target": "hooks/lib/zensu-prompt-origin.sh",
+      "sha256": "5953dd53c307a2fa3956b63b4cb1370ef29c8f2f5f21af516607c11a767bbdd8"
+    },
+    {
+      "source": "hooks/lib/zensu-msys-env.sh",
+      "target": "hooks/lib/zensu-msys-env.sh",
+      "sha256": "646c8f58ceccc5f79e1e8627319844fc7c2e613f40b0dfa38c84c7598914345d"
+    },
+    {
+      "source": "hooks/lib/secret-scan-decide.js",
+      "target": "hooks/lib/secret-scan-decide.js",
+      "sha256": "5a57e7dc12bcd10289475bbedd29687135848ced078b6e648b021589246e855f"
+    },
+    {
+      "source": "hooks/lib/stop-idle-probe-v1.js",
+      "target": "hooks/lib/stop-idle-probe-v1.js",
+      "sha256": "7bfe6f96ba7fefa9fa6efbc297fbe7d93eb0d77fb5b8ba4bf2eaeb1e4aaf96f3"
+    },
+    {
+      "source": "hooks/lib/finding-verify-v1.js",
+      "target": "hooks/lib/finding-verify-v1.js",
+      "sha256": "cff81cd48b3f363cd39860bcc5afb46cac8257efd633ef98a3f9e0ccc451c311"
+    },
+    {
+      "source": "hooks/lib/worktree-keep-v1.js",
+      "target": "hooks/lib/worktree-keep-v1.js",
+      "sha256": "8d8d4dd10968ebd2dc18581f1c315950a69d841ff8ab21924b41d02f834c0dfd"
+    },
+    {
+      "source": "hooks/lib/review-evidence-lease-v1.js",
+      "target": "hooks/lib/review-evidence-lease-v1.js",
+      "sha256": "031ecd55b912a2e85f760c4892b5878fb72445625950a11996e5c0e20229e5b0"
+    },
+    {
+      "source": "hooks/lib/zensu-review-evidence.sh",
+      "target": "hooks/lib/zensu-review-evidence.sh",
+      "sha256": "e4cdcbf499caf1935f79b37c17505c5ab311c837aa23a3018ec6bac7bd3adb96"
+    },
+    {
+      "source": "hooks/lib/reviewer-spawn-denial-v1.js",
+      "target": "hooks/lib/reviewer-spawn-denial-v1.js",
+      "sha256": "980496d5b7fc7c7880a47f12c58ff8b9d89d4d91651ed0c143099643c16b2673"
+    },
+    {
+      "source": "hooks/lib/hook-registration-v1.js",
+      "target": "hooks/lib/hook-registration-v1.js",
+      "sha256": "45990e97e1351b9408bed4d5bf3fe472ec1d8c63bf89490f8c79571fdf68f80f"
+    },
+    {
+      "source": "hooks/lib/acceptance-verify-v1.js",
+      "target": "hooks/lib/acceptance-verify-v1.js",
+      "sha256": "17ce7ce9abd8d8ee23d725449399851e9f46d6da2356a6859b10b5835f4fc871"
+    },
+    {
+      "source": "hooks/lib/ci-contract-v1.js",
+      "target": "hooks/lib/ci-contract-v1.js",
+      "sha256": "ee8583dbb1e686373ac9d4c67c2cb45f15e755dcb615441ae18d89f6efe9b5a9"
+    },
+    {
+      "source": "hooks/lib/zensu-tdd-phase.sh",
+      "target": "hooks/lib/zensu-tdd-phase.sh",
+      "sha256": "b1130fff97d9832fc328af2570907ce08f0e8401c0a5d447b7aa304c43ee9f11"
+    },
+    {
+      "source": "hooks/lib/zensu-cli-map.sh",
+      "target": "hooks/lib/zensu-cli-map.sh",
+      "sha256": "d17edfff8fbeb10230ad99d0ef01e450ab9c5fa77735c94441c864ab3ad938d0"
+    },
+    {
+      "source": "hooks/lib/session-reanchor-v1.js",
+      "target": "hooks/lib/session-reanchor-v1.js",
+      "sha256": "7f8c0aaf88cc2cd888649762d275b8ac586f7ba5217eae224f016810c2ba2a8a"
+    },
+    {
+      "source": "hooks/lib/zensu-zen-shared.sh",
+      "target": "hooks/lib/zensu-zen-shared.sh",
+      "sha256": "6c03745c8694bd6f2ac98f3716c86c8d2cc0e17bf52118ac14eea9e41f5ceebc"
+    },
+    {
+      "source": "hooks/lib/claude-principal-v1.js",
+      "target": "hooks/lib/runtime-principal-v1.js",
+      "sha256": "1be066ec2acf04c65f9d10a368b05683d00d329af14a4b6cbb004544d78ed1b7"
+    },
+    {
+      "source": "hooks/lib/secret-patterns.js",
+      "target": "hooks/lib/secret-patterns.js",
+      "sha256": "f4bf1f455bce0e7107bd963ad0ac5953d47c8a86bf33769a47b43539d8d589cc"
+    },
+    {
+      "source": "hooks/lib/aspect-activation-v1.js",
+      "target": "hooks/lib/aspect-activation-v1.js",
+      "sha256": "684ae01a588380a1acc5571cf2a1614285bcd6a6d509efc1969cab8b9f6bbf3e"
+    },
+    {
+      "source": "hooks/lib/claude-hook-session-v1.js",
+      "target": "hooks/lib/runtime-hook-session-v1.js",
+      "sha256": "c9fef40ece6d5154e82eedd684d8592935588c3d0387205361d706b67fd50363"
+    },
+    {
+      "source": "hooks/lib/zensu-session.sh",
+      "target": "hooks/lib/zensu-session.sh",
+      "sha256": "c016dbdf432450d4de746a42b278b7d6c9ef3c81945e4290b9f2f5c58936227f"
+    },
+    {
+      "source": "hooks/lib/valid-diff-lines.js",
+      "target": "hooks/lib/valid-diff-lines.js",
+      "sha256": "4d1cb707e1275e145406446604bec5f77dffd585831b2fabf63475696a523428"
+    },
+    {
+      "source": "hooks/lib/zensu-doctor-invocation.js",
+      "target": "hooks/lib/zensu-doctor-invocation.js",
+      "sha256": "2e5ab8e67f3e0224786c94d811404f494a36c2e92fb39cfb6ea720c2f133efa0"
+    },
+    {
+      "source": "hooks/lib/zensu-bounded-run.sh",
+      "target": "hooks/lib/zensu-bounded-run.sh",
+      "sha256": "e2b027c94457ad3ef6f1661f12d06fe87ebc961f6437d59a4e8bd52418d5b4a0"
+    },
+    {
+      "source": "hooks/lib/zensu-vcs.sh",
+      "target": "hooks/lib/zensu-vcs.sh",
+      "sha256": "ce3045b2e63b49fe577746a021cefd587121e6d8ec3e499241fcfff819ab8d5c"
+    },
+    {
+      "source": "hooks/lib/zensu-safe-display-v1.js",
+      "target": "hooks/lib/zensu-safe-display-v1.js",
+      "sha256": "fde6a7be5c6e2af11ef658b5d6862a00d87d1996ddf0edd13fb131e4254a53d3"
+    },
+    {
+      "source": "hooks/lib/zensu-work-order.sh",
+      "target": "hooks/lib/zensu-work-order.sh",
+      "sha256": "59fb066384b6287df60ff8bf507aa7118ac6fb01beacbb992982365d6e4835a4"
+    },
+    {
+      "source": "hooks/lib/review-evidence-hook-v1.js",
+      "target": "hooks/lib/review-evidence-hook-v1.js",
+      "sha256": "6120f201d40d944ab49000a6960bcd1bda9728ac27d8187d2a2375584e2138d6"
+    },
+    {
+      "source": "hooks/lib/zensu-edit-landing.sh",
+      "target": "hooks/lib/zensu-edit-landing.sh",
+      "sha256": "eafac2adf975b9c71a0341bdd92d1d014c1937eeec541883d62251c8435aaf84"
+    },
+    {
+      "source": "hooks/lib/zensu-artifact-redact-v1.js",
+      "target": "hooks/lib/zensu-artifact-redact-v1.js",
+      "sha256": "4eb2b4877b1c2a78ada08a6551c5010abee86c47e4820b48d76d58c69288e69c"
+    },
+    {
+      "source": "hooks/lib/zensu-browser-consent-prefilter.sh",
+      "target": "hooks/lib/zensu-browser-consent-prefilter.sh",
+      "sha256": "ea7c271f52a336251bc0df3f7319f1dda39465c3008f4da16b057d8ae51ac941"
+    },
+    {
+      "source": "hooks/lib/reviewer-spawn-allow-v1.js",
+      "target": "hooks/lib/reviewer-spawn-allow-v1.js",
+      "sha256": "19c23581d06358b05d67f8a42a26923682745e9f5135e8a3fc773f85acc8c02d"
+    },
+    {
+      "source": "hooks/lib/review-round-scope-v1.js",
+      "target": "hooks/lib/review-round-scope-v1.js",
+      "sha256": "3a602e5fdbba1a9dfdaeec319216fd32a92272365ef32e1f8e41cc9573864ad0"
+    },
+    {
+      "source": "hooks/lib/work-order-v1.js",
+      "target": "hooks/lib/work-order-v1.js",
+      "sha256": "a8cde543dc645ba96088e0c9cd6d3aa29ca66d65fefe319348493f86421c115b"
+    },
+    {
+      "source": "hooks/lib/plugin-data-guard-v1.js",
+      "target": "hooks/lib/plugin-data-guard-v1.js",
+      "sha256": "4d2f51c2e1f2d89541ca376e184d2bc8c7cbc22df96cbb0af623bae236ac9a98"
+    },
+    {
+      "source": "hooks/lib/zensu-zen-mode.sh",
+      "target": "hooks/lib/zensu-zen-mode.sh",
+      "sha256": "68c06391f7105bf4275f1f4319b7cf459d7561776f56616a91b689dfc6f57213"
+    },
+    {
+      "source": "hooks/lib/zensu-prompt-ledger.sh",
+      "target": "hooks/lib/zensu-prompt-ledger.sh",
+      "sha256": "64bd480383f966bd58dff89c24cd2b0a4b60dd9f5ca4aad0a8cdb86ed8b85ce7"
+    },
+    {
+      "source": "hooks/lib/zensu-session-reanchor.sh",
+      "target": "hooks/lib/zensu-session-reanchor.sh",
+      "sha256": "157abef0bf89ae374c71fe96cb9f98c775974911480a04a5c68835198186abbc"
+    },
+    {
+      "source": "hooks/lib/zensu-autopilot-state.sh",
+      "target": "hooks/lib/zensu-autopilot-state.sh",
+      "sha256": "90b296961aa751bcc3a4fa276e0af94702f4435d9120df69b6d342b65028e8ab"
+    },
+    {
+      "source": "hooks/lib/bash-source-write-parse.js",
+      "target": "hooks/lib/bash-source-write-parse.js",
+      "sha256": "6f31bbb8e23b4b0d62d044d3235e9ab673cd9fcd15084eb5283bc55f7c52640e"
+    },
+    {
+      "source": "hooks/lib/zensu-marker-write.sh",
+      "target": "hooks/lib/zensu-marker-write.sh",
+      "sha256": "1ab98a8286b36a124c56395bbff3fd840da2234957856b00e82f5875916e939c"
+    },
+    {
+      "source": "hooks/lib/session-adopt-report-v1.js",
+      "target": "hooks/lib/session-adopt-report-v1.js",
+      "sha256": "f73686f3459696006004110be989c7248681b72d075818474ea6c12a310c451b"
+    },
+    {
+      "source": "hooks/lib/persona-activation.js",
+      "target": "hooks/lib/persona-activation.js",
+      "sha256": "fb4a20949f2f17705928bc506847ec6605cb718b8ec368d719a8af5d950ef6f1"
+    },
+    {
+      "source": "hooks/lib/evidence-run-v1.js",
+      "target": "hooks/lib/evidence-run-v1.js",
+      "sha256": "1c5feaa8917d107d7c248d15f7555326e72e2d202c0c51915ca665bb7f8da1e0"
+    },
+    {
+      "source": "hooks/lib/zensu-doctor.sh",
+      "target": "hooks/lib/zensu-doctor.sh",
+      "sha256": "312a49fc2a028994a54a0d8af0f9a337e4712db09ca8066077fc6fe31b45d775"
+    },
+    {
+      "source": "hooks/lib/zensu-stop-deadline.sh",
+      "target": "hooks/lib/zensu-stop-deadline.sh",
+      "sha256": "af5aa8ca9406df1edbdfd8cb3c7287e1358d4faf3d50424746d369b130174c1b"
+    },
+    {
+      "source": "hooks/lib/rule-block-v1.js",
+      "target": "hooks/lib/rule-block-v1.js",
+      "sha256": "77cb9a256eec4ff1f17643605c92180f378903c550ef2b74c36cfb4d9480403b"
+    },
+    {
+      "source": "hooks/lib/zensu-mcp-tools.sh",
+      "target": "hooks/lib/zensu-mcp-tools.sh",
+      "sha256": "b222f5e29adf2a18f9c1db529020f94bf0cbe24b0213dd83f7fe44a1439da84d"
+    },
+    {
+      "source": "hooks/lib/zensu-full-suite.sh",
+      "target": "hooks/lib/zensu-full-suite.sh",
+      "sha256": "8f2be322142adc3c2648133524305c7c3981c20ab07b7306f3433951beacc3dd"
+    },
+    {
+      "source": "hooks/lib/zensu-session-adopt.sh",
+      "target": "hooks/lib/zensu-session-adopt.sh",
+      "sha256": "6b397fd15a49160ae6b8f6470d8dd7ac7d4cd2889f8ee8b9f68309ea82090e24"
+    },
+    {
+      "source": "scripts/fixture-manifest.js",
+      "target": "scripts/fixture-manifest.js",
+      "sha256": "95c61e4e4d35cea9453d68b68b100594918f36c8440efb21664ea619a8ef9d24"
+    },
+    {
+      "source": "scripts/fixture-mutation-watch.js",
+      "target": "scripts/fixture-mutation-watch.js",
+      "sha256": "5ab24df284452122b6b19ef01a705e63b60dded3cb9d0a24540585fb379bc7f3"
+    },
+    {
+      "source": "scripts/owned-process.js",
+      "target": "scripts/owned-process.js",
+      "sha256": "cad1856a8b3311aeb01407b13dfb6584b01b4c05769d4bf7ba0f2807e72d8ceb"
+    },
+    {
+      "source": "scripts/process-supervisor.js",
+      "target": "scripts/process-supervisor.js",
+      "sha256": "fc8203da873a0a42e46b867f9f7a78b6fd3e4b28872db56049c604725363adfa"
+    },
+    {
+      "source": "scripts/verify-browser-config.js",
+      "target": "scripts/verify-browser-config.js",
+      "sha256": "b1aaf0819f93c4475956a637a3ed9f4188e411b7cb93594d9c70e2e7865babb3"
+    },
+    {
+      "source": "scripts/verify-free-port.js",
+      "target": "scripts/verify-free-port.js",
+      "sha256": "6620cafed824111ce5cc49f8530d7ac599354280bd65f7b72d887b92ca9d19f7"
+    },
+    {
+      "source": "config.example.json",
+      "target": "config.example.json",
+      "sha256": "bdb79f2d8b0a5242612aecc955e6ac7500f43b435995d81511a6339d86070bc9"
+    },
+    {
+      "source": "docs/review-severity.md",
+      "target": "docs/review-severity.md",
+      "sha256": "74112dd4b10e303136a1f5530d284a7a309c3056c344b586ad10e0564aa9163a"
+    }
+  ]
+}

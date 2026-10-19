@@ -1,0 +1,462 @@
+# Every registered command is covered, plus an unknown-command control.
+- description: 'live: /zensu-adopt-session resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-adopt-session
+    probe: command
+    command: zensu-adopt-session
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-adopt-session ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: adopt-session
+- description: 'live: /zensu-autopilot resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-autopilot
+    probe: command
+    command: zensu-autopilot
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-autopilot ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: autopilot
+- description: 'live: /zensu-autopilot-adopt resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-autopilot-adopt
+    probe: command
+    command: zensu-autopilot-adopt
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-autopilot-adopt ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: autopilot-adopt
+- description: 'live: /zensu-autopilot-release resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-autopilot-release
+    probe: command
+    command: zensu-autopilot-release
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-autopilot-release ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: autopilot-release
+- description: 'live: /zensu-bootstrap resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-bootstrap
+    probe: command
+    command: zensu-bootstrap
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-bootstrap ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: bootstrap
+- description: 'live: /zensu-converge resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-converge
+    probe: command
+    command: zensu-converge
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-converge ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: converge
+- description: 'live: /zensu-cover resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-cover
+    probe: command
+    command: zensu-cover
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-cover ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: cover
+- description: 'live: /zensu-delivery-route resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-delivery-route
+    probe: command
+    command: zensu-delivery-route
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-delivery-route ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: delivery-route
+- description: 'live: /zensu-docs resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-docs
+    probe: command
+    command: zensu-docs
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-docs ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: docs
+- description: 'live: /zensu-doctor resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-doctor
+    probe: command
+    command: zensu-doctor
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-doctor ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: doctor
+- description: 'live: /zensu-full-suite resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-full-suite
+    probe: command
+    command: zensu-full-suite
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-full-suite ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: full-suite
+- description: 'live: /zensu-gauntlet-loop resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-gauntlet-loop
+    probe: command
+    command: zensu-gauntlet-loop
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-gauntlet-loop ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: gauntlet-loop
+- description: 'live: /zensu-ghost-scan resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-ghost-scan
+    probe: command
+    command: zensu-ghost-scan
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-ghost-scan ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: ghost-scan
+- description: 'live: /zensu-help resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-help
+    probe: command
+    command: zensu-help
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-help ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: zensu-help
+- description: 'live: /zensu-implement resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-implement
+    probe: command
+    command: zensu-implement
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-implement ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: implement
+- description: 'live: /zensu-pilot resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-pilot
+    probe: command
+    command: zensu-pilot
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-pilot ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: pilot
+- description: 'live: /zensu-plan-review resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-plan-review
+    probe: command
+    command: zensu-plan-review
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-plan-review ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: plan-review
+- description: 'live: /zensu-pr-fix-findings resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-pr-fix-findings
+    probe: command
+    command: zensu-pr-fix-findings
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-pr-fix-findings ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: pr-fix-findings
+- description: 'live: /zensu-pr-team-review resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-pr-team-review
+    probe: command
+    command: zensu-pr-team-review
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-pr-team-review ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: pr-team-review
+- description: 'live: /zensu-pulse resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-pulse
+    probe: command
+    command: zensu-pulse
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-pulse ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: pulse
+- description: 'live: /zensu-recover-chain resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-recover-chain
+    probe: command
+    command: zensu-recover-chain
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-recover-chain ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: recover-chain
+- description: 'live: /zensu-reset-review-limit resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-reset-review-limit
+    probe: command
+    command: zensu-reset-review-limit
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-reset-review-limit ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: reset-review-limit
+- description: 'live: /zensu-security-review resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-security-review
+    probe: command
+    command: zensu-security-review
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-security-review ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: security-review
+- description: 'live: /zensu-self-review resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-self-review
+    probe: command
+    command: zensu-self-review
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-self-review ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: self-review
+- description: 'live: /zensu-session-trail resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-session-trail
+    probe: command
+    command: zensu-session-trail
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-session-trail ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: session-trail
+- description: 'live: /zensu-setup resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-setup
+    probe: command
+    command: zensu-setup
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-setup ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: setup
+- description: 'live: /zensu-tdd resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-tdd
+    probe: command
+    command: zensu-tdd
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-tdd ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: tdd
+- description: 'live: /zensu-tdd-mode resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-tdd-mode
+    probe: command
+    command: zensu-tdd-mode
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-tdd-mode ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: tdd-mode
+- description: 'live: /zensu-verify-feature resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-verify-feature
+    probe: command
+    command: zensu-verify-feature
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-verify-feature ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: verify-feature
+- description: 'live: /zensu-wargame resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-wargame
+    probe: command
+    command: zensu-wargame
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-wargame ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: wargame
+- description: 'live: /zensu-work resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-work
+    probe: command
+    command: zensu-work
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-work ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: work
+- description: 'live: /zensu-zen-mode resolves to its skill'
+  vars:
+    scenario_id: live-command-zensu-zen-mode
+    probe: command
+    command: zensu-zen-mode
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - RESOLVED zensu-zen-mode ->
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - UNRESOLVED
+    expected_skill: zen-mode
+- description: 'live: an unknown /zensu-* command does NOT resolve (detector control)'
+  vars:
+    scenario_id: live-command-negative-control
+    probe: command
+    command: zensu-definitely-not-a-command
+    timeout_s: 100
+    expect:
+      stdout_contains_any:
+      - UNRESOLVED zensu-definitely-not-a-command
+      - LIVE-SKIPPED
+      - LIVE-UNAVAILABLE
+      stdout_not_contains:
+      - RESOLVED zensu-definitely-not-a-command ->

@@ -33,39 +33,21 @@ Write the contract at the top of the wargame doc:
   - INV-1: <e.g. every data point has exactly one write-owner at all times>
   - INV-2: <...>
 - **Evidence bar**: <e.g. every claim exercised E2E against the live schema; no mocks; reproduction command recorded>.
-- **Convergence**: cohort of independent verifiers; done at parity (see loop).
+- **Convergence**: native perspective checks (separate child contexts); done at parity (see loop).
 - **Out of scope**: <what this contract does NOT cover>.
 ```
 
 The wargame moves below the contract are then the route that *discharges* it: recon that enumerates the set, moves that test each invariant, verification that meets the evidence bar.
 
-## Cohort-until-parity loop
+## Perspective-until-parity loop
 
-"Parity" = independent checks agree and stop surfacing new results. One reviewer proves nothing; a cohort that converges does. Use this in the refinement phase (SUCCESS point 7, strengthened).
+Use the native read-only advice procedure in `{plugin_root}/docs/native-reviewers.md` for distinct verifier children and actual completion receipts. Agreement is not correctness. Do not claim blinded verification if the packet reveals earlier conclusions or the hidden reference.
 
-There are two cohort backends. Pick by mission type:
+For code missions, apply the full review panel from `skills/tdd/references/review-chain.md`: conventions, bugs, architecture, tests and security. Supply each pass with the same complete `REVIEW PACKET v1`, naming unrun checks and their reasons. Merge the findings, perform a judge pass, and verify each surviving claim against the cited code. This standalone audit does not fabricate a TDD ticket or gated completion.
 
-### Code / feature / audit missions → reuse the Zensu review chain
+For non-code missions, use three distinct native advice children appropriate to the claim, such as rule validity, arithmetic and source support. Each tries to refute the claim using the original evidence. Collect every actual child result and disclose any inspection or blindness limits.
 
-When the findings are about real code — an ownership audit, a bug hunt, a correctness/security proof over a repo or a `ZEN-XXX` feature — do **not** invent ad-hoc verifiers. The plugin already ships a battle-tested cohort with a merge step:
-
-1. **Fan out `zensu-review-aspect` ×5** in one parallel batch — one per perspective (`conventions`, `bugs`, `architecture`, `tests`, `security`). Each spawn prompt MUST name the perspective and the files under scrutiny, e.g.:
-   `Perspective: security. Files changed: [internal/orders/write.go, db/schema.sql]`
-   Point them at the files your findings cite. Each is read-only and returns findings for its one lens.
-2. **Merge in the main thread**, then optionally run `zensu-code-reviewer` for a consolidated pass.
-3. **Measure parity** against the merged set: parity holds when the perspectives agree on every finding AND a round surfaces nothing new. A new or contradicted finding = not converged → fold it in, re-point the aspects at the changed scope, run another round.
-
-This keeps one verification machine across Zensu, lands findings in the review chain's format, and reuses the same lenses `/zensu-tdd` trusts. The five perspectives are code lenses — that is exactly why they fit code/audit missions and why the non-code path below exists.
-
-### Non-code missions → diverse ad-hoc verifiers
-
-When the mission has no code substrate (a tax plan, offer copy, a competitive analysis, a process design), the five code lenses do not map. Spawn a small cohort (default 3) of independent verifiers, each blind to the others, each given a distinct lens the property allows (e.g. for a tax plan: one checks legality, one checks arithmetic against the raw figures, one checks that each claim cites a real rule). Give each the contract's evidence bar and tell it to try to *break* the claim, defaulting to "refuted" when evidence is thin.
-
-### Both backends
-
-- Only claims that survive the cohort at parity go in the final report.
-- Track rounds; if it will not converge after a sensible cap, that non-convergence is itself the finding — report it, do not fake agreement.
-- Evidence-free verdicts are dropped regardless of backend.
+Track rounds and disagreement. Repeat when new or contradicted findings require investigation. Only evidence-supported claims enter the final report; report a bounded non-convergence instead of inventing agreement.
 
 ## How it changes the SUCCESS grade
 
@@ -73,4 +55,4 @@ A contracted wargame must additionally satisfy:
 
 - Coverage is measured against the enumerated set, and the doc says what fraction is covered and what is not (ties to point 4, RECON NEEDED).
 - Every surviving claim cleared the stated evidence bar (strengthens point 6).
-- The doc records the cohort rounds and the parity result — the attacks that failed and the patches from the ones that landed. For code missions, cite which `review-aspect` perspectives ran and what they returned (this IS point 7, made concrete).
+- The doc records the perspective rounds and the parity result — the attacks that failed and the patches from the ones that landed. For code missions, cite which `review-aspect` perspectives ran and what they returned (this IS point 7, made concrete).

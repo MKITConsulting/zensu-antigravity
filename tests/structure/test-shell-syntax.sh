@@ -17,12 +17,18 @@ while IFS= read -r f; do
   if bash -n "$f" 2>/dev/null; then ok "bash -n $rel"; else bad "bash -n $rel"; fi
 done < <(find "$ROOT/hooks" "$ROOT/tests" "$ROOT/evals" -name '*.sh' -type f 2>/dev/null; printf '%s\n' "$ROOT/install.sh")
 
-# node --check every .js / .mjs under hooks/
+# node --check every shipped .js / .mjs. Not just hooks/: the promptfoo providers,
+# assertions and verifier are shipped code too, and the live provider in particular
+# is executed by no gate suite — a syntax error there would ship with the gate green
+# and only surface during a hand-run live sweep.
 while IFS= read -r f; do
   [ -f "$f" ] || continue
   rel="${f#"$ROOT"/}"
   if node --check "$f" 2>/dev/null; then ok "node --check $rel"; else bad "node --check $rel"; fi
-done < <(find "$ROOT/hooks" -name '*.js' -type f 2>/dev/null; find "$ROOT/hooks" -name '*.mjs' -type f 2>/dev/null)
+done < <(
+  find "$ROOT/hooks" "$ROOT/evals" \( -name '*.js' -o -name '*.mjs' \) -type f \
+    -not -path '*/results/*' -not -path '*/node_modules/*' 2>/dev/null
+)
 
 # Entry executables must be +x.
 for f in "$ROOT/install.sh" "$ROOT/hooks/antigravity/antigravity-shim.sh" "$ROOT/tests/run-all.sh"; do

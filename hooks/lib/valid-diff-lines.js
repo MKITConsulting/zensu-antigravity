@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 // valid-diff-lines.js — unified-diff anchor validator for PR inline comments.
 //
-// A forge's reviews API rejects (HTTP 422) an inline comment whose
-// (path, line, side) anchor does not land on a commentable line of the PR/MR
-// diff, and on GitHub that failure takes the WHOLE review POST with it. This
-// lib parses a unified diff (`git diff` / `gh pr diff` / `glab mr diff`
-// output) into per-file sets of commentable line numbers and answers anchor
-// queries, so the publish flow can validate and remap BEFORE posting instead
-// of losing comments to the API.
+// GitHub's reviews API 422-rejects an inline comment whose (path, line, side)
+// anchor does not land on a commentable line of the PR diff. This lib parses a
+// unified diff (git diff / gh pr diff output) into per-file sets of commentable
+// line numbers and answers anchor queries so the publish flow can validate and
+// remap BEFORE posting instead of losing comments to the API.
 //
 //   RIGHT side = added (+) and context ( ) lines, numbered by the NEW file.
 //   LEFT side  = removed (-) and context ( ) lines, numbered by the OLD file.

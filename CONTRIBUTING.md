@@ -33,11 +33,11 @@ You are welcome to clone and run the plugin locally for evaluation or learning p
 ```bash
 git clone https://github.com/MKITConsulting/zensu-antigravity.git
 cd zensu-antigravity
-bash install.sh          # stage the plugin into the Antigravity IDE + CLI plugin paths
+bash install.sh          # curated stage + agy plugin install (the host owns the installed copy)
 export ZENSU_API_KEY=zsk_...
 ```
 
-Restart Antigravity so the freshly staged plugin (rules, agents, skills, hooks) loads.
+Restart Antigravity so the freshly registered plugin (commands, agents, skills, hooks) loads.
 
 ## Running the Tests
 
@@ -47,7 +47,20 @@ The deterministic test gate runs offline (no network, no API):
 bash tests/run-all.sh
 ```
 
-It runs the `tests/structure/test-*.sh` suite and the `evals/config-gate/run-eval.sh --self-check` offline matrix. Run it before opening any internal change.
+It runs the `tests/structure/test-*.sh` suite, the `evals/config-gate/run-eval.sh --self-check`
+offline matrix, and the offline promptfoo suite.
+
+**The gate cannot see the host.** It was fully green while three host-contract defects were
+live. After touching anything that faces agy — `hooks.json.template`, the shim,
+`emit-verdict.js`, `normalize-payload.js`, the command shims, `install.sh` — also run the
+live suite by hand:
+
+```bash
+ZENSU_LIVE_AGY=1 bash evals/promptfoo/live/run-live.sh
+```
+
+It drives a real logged-in `agy` (one model call per scenario). Without the env var it
+refuses to report a green run that verified nothing. Run it before opening any internal change.
 
 ## Code Standards (Internal Reference)
 
@@ -55,8 +68,8 @@ The following standards apply to maintainer commits:
 
 - **No comments in code** — code should be self-explanatory
 - **Conventional Commits** — use prefixes like `feat:`, `fix:`, `chore:`, `docs:`
-- **Skills** — follow the existing phase-based workflow pattern (see `skills/bootstrap/SKILL.md` for reference). Each skill ships YAML frontmatter (`name:` + `description:`) and is invoked through its `/zensu-<name>` workflow.
-- **Agents** — follow the structure of `agents/zensu-plm.md` (decision rules, tool references, important rules). The two reviewer agents (`zensu-code-reviewer`, `zensu-review-aspect`) declare a write-free `tools:` list.
+- **Skills** — follow the existing phase-based workflow pattern (see `skills/bootstrap/SKILL.md` for reference). Each skill ships YAML frontmatter (`name:` + `description:`) and is invoked through its `/zensu-<name>` command shim (`commands/`).
+- **Agents** — follow the structure of `agents/zensu-plm.md` (decision rules, tool references, important rules). The reviewer agents (`zensu-code-reviewer`, `zensu-review-aspect`) declare a write-free `tools:` list.
 - **Hooks** — the wrapped hook scripts under `hooks/` stay engine-neutral (they read the normalized payload and know nothing about the host); all host-specific translation lives only in `hooks/antigravity/antigravity-shim.sh`. Use `bash -c` with proper error handling and `2>/dev/null` for optional commands.
 
 ## Licensing

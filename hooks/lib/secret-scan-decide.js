@@ -1,29 +1,26 @@
 "use strict";
 
-// Decision logic for the secret scan, shared by pre-write-secret-scan.sh (the
-// file writers) and the raw-Bash step of pre-bash-source-write-gate.sh. Kept in
-// its own file (like bash-source-write-parse.js) so it uses normal quoting
-// instead of a bash single-quoted node -e, and so pathExempt is unit-testable.
-// Reads the normalized PreToolUse payload from STDIN (not env — a ~1MB write
-// via env risks E2BIG and would fail open exactly on the largest payloads).
-// Prints the matched rule names on stdout, or nothing. Fail-open paths note
-// themselves on stderr and exit 0.
+// Decision logic for pre-write-secret-scan.sh, kept in its own file (like
+// bash-source-write-parse.js) so it uses normal quoting instead of a bash
+// single-quoted node -e, and so pathExempt is unit-testable. Reads the
+// PreToolUse payload from STDIN (not env — a ~1MB Write via env risks E2BIG
+// and would fail open exactly on the largest payloads). Prints the matched
+// rule names on stdout, or nothing. Fail-open paths note themselves on stderr
+// and exit 0.
 //
-// Tool dispatch (Antigravity tool names; the shim hands over the flat payload):
-//   write_to_file              — scan tool_input.content
-//   replace_file_content       — scan tool_input.content
-//   multi_replace_file_content — scan tool_input.content
-//     (all three: path allowlist on tool_input.file_path)
-//   run_command                — scan the command text when the shared parser
-//                                reports a write channel (detectChannels); an
-//                                inline ZENSU_SECRET_SCAN=off prefix skips the
-//                                scan (parity with the sibling gates' inline
-//                                escape hatches; checked against heredoc-
-//                                STRIPPED text so a scanned payload cannot
-//                                smuggle the escape inside a heredoc body). The
-//                                path allowlist does NOT apply to run_command —
-//                                targets are not resolved here; use the marker,
-//                                a placeholder, or the escape hatch instead.
+// Tool dispatch:
+//   Write        — scan content            (path allowlist on file_path)
+//   Edit         — scan new_string         (path allowlist on file_path)
+//   MultiEdit    — scan edits[].new_string (path allowlist on file_path)
+//   NotebookEdit — scan new_source         (path allowlist on notebook_path)
+//   Bash         — scan the command text when the shared parser reports a
+//                  write channel (detectChannels); an inline
+//                  ZENSU_SECRET_SCAN=off prefix skips the scan (parity with
+//                  the sibling gates' inline escape hatches; checked against
+//                  heredoc-STRIPPED text so a scanned payload cannot smuggle
+//                  the escape inside a heredoc body). The path allowlist does
+//                  NOT apply to Bash — targets are not resolved here; use the
+//                  marker, a placeholder, or the escape hatch instead.
 //
 // pathExempt covers test(s)/, __tests__/, spec(s)/, testdata/, evals/,
 // fixtures/ segments (case-insensitive) and *.example.* files.
@@ -31,8 +28,6 @@
 const path = require("path");
 const { scan } = require(path.join(__dirname, "secret-patterns.js"));
 const { detectChannels, stripHeredocs } = require(path.join(__dirname, "bash-source-write-parse.js"));
-
-const WRITERS = new Set(["write_to_file", "replace_file_content", "multi_replace_file_content"]);
 
 function pathExempt(p) {
   if (typeof p !== "string" || !p) return false;
@@ -58,12 +53,20 @@ function main() {
     return "";
   }
   const tool = j.tool_name || "";
-  const ti = (j.tool_input && typeof j.tool_input === "object") ? j.tool_input : {};
+  const ti = j.tool_input || {};
   const candidates = [];
 
-  if (WRITERS.has(tool)) {
+  if (tool === "Write") {
     if (!pathExempt(ti.file_path)) candidates.push(ti.content);
-  } else if (tool === "run_command") {
+  } else if (tool === "Edit") {
+    if (!pathExempt(ti.file_path)) candidates.push(ti.new_string);
+  } else if (tool === "MultiEdit") {
+    if (!pathExempt(ti.file_path) && Array.isArray(ti.edits)) {
+      for (const e of ti.edits) candidates.push(e && e.new_string);
+    }
+  } else if (tool === "NotebookEdit") {
+    if (!pathExempt(ti.notebook_path)) candidates.push(ti.new_source);
+  } else if (tool === "Bash") {
     const cmd = typeof ti.command === "string" ? ti.command : "";
     if (!cmd) return "";
     let channels = "";

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # plugin.json manifest sanity. Parses; carries name/version/description; the
-# skills / rules / agents / workflows arrays reference paths that EXIST on disk;
+# skills / agents / commands arrays reference paths that EXIST on disk;
 # the `hooks` ref points at ./hooks.json (the install-generated file); declares
 # NO mcpServers key (CLI-driven, D6); keywords include "antigravity".
 set -u
@@ -22,37 +22,38 @@ get() { node -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"
 [ -n "$(get version)" ] && ok "has version ($(get version))" || bad "missing version"
 [ -n "$(get description)" ] && ok "has description" || bad "missing description"
 
-# skills/rules/agents/workflows arrays reference existing paths.
+# skills/agents/commands arrays reference existing paths.
 check_array() { # $1=key
   local key="$1" missing=""
   while IFS= read -r rel; do
     [ -z "$rel" ] && continue
-    # SKILL paths are dirs; rules/agents/workflows are files
+    # SKILL paths are dirs; agents/commands are files
     if [ -e "$ROOT/$rel" ] || [ -e "$ROOT/$rel/SKILL.md" ]; then :; else missing="$missing $rel"; fi
   done < <(node -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));for(const x of (p[process.argv[2]]||[]))console.log(String(x).replace(/^\.\//,""))' "$M" "$key")
   [ -z "$missing" ] && ok ".$key[] all reference existing paths" || bad ".$key[] missing on disk:$missing"
 }
 check_array skills
-check_array rules
 check_array agents
-check_array workflows
+check_array commands
 
 # array cardinalities
 SK="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).skills||[]).length)' "$M")"
-WF="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).workflows||[]).length)' "$M")"
+CMD="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).commands||[]).length)' "$M")"
 AG="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).agents||[]).length)' "$M")"
-RU="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).rules||[]).length)' "$M")"
 # Expected cardinalities come from the filesystem, not from frozen literals:
 # what matters is that the manifest declares exactly what ships, so a new skill
 # that nobody registered fails here instead of silently never loading.
 SK_DISK="$(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
-WF_DISK="$(find "$ROOT/workflows" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
+CMD_DISK="$(find "$ROOT/commands" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
 AG_DISK="$(find "$ROOT/agents" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
-RU_DISK="$(find "$ROOT/rules" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
 [ "$SK" = "$SK_DISK" ] && ok "$SK skills declared, matching skills/ on disk" || bad "skills count = $SK (skills/ has $SK_DISK)"
-[ "$WF" = "$WF_DISK" ] && ok "$WF workflows declared, matching workflows/ on disk" || bad "workflows count = $WF (workflows/ has $WF_DISK)"
+[ "$CMD" = "$CMD_DISK" ] && ok "$CMD commands declared, matching commands/ on disk" || bad "commands count = $CMD (commands/ has $CMD_DISK)"
 [ "$AG" = "$AG_DISK" ] && ok "$AG agents declared, matching agents/ on disk" || bad "agents count = $AG (agents/ has $AG_DISK)"
-[ "$RU" = "$RU_DISK" ] && ok "$RU rules declared, matching rules/ on disk" || bad "rules count = $RU (rules/ has $RU_DISK)"
+
+# The canonical 0.27.0 feature inventory must not shrink even if disk and manifest agree.
+[ "$SK" = 32 ] && ok "canonical 32-skill inventory retained" || bad "canonical 32-skill inventory shrank"
+[ "$CMD" = 32 ] && ok "all 32 native command shims registered" || bad "native command inventory incomplete"
+[ "$AG" = 7 ] && ok "six canonical profiles plus the native Gauntlet critic retained" || bad "role inventory incomplete"
 
 # hooks ref points at ./hooks.json (string)
 HK="$(get hooks)"

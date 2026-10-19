@@ -1,11 +1,9 @@
 "use strict";
 
 // Single source of truth for secret detection, consumed by
-// hooks/lib/secret-scan-decide.js (which serves both pre-write-secret-scan.sh
-// and the raw-Bash secret step of pre-bash-source-write-gate.sh). Curated
-// provider-token rules plus a Shannon-entropy assignment heuristic —
-// deliberately NOT a naive key/secret/password catch-all, which drowns the gate
-// in false positives.
+// hooks/pre-write-secret-scan.sh. Curated provider-token rules plus a
+// Shannon-entropy assignment heuristic — deliberately NOT a naive
+// key/secret/password catch-all, which drowns the gate in false positives.
 //
 // Dual mode:
 //   CLI    — stdin: candidate text; stdout: JSON {"matches":[{rule,line}]}

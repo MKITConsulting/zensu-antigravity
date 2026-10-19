@@ -36,6 +36,22 @@ Docs: <https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-
 }
 ```
 
+`commit_id` is a **review-level** field. It belongs at the top level of this
+payload and nowhere else: an entry of `comments[]` accepts exactly `path`,
+`body`, `side`, `line`, optionally `start_line` + `start_side`, and the legacy
+`position` — nothing more. A per-comment `commit_id` fails the WHOLE POST with a
+422 that names the GraphQL type behind the endpoint:
+
+```text
+{"message":"Unprocessable Entity","errors":["Variable $threads of type [DraftPullRequestReviewThread] was provided invalid value for 0.commitId (Field is not defined on DraftPullRequestReviewThread)"],"status":"422"}
+```
+
+The per-comment fallback near the end of this file DOES set `commit_id` on its
+comment object, and is correct there: it posts to
+`POST /repos/{owner}/{repo}/pulls/{n}/comments`, a different endpoint that
+creates one standalone review comment and therefore carries its own head SHA.
+Never copy that shape back into the reviews payload above.
+
 ## Pre-Publish Anchor Validation (MANDATORY)
 
 GitHub 422-rejects any inline comment whose `(path, line, side)` anchor is not a
@@ -46,25 +62,24 @@ Validate EVERY inline anchor BEFORE writing the payload, using
 `none`):
 
 ```bash
-# $WORKDIR/_pr.diff was captured in SKILL.md Phase A.1 from the detached worktree.
-# If it is missing, re-derive it once: gh pr diff <n> --repo <o>/<r> > "$WORKDIR/_pr.diff"
+gh pr diff <n> --repo <o>/<r> > "$WORKDIR/_pr.diff"
+[ -s "$WORKDIR/_pr.diff" ] || gh pr diff <n> --repo <o>/<r> > "$WORKDIR/_pr.diff"
 node "<absolute-plugin-root>/hooks/lib/valid-diff-lines.js" '<path>' '<line>' '<side>' < "$WORKDIR/_pr.diff"
 ```
 
-Replace `<absolute-plugin-root>` with the concrete absolute plugin root the parent
-`SKILL.md` resolved in Step 0 (from `~/.zensu/plugin-root`); this supporting file is
-loaded through a file read and does not receive placeholder substitution.
+Replace `<absolute-plugin-root>` with the concrete absolute `ROOT` established
+by the parent `SKILL.md`; this supporting file is loaded through `Read` and does
+not receive native placeholder substitution.
 
 **Quoting is load-bearing:** `<path>` comes from the PR diff — an
 attacker-influenced value that may contain `$( )`, backticks, `;`, or spaces,
 and double quotes do NOT neutralize `$( )`. Substitute the literals inside the
 single quotes exactly as shown; if a substituted value (the path here, path or
 body in the fallback fence) contains a `'`, escape it as `'\''` — or skip
-validation for that comment and fold it into the body (`none` handling). If the
-validator prints nothing or exits non-zero, treat the verdict as `none`. If
-`_pr.diff` is empty after one re-derive, do not derive any verdicts from it: stop,
-surface the error to the user, and publish body-only (fold ALL inline findings) —
-never loop on further fetches.
+validation for that comment and fold it to the body (`none` handling). If the validator prints nothing or exits non-zero, treat the verdict
+as `none`. If `_pr.diff` is empty after the re-fetch above, do not derive any
+verdicts from it: stop, surface the `gh pr diff` error to the user, and publish
+body-only (fold ALL inline findings) — never loop on further fetches.
 
 Apply the verdict per comment (each side validates against its own numbering —
 `RIGHT` against new-file lines, `LEFT` against old-file lines, matching the
@@ -73,13 +88,16 @@ Apply the verdict per comment (each side validates against its own numbering —
 - `valid` — keep the anchor unchanged.
 - `remap <n>` — set `line` to `<n>` and append one note line to the comment
   body: `_(anchor remapped from line <original> — original line is not part of
-  the diff)_`. The finding survives with its evidence intact. Remaps are capped
-  at 40 lines of distance — anything farther prints `none` instead, because a
-  comment 40+ lines away from its evidence is noise.
+  the diff)_`. The finding survives with its evidence intact. Drop any
+  `suggestion` block: it would replace line `<n>`, not the line the finding is
+  about. Remaps are capped at 40 lines of distance — anything farther prints
+  `none` instead, because a comment 40+ lines away from its evidence is noise.
 - `none` — the side has no commentable line within reach (deleted/binary/out of
-  PR, or beyond the remap cap): do NOT emit an inline comment; fold the finding
-  into the overall review body under a `**Findings without a diff anchor**`
-  list (path + intended line + text). Never silently drop a finding.
+  PR, or beyond the remap cap): do NOT emit an inline comment;
+  fold the finding into the overall body as a body-only finding
+  (`references/publish.md`). It keeps its ID and its line there, marked `· no inline comment`,
+  with its full explanation in a collapsed block below. Never silently drop a
+  finding.
 
 Multi-line comments: GitHub additionally requires `start_line` and `line` in
 the SAME hunk, so validate EVERY integer in `[start_line, line]` (same side);
@@ -93,14 +111,14 @@ Write the full payload to a file, post it via `--input`:
 
 ```bash
 gh api -X POST repos/<owner>/<repo>/pulls/<n>/reviews \
-  --input $WORKDIR/_synthesis.json
+  --input "$WORKDIR/_synthesis.json"
 ```
 
 Capture the response — `id` and `html_url` are the values you return to the user.
 
 ## `line` + `side` Rules
 
-| File `changeType` (from `gh pr view --json files`) | Default `side` for new content | Notes |
+| File `changeType` (from the worktree `git diff --name-status`, forge-agnostic) | Default `side` for new content | Notes |
 |---|---|---|
 | `ADDED` | `RIGHT` | Every line is in the diff; any line number valid |
 | `MODIFIED` | `RIGHT` for new lines, `LEFT` for removed lines | Line must be in the diff hunk — out-of-hunk → 422 |
@@ -110,6 +128,28 @@ Capture the response — `id` and `html_url` are the values you return to the us
 **Multi-line comments**: provide `start_line` + `line` (both on same `side`). GitHub renders as a range.
 
 **`position` (legacy)**: don't use unless `line`/`side` doesn't fit. `position` is the line offset within the unified diff — fragile.
+
+## Suggested changes
+
+An inline comment may carry one fenced block whose info string is exactly `suggestion`.
+GitHub renders it as a diff with a **Commit suggestion** button. Applying it commits the
+block's content to the PR branch in place of the commented line — or of every line from
+`start_line` to `line`. A wrong suggestion therefore costs the author a commit. Emit one
+only when every condition holds:
+
+- The fix replaces exactly the commented lines. If it also needs a line outside the
+  commented range, describe the fix in prose instead.
+- The anchor validated as `valid` on side `RIGHT`. A remapped anchor, a `LEFT` anchor, and a
+  body-only finding never carry a suggestion.
+- The lead has read the commented lines itself — in the Stage-2 read of the Finding
+  Verification Gate, or in a direct `Read` of `$WORKTREE` when the gate is off — and the
+  block repeats every unchanged character of those lines exactly, indentation included.
+- The block is complete code: no placeholder, no ellipsis, no elided middle, and no run of
+  three backticks, which would end the fence early.
+- The block differs from the current lines.
+
+Put the block after the prose explanation, never instead of it: the author has to learn why
+before seeing what. GitLab spells the fence differently (`rules/gitlab-publish.md`).
 
 ## Single-Submit vs Multi-Submit
 
@@ -121,20 +161,40 @@ Capture the response — `id` and `html_url` are the values you return to the us
 
 **Don't** loop over `gh api .../pulls/comments` for each inline — that creates N orphaned comments with no review wrapper.
 
-## Idempotency
+## Idempotency and delegated reconciliation
 
-Re-running the skill on the same PR posts an **additional** review. There's no native idempotency key. If you want to suppress duplicates, hash the synthesis body and check existing reviews before posting:
+Standalone mode keeps the existing behavior: `--post-review` submits a new review, and an
+explicit standalone re-run may therefore create an additional review.
 
-```bash
-HASH=$(jq -r '.body' $WORKDIR/_synthesis.json | sha256sum | head -c 8)
-if gh api repos/<o>/<r>/pulls/<n>/reviews | jq -e ".[] | select(.body | contains(\"$HASH\"))" > /dev/null; then
-  echo "Already posted — skipping"
-  exit 0
-fi
-# else inject HASH into body footer and post
+Autopilot delegation never calls that path directly. It calls the VCS driver's
+`--reconcile-review` operation with the durable operation key and expected head. The driver
+adds this marker to the single GitHub review body (`partCount` is always `1`):
+
+```text
+<!-- zensu-review:v1:<sha256(operationKey)>:<payloadDigest>:<headSha>:1:part=1/1 -->
 ```
 
-Default behaviour: post without dedup, accept that re-runs create additional reviews.
+The reconcile read exhausts every page of existing reviews before deciding. Exact marker
+presence returns `present` without a POST; marker absence posts once and returns `posted`;
+`reconciled` is reserved for a provider path that completed missing parts. Duplicate exact
+markers, the same operation digest with a different payload/head/part count, malformed v1
+markers, an OPEN/head mismatch, or incomplete pagination fail closed without posting.
+
+The structured result has exactly
+`{status,marker,headSha,partCount,postedCount,url,provider}` with `provider=github`. The caller validates the operation
+digest, payload-digest shape, bound head, `partCount=1`, first-part marker, status/count
+relationship, and non-empty URL before recording durable publication evidence.
+
+### Delegated failure policy
+
+Delegated mode fails closed on every non-zero or malformed `--reconcile-review` result.
+After a fresh OPEN/bound-head guard, the only safe retry is to retry the complete `--reconcile-review` call with the same operation key, bound head, and byte-identical payload.
+The delegated path must never update the bound head or payload to make a retry pass, and it must never escape to
+`--post-review`, `gh pr review`, a direct review/comment POST, binary-search submission, or
+the standalone fallback below. An ambiguous transport failure is reconciled by the complete
+operation read-before-write path; it is never answered with a raw POST retry.
+The durable owner must serialize calls for one operation; simultaneous independent writers
+outside that contract are not a distributed exactly-once mode.
 
 ## Auth Pre-Check
 
@@ -150,7 +210,10 @@ Required scopes:
 
 If scopes missing: `gh auth refresh -s repo`.
 
-## Failure Modes
+## Standalone failure modes
+
+The remediation table and payload-adjustment retries in this section apply only to the
+standalone `--post-review` path. Delegated mode follows the fail-closed policy above.
 
 | HTTP status | Cause | Fix |
 |---|---|---|
@@ -159,25 +222,34 @@ If scopes missing: `gh auth refresh -s repo`.
 | 404 | PR doesn't exist OR no read access | Verify PR URL + repo membership |
 | 422 (line out of diff) | Inline `line` not in any diff hunk | Should not occur — anchors are pre-validated (see Pre-Publish Anchor Validation). If it still fires: refetch the diff, re-validate every anchor, retry |
 | 422 (commit_id mismatch) | Head SHA changed since fetch | Re-run `git rev-parse pr-<n>-review`, update payload, retry |
+| 422 (`commitId` not defined on `DraftPullRequestReviewThread`) | `commit_id` set on an entry of `comments[]` | Move it to the review level (see Payload Shape) — retrying the same payload can never pass |
 | 500 / 502 | GitHub transient | Wait 30s, retry once |
 
-Last-resort only (a 422 that survives re-validation): identify the offending comment(s) by binary search — `jq 'del(.comments[<i>])' payload.json > shrunk.json` and retry until POST succeeds — and fold whatever was removed into the overall body so no finding is lost.
+Standalone last-resort only (a 422 that survives re-validation): identify the offending comment(s) by binary search — `jq 'del(.comments[<i>])' payload.json > shrunk.json` and retry until POST succeeds — and fold whatever was removed into the overall body as body-only findings (`SKILL.md` Phase D) so no finding is lost.
 
-## Fallback: Per-Comment Posting
+## Standalone-only fallback: Per-comment posting
 
-If the single-submit fails for non-retryable reasons (e.g. malformed payload), fall back to:
+If a standalone single-submit fails for non-retryable reasons (e.g. malformed payload), fall back to:
 
 ```bash
 # Overall body only
-gh pr review <n> --repo <o>/<r> --comment --body-file "$WORKDIR/body.md"
+gh pr review <n> --repo <o>/<r> --comment --body-file "$WORKDIR/_body.md"
 
-# Each inline separately. Build the JSON with jq so an untrusted path/body is never
-# interpolated into the command line (the same quoting hazard as the validator call).
-jq -n --arg path '<path>' --arg body "$(cat "$WORKDIR/inline-<i>.md")" \
-      --arg side RIGHT --arg commit '<sha>' --argjson line <line> \
-      '{path:$path, line:$line, side:$side, body:$body, commit_id:$commit}' \
-  | gh api repos/<o>/<r>/pulls/<n>/comments -X POST --input -
+# Each inline separately — the "Quoting is load-bearing" rule applies HERE too:
+# path and body are attacker-influenced, so never interpolate them into raw
+# `-f key=value` strings. Build the JSON with single-quoted jq --arg values
+# (escape embedded ' as '\'' per the rule above) and post via --input, using
+# each comment's VALIDATED side (not a hardcoded RIGHT):
+jq -n --arg path '<path>' --arg body '<markdown>' \
+      --arg side '<side>' --arg sha '<sha>' --argjson line '<line>' \
+      '{path: $path, line: $line, side: $side, body: $body, commit_id: $sha}' \
+  > "$WORKDIR/_comment.json"
+gh api -X POST repos/<o>/<r>/pulls/<n>/comments --input "$WORKDIR/_comment.json"
 ```
+
+`commit_id` is REQUIRED on this endpoint's comment object and FORBIDDEN inside the
+reviews payload's `comments[]` — the two endpoints take different shapes, so this
+fence is not a template for the review payload (see Payload Shape).
 
 This loses atomicity but unblocks the user. Mention the fallback in the final message.
 

@@ -45,7 +45,7 @@ must clear the evidence bar. (SUCCESS 6)
 The adversarial pass. The attack that FAILED against the plan (proof of
 strength) and the attack that LANDED plus the patch it forced. For /goal
 missions this is the cohort-until-parity result: rounds run, verdicts, parity
-reached or not. For code/feature/audit missions, name which zensu-review-aspect
+reached or not. For code/feature/audit missions, name which zensu:review-aspect
 perspectives ran and what each returned. (SUCCESS 7)
 ```
 

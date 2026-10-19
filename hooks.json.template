@@ -1,22 +1,14 @@
 {
-  "zensu-pre-edit": {
+  "zensu-pre-tool": {
     "PreToolUse": [
       {
-        "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
+        "matcher": ".*",
         "hooks": [
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-edit-tdd-reminder.sh", "timeout": 30 },
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-write-secret-scan.sh", "timeout": 30 }
-        ]
-      }
-    ]
-  },
-  "zensu-pre-bash": {
-    "PreToolUse": [
-      {
-        "matcher": "run_command",
-        "hooks": [
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-bash-zensu-gate.sh", "timeout": 30 },
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-bash-source-write-gate.sh", "timeout": 30 }
+          {
+            "type": "command",
+            "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-tool-chain.sh PreToolUse",
+            "timeout": 120
+          }
         ]
       }
     ]
@@ -24,19 +16,22 @@
   "zensu-pre-invocation": {
     "PreInvocation": [
       {
-        "hooks": [
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh user-prompt-intent-router.sh", "timeout": 10 },
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh user-prompt-tdd-reminder.sh", "timeout": 10 }
-        ]
+        "type": "command",
+        "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh pre-invocation-chain.sh PreInvocation",
+        "timeout": 90
       }
     ]
   },
-  "zensu-post-bash": {
+  "zensu-post-tool": {
     "PostToolUse": [
       {
-        "matcher": "run_command",
+        "matcher": ".*",
         "hooks": [
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh post-bash-witness.sh", "timeout": 10 }
+          {
+            "type": "command",
+            "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh post-tool-chain.sh PostToolUse",
+            "timeout": 120
+          }
         ]
       }
     ]
@@ -44,9 +39,9 @@
   "zensu-stop": {
     "Stop": [
       {
-        "hooks": [
-          { "type": "command", "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh stop-chain-enforcer.sh", "timeout": 15 }
-        ]
+        "type": "command",
+        "command": "bash __ZENSU_HOME__/hooks/antigravity/antigravity-shim.sh stop-chain.sh Stop",
+        "timeout": 180
       }
     ]
   }

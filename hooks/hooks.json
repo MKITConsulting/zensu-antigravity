@@ -1,0 +1,216 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-reviewer-capability-gate.sh\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-agent-reviewer-allow.sh\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-write-plugin-data-guard.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-edit-tdd-reminder.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-write-secret-scan.sh\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-write-plugin-data-guard.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-write-secret-scan.sh\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-bash-zensu-gate.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-bash-source-write-gate.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-write-secret-scan.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-browser-navigation-consent.sh\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/pre-work-order-gate.sh\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/post-artifact-redact.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/post-browser-navigation-consent.sh\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/post-artifact-redact.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/post-work-order.sh\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/user-prompt-context-nudge.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/user-prompt-intent-router.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/user-prompt-tdd-reminder.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/user-prompt-zen-mode.sh\"",
+            "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/user-prompt-best-solution-first.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/stop-chain-enforcer.sh\"",
+            "timeout": 90
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/stop-work-order.sh\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/session-start-evidence-discipline.sh\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/session-start-prompt-ledger.sh\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/user-prompt-best-solution-first.sh\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/session-start-pulse.sh\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/session-start-banner.sh\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/session-start-primer.sh\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"${ZENSU_PLUGIN_ROOT}/hooks/session-start-autopilot-resume.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

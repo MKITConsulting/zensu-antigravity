@@ -1,0 +1,197 @@
+- description: 'host contract: PreInvocation and Stop are declared FLAT, the shape the host can parse'
+  vars:
+    scenario_id: host-contract-flat-events-in-template
+    kind: shell
+    script: "node -e '\n  const fs = require(\"fs\");\n  const tpl = JSON.parse(fs.readFileSync(process.env.ZENSU_PLUGIN_ROOT\
+      \ + \"/hooks.json.template\", \"utf8\"));\n  const want = new Map();\n  for (const line of fs.readFileSync(process.env.ZENSU_PLUGIN_ROOT\
+      \ + \"/tests/fixtures/host-hook-events.txt\", \"utf8\").split(\"\\n\")) {\n    const m = line.trim().match(/^([A-Za-z]+)\\\
+      s+(grouped|flat)$/);\n    if (m) want.set(m[1], m[2]);\n  }\n  if (!want.size) { console.log(\"FIXTURE-EMPTY\"\
+      ); process.exit(0); }\n  const wrong = [];\n  for (const [group, events] of Object.entries(tpl)) {\n    for\
+      \ (const [event, arr] of Object.entries(events || {})) {\n      if (!Array.isArray(arr)) continue;\n     \
+      \ for (const e of arr) {\n        const seen = Array.isArray(e && e.hooks) ? \"grouped\" : (typeof (e || {}).command\
+      \ === \"string\" ? \"flat\" : \"malformed\");\n        const expected = want.get(event);\n        if (!expected)\
+      \ wrong.push(group + \"/\" + event + \":unknown-event\");\n        else if (seen !== expected) wrong.push(group\
+      \ + \"/\" + event + \":\" + seen + \"!=\" + expected);\n      }\n    }\n  }\n  const entries = Object.values(tpl).reduce((n,\
+      \ evs) => n + Object.values(evs || {}).reduce((m, a) => m + (Array.isArray(a) ? a.length : 0), 0), 0);\n \
+      \ console.log(wrong.length ? \"STRUCTURE-WRONG \" + wrong.join(\" \") : \"STRUCTURE-OK entries=\" + entries);\n\
+      '\n"
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - STRUCTURE-OK entries=4
+      stdout_not_contains:
+      - STRUCTURE-WRONG
+      - FIXTURE-EMPTY
+- description: 'host contract: every rendered command names the event it is registered under'
+  vars:
+    scenario_id: host-contract-event-arg-matches-registration
+    kind: shell
+    script: "node -e '\n  const fs = require(\"fs\");\n  const tpl = JSON.parse(fs.readFileSync(process.env.ZENSU_PLUGIN_ROOT\
+      \ + \"/hooks.json.template\", \"utf8\"));\n  const re = /antigravity-shim\\.sh\\s+(\\S+)\\s+(\\S+)\\s*$/;\n\
+      \  const wrong = [];\n  let n = 0;\n  const check = (event, h) => {\n    n += 1;\n    const m = String((h\
+      \ || {}).command || \"\").match(re);\n    if (!m) { wrong.push(event + \":no-event-token\"); return; }\n \
+      \   if (m[2] !== event) wrong.push(m[1] + \":\" + m[2] + \"!=\" + event);\n  };\n  for (const events of Object.values(tpl))\n\
+      \    for (const [event, arr] of Object.entries(events || {})) {\n      if (!Array.isArray(arr)) continue;\n\
+      \      for (const e of arr) {\n        if (Array.isArray(e && e.hooks)) e.hooks.forEach(h => check(event,\
+      \ h));\n        else check(event, e);\n      }\n    }\n  console.log(wrong.length ? \"EVENT-ARG-WRONG \" +\
+      \ wrong.join(\" \") : \"EVENT-ARG-OK n=\" + n);\n'\n"
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - EVENT-ARG-OK n=4
+      stdout_not_contains:
+      - EVENT-ARG-WRONG
+- description: 'host contract: Stop says continue — the only value that blocks stopping'
+  vars:
+    scenario_id: host-contract-stop-says-continue
+    kind: shell
+    script: 'ZV_EVENT=Stop ZV_ROLE=block ZV_TEXT="chain incomplete" node "$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js"
+
+      '
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - '"decision":"continue"'
+      stdout_not_contains:
+      - '"decision":"block"'
+      - allow_tool
+- description: 'host contract: a PreInvocation advisory uses injectSteps, not an allow verdict'
+  vars:
+    scenario_id: host-contract-preinvocation-injectsteps
+    kind: shell
+    script: 'ZV_EVENT=PreInvocation ZV_ROLE=context ZV_TEXT="run the zensu workflow" node "$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js"
+
+      '
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - '"injectSteps"'
+      - '"ephemeralMessage"'
+      - run the zensu workflow
+      stdout_not_contains:
+      - '"additionalContext"'
+      - '"decision"'
+      - allow_tool
+- description: 'host contract: a PreToolUse advisory never auto-approves the tool call'
+  vars:
+    scenario_id: host-contract-pretooluse-advisory-never-allows
+    kind: shell
+    script: 'ZV_EVENT=PreToolUse ZV_ROLE=context ZV_TEXT="just a nudge" node "$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js"
+
+      '
+    expect:
+      exit_code: 0
+      stdout_json:
+        decision: ask
+      stdout_not_contains:
+      - just a nudge
+      - '"allow"'
+- description: 'host contract: a PreToolUse deny still travels, with its reason'
+  vars:
+    scenario_id: host-contract-pretooluse-deny-travels
+    kind: shell
+    script: 'ZV_EVENT=PreToolUse ZV_ROLE=deny ZV_TEXT="gate says no" node "$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js"
+
+      '
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - '"decision":"deny"'
+      - gate says no
+      stdout_not_contains:
+      - allow_tool
+      - deny_reason
+- description: 'host contract: PostToolUse returns the empty object the host expects'
+  vars:
+    scenario_id: host-contract-posttooluse-empty
+    kind: shell
+    script: 'ZV_EVENT=PostToolUse ZV_ROLE=context ZV_TEXT="anything at all" node "$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js"
+
+      '
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - '{}'
+      stdout_not_contains:
+      - anything at all
+      - '"decision"'
+- description: 'host contract: an unknown event emits nothing rather than guessing a dialect'
+  vars:
+    scenario_id: host-contract-unknown-event-safe
+    kind: shell
+    script: 'ZV_EVENT=Nonsense ZV_ROLE=deny ZV_TEXT="x" node "$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js"
+
+      '
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - '{}'
+      stdout_not_contains:
+      - '"decision"'
+- description: 'host contract: agy''s conversationId becomes the session id every hook agrees on'
+  vars:
+    scenario_id: host-contract-conversationid-is-session-id
+    kind: shell
+    script: "for shape in \\\n  '{\"conversationId\":\"conv-42\",\"invocationNum\":0}' \\\n  '{\"conversationId\"\
+      :\"conv-42\",\"toolCall\":{\"name\":\"run_command\",\"args\":{\"CommandLine\":\"ls\"}}}' \\\n  '{\"conversationId\"\
+      :\"conv-42\",\"executionNum\":1,\"terminationReason\":\"model_stop\"}'\ndo\n  printf '%s' \"$shape\" | node\
+      \ \"$ZENSU_PLUGIN_ROOT/hooks/antigravity/normalize-payload.js\" | sed -n '2p' \\\n    | node -e 'let s=\"\"\
+      ;process.stdin.on(\"data\",c=>s+=c).on(\"end\",()=>{try{const v=JSON.parse(s).session_id;process.stdout.write((v?\"\
+      RESOLVED \"+v:\"MISSING\")+\"\\n\")}catch(_){process.stdout.write(\"PARSE-FAIL\\n\")}})'\ndone\n"
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - 'RESOLVED conv-42
+
+        RESOLVED conv-42
+
+        RESOLVED conv-42'
+      stdout_not_contains:
+      - PARSE-FAIL
+      - MISSING
+- description: 'host contract: native conversation identity outranks compatibility aliases'
+  vars:
+    scenario_id: host-contract-conversation-id-outranks-alias
+    kind: shell
+    script: "printf '%s' '{\"session_id\":\"explicit\",\"conversationId\":\"conv-42\"}' \\\n  | node \"$ZENSU_PLUGIN_ROOT/hooks/antigravity/normalize-payload.js\"\
+      \ | sed -n '2p'\n"
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - '"session_id":"conv-42"'
+      stdout_not_contains:
+      - explicit
+- description: 'host contract: the retired allow_tool/deny_reason dialect is gone from every event'
+  vars:
+    scenario_id: host-contract-retired-dialect-gone
+    kind: shell
+    script: "for ev in PreToolUse PostToolUse PreInvocation PostInvocation Stop; do\n  for role in deny block context;\
+      \ do\n    ZV_EVENT=\"$ev\" ZV_ROLE=\"$role\" ZV_TEXT=\"t\" node \"$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js\"\
+      \n    printf '\\n'\n  done\ndone\n"
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - '"decision":"deny"'
+      - '"decision":"continue"'
+      - injectSteps
+      stdout_not_contains:
+      - allow_tool
+      - deny_reason
+      - additionalContext
+- description: 'host contract: the retired env knobs no longer change any verdict'
+  vars:
+    scenario_id: host-contract-retired-env-knobs-inert
+    kind: shell
+    script: "BASE=\"$(ZV_EVENT=Stop ZV_ROLE=block ZV_TEXT=t node \"$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js\"\
+      )\"\nDRIFT=\"\"\nfor v in superset allow_tool decision exit; do\n  O=\"$(ZENSU_AG_HOOK_CONTRACT=\"$v\" ZV_EVENT=Stop\
+      \ ZV_ROLE=block ZV_TEXT=t node \"$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js\")\"\n  [ \"$O\" = \"\
+      $BASE\" ] || DRIFT=\"$DRIFT CONTRACT=$v\"\ndone\nfor v in 0 1; do\n  O=\"$(ZENSU_AG_STOP_BLOCKS=\"$v\" ZV_EVENT=Stop\
+      \ ZV_ROLE=block ZV_TEXT=t node \"$ZENSU_PLUGIN_ROOT/hooks/antigravity/emit-verdict.js\")\"\n  [ \"$O\" = \"\
+      $BASE\" ] || DRIFT=\"$DRIFT STOP_BLOCKS=$v\"\ndone\n[ -n \"$DRIFT\" ] && echo \"KNOB-STILL-LIVE$DRIFT\" ||\
+      \ echo \"KNOBS-INERT\"\n"
+    expect:
+      exit_code: 0
+      stdout_contains:
+      - KNOBS-INERT
+      stdout_not_contains:
+      - KNOB-STILL-LIVE

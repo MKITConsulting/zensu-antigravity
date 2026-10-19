@@ -1,243 +1,438 @@
-# The strict TDD phase gate, proven phase by phase through the Antigravity
-# writer tools. Strict mode is opt-in (hooks.tddImplementation), so every strict
-# scenario ships that config; the vanilla scenarios prove the gate stays out of
-# the way when it is off.
-
-- description: "phase gate RED_WRITE: authoring the failing test is allowed"
+- description: 'phase gate RED_WRITE: authoring the failing test is allowed'
   vars:
     scenario_id: phase-red-write-allows-test
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: &strict_env { ZENSU_AG_HOOK_CONTRACT: superset, TDD_STATE_DIR: "__DATA__/tdd" }
-    config: &strict_config { hooks: { tddImplementation: true } }
-    setup: &arm_red_write |
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
       LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_WRITE --step s1 --session pf-phase >/dev/null 2>&1 || true
-    payload: &write_test
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_WRITE "fixture phase" >/dev/null || exit $?
+    payload:
       toolCall:
         name: write_to_file
-        args: { TargetFile: "__PROJECT__/src/app.test.ts", CodeContent: "test('x', () => {})" }
-      workspacePaths: ["__PROJECT__"]
+        args:
+          TargetFile: __PROJECT__/src/app.test.ts
+          CodeContent: test('x', () => {})
+      workspacePaths:
+        - __PROJECT__
       session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_not_contains: ["deny_reason"]
-
-- description: "phase gate RED_RUN: nothing may be edited while the test is being run"
+      stdout_not_contains:
+        - deny_reason
+        - '"allow"'
+        - '"deny"'
+      stdout_json:
+        decision: ask
+- description: 'phase gate RED_RUN: nothing may be edited while the test is being run'
   vars:
     scenario_id: phase-red-run-freezes-edits
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
+    config:
+      hooks:
+        tddImplementation: true
     setup: |
       LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_RUN --step s1 --session pf-phase >/dev/null 2>&1 || true
-    payload: *write_test
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_RUN "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.test.ts
+          CodeContent: test('x', () => {})
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_json: { allow_tool: false }
-      contains: ["RED_RUN"]
-
-- description: "phase gate RED_FAIL: production code stays frozen until IMPL is entered"
+      stdout_json:
+        decision: deny
+      contains:
+        - RED_RUN
+- description: 'phase gate RED_FAIL: production code stays frozen until IMPL is entered'
   vars:
     scenario_id: phase-red-fail-denies-production
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
-    setup: &arm_red_fail |
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
       LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_WRITE --step s1 --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_RUN --step s1 --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_FAIL --step s1 --session pf-phase --reason "expected failure" >/dev/null 2>&1 || true
-    payload: &write_production
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_WRITE "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_RUN "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_FAIL "fixture phase" >/dev/null || exit $?
+    payload:
       toolCall:
         name: write_to_file
-        args: { TargetFile: "__PROJECT__/src/app.ts", CodeContent: "export const a = 1" }
-      workspacePaths: ["__PROJECT__"]
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 1
+      workspacePaths:
+        - __PROJECT__
       session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_json: { allow_tool: false }
-
-- description: "phase gate RED_FAIL: the test itself may still be corrected"
+      stdout_json:
+        decision: deny
+- description: 'phase gate RED_FAIL: the test itself may still be corrected'
   vars:
     scenario_id: phase-red-fail-allows-test
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
-    setup: *arm_red_fail
-    payload: *write_test
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_WRITE "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_RUN "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_FAIL "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.test.ts
+          CodeContent: test('x', () => {})
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_not_contains: ["deny_reason"]
-
-- description: "phase gate IMPL: claiming IMPL without a recorded RED failure is refused"
+      stdout_not_contains:
+        - deny_reason
+        - '"allow"'
+        - '"deny"'
+      stdout_json:
+        decision: ask
+- description: 'phase gate IMPL: claiming IMPL without a recorded RED failure is refused'
   vars:
     scenario_id: phase-impl-without-red-fail-denied
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
+    config:
+      hooks:
+        tddImplementation: true
     setup: |
       LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase IMPL --step s1 --session pf-phase >/dev/null 2>&1 || true
-    payload: *write_production
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 IMPL "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 1
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_json: { allow_tool: false }
-      contains: ["RED_FAIL"]
-
-- description: "phase gate IMPL: production code opens once RED actually failed first"
+      stdout_json:
+        decision: deny
+      contains:
+        - RED_FAIL
+- description: 'phase gate IMPL: production code opens once RED actually failed first'
   vars:
     scenario_id: phase-impl-after-red-fail-allows-production
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
-    setup: &arm_impl |
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
       LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_WRITE --step s1 --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_RUN --step s1 --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_FAIL --step s1 --session pf-phase --reason "expected failure" >/dev/null 2>&1 || true
-      bash "$LOG" --phase IMPL --step s1 --session pf-phase >/dev/null 2>&1 || true
-    payload: *write_production
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_WRITE "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_RUN "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_FAIL "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 IMPL "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 1
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_not_contains: ["deny_reason"]
-
-- description: "phase gate GREEN_PASS: production is frozen again once the suite is green"
+      stdout_not_contains:
+        - deny_reason
+        - '"allow"'
+        - '"deny"'
+      stdout_json:
+        decision: ask
+- description: 'phase gate GREEN_PASS: production is frozen again once the suite is green'
   vars:
     scenario_id: phase-green-pass-denies-production
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
-    setup: &arm_green |
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
       LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase GREEN_PASS --step s1 --session pf-phase >/dev/null 2>&1 || true
-    payload: *write_production
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 GREEN_PASS "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 1
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_json: { allow_tool: false }
-
-- description: "phase gate GREEN_PASS: extending the tests stays allowed"
+      stdout_json:
+        decision: deny
+- description: 'phase gate GREEN_PASS: extending the tests stays allowed'
   vars:
     scenario_id: phase-green-pass-allows-test
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
-    setup: *arm_green
-    payload: *write_test
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 GREEN_PASS "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.test.ts
+          CodeContent: test('x', () => {})
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_not_contains: ["deny_reason"]
-
-- description: "phase gate REFACTOR: both sides are editable during refactor"
+      stdout_not_contains:
+        - deny_reason
+        - '"allow"'
+        - '"deny"'
+      stdout_json:
+        decision: ask
+- description: 'phase gate REFACTOR: both sides are editable during refactor'
   vars:
     scenario_id: phase-refactor-allows-production
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
+    config:
+      hooks:
+        tddImplementation: true
     setup: |
       LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || true
-      bash "$LOG" --phase REFACTOR --step s1 --session pf-phase >/dev/null 2>&1 || true
-    payload: *write_production
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 REFACTOR "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 1
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_not_contains: ["deny_reason"]
-
-- description: "phase gate: replace_file_content is gated exactly like write_to_file"
+      stdout_not_contains:
+        - deny_reason
+        - '"allow"'
+        - '"deny"'
+      stdout_json:
+        decision: ask
+- description: 'phase gate: replace_file_content is gated exactly like write_to_file'
   vars:
     scenario_id: phase-covers-replace-writer
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
-    setup: *arm_red_fail
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_WRITE "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_RUN "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_FAIL "fixture phase" >/dev/null || exit $?
     payload:
       toolCall:
         name: replace_file_content
-        args: { TargetFile: "__PROJECT__/src/app.ts", CodeContent: "export const a = 3" }
-      workspacePaths: ["__PROJECT__"]
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 3
+      workspacePaths:
+        - __PROJECT__
       session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_json: { allow_tool: false }
-
-- description: "phase gate: multi_replace_file_content is gated exactly like write_to_file"
+      stdout_json:
+        decision: deny
+- description: 'phase gate: multi_replace_file_content is gated exactly like write_to_file'
   vars:
     scenario_id: phase-covers-multi-replace-writer
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
-    setup: *arm_red_fail
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_WRITE "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_RUN "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_FAIL "fixture phase" >/dev/null || exit $?
     payload:
       toolCall:
         name: multi_replace_file_content
-        args: { TargetFile: "__PROJECT__/src/app.ts", CodeContent: "export const a = 4" }
-      workspacePaths: ["__PROJECT__"]
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 4
+      workspacePaths:
+        - __PROJECT__
       session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_json: { allow_tool: false }
-
-- description: "phase gate: the documented off-switch releases a frozen phase"
+      stdout_json:
+        decision: deny
+- description: 'phase gate: the documented off-switch releases a frozen phase'
   vars:
     scenario_id: phase-off-switch-bypasses
     kind: hook
     hook: pre-edit-tdd-reminder.sh
     env:
-      ZENSU_AG_HOOK_CONTRACT: superset
-      TDD_STATE_DIR: "__DATA__/tdd"
-      ZENSU_TDD_GATE: "off"
-    config: *strict_config
-    setup: *arm_red_fail
-    payload: *write_production
+      ZENSU_TDD_GATE: 'off'
+    config:
+      hooks:
+        tddImplementation: true
+    setup: |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_WRITE "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_RUN "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_FAIL "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 1
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_not_contains: ["deny_reason"]
-
-- description: "phase gate: an unarmed session is never gated"
+      stdout_not_contains:
+        - deny_reason
+        - '"allow"'
+        - '"deny"'
+      stdout_json:
+        decision: ask
+- description: 'phase gate: an unarmed session is never gated'
   vars:
     scenario_id: phase-unarmed-session-ungated
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: *strict_config
-    payload: *write_production
+    config:
+      hooks:
+        tddImplementation: true
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 1
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_not_contains: ["deny_reason"]
-
-- description: "phase gate: vanilla mode keeps the RED/GREEN ceremony out of the way"
+      stdout_not_contains:
+        - deny_reason
+        - '"allow"'
+        - '"deny"'
+      stdout_json:
+        decision: ask
+- description: 'phase gate: vanilla mode keeps the RED/GREEN ceremony out of the way'
   vars:
     scenario_id: phase-vanilla-mode-ungated
     kind: hook
     hook: pre-edit-tdd-reminder.sh
-    env: *strict_env
-    config: { hooks: { tddImplementation: false } }
-    setup: *arm_red_fail
-    payload: *write_production
+    config:
+      hooks:
+        tddImplementation: false
+    setup: |
+      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-session.sh"
+      zensu_bind_model_session || exit $?
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      bash "$LOG" --tdd-begin --session pf-phase >/dev/null 2>&1 || exit $?
+      tdd_write_phase pf-phase s1 RED_WRITE "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_RUN "fixture phase" >/dev/null || exit $?
+      tdd_write_phase pf-phase s1 RED_FAIL "fixture phase" >/dev/null || exit $?
+    payload:
+      toolCall:
+        name: write_to_file
+        args:
+          TargetFile: __PROJECT__/src/app.ts
+          CodeContent: export const a = 1
+      workspacePaths:
+        - __PROJECT__
+      session_id: pf-phase
     expect:
       exit_code: 0
-      stdout_not_contains: ["deny_reason"]
+      stdout_not_contains:
+        - deny_reason
+        - '"allow"'
+        - '"deny"'
+      stdout_json:
+        decision: ask

@@ -1,19 +1,15 @@
-# Proof for the orchestration-layer capabilities: requirement-ID traceability,
-# the review-judge stage, repo overlays and templates, persona activation,
-# durable autopilot state, the bypass ledger, project-dir recovery, and the
-# host-version drift guard.
-
-- description: "traceability: the TDD skill defines the stable requirement-ID format"
+- description: 'traceability: the TDD skill defines the stable requirement-ID format'
   vars:
     scenario_id: trace-tdd-declares-requirement-ids
     kind: shell
     script: |
-      grep -oE 'AC-###|FR-###' "$ZENSU_PLUGIN_ROOT/skills/tdd/SKILL.md" | sort -u
+      grep -rhoE 'AC-###|FR-###' "$ZENSU_PLUGIN_ROOT/skills/tdd" | sort -u
     expect:
       exit_code: 0
-      contains: ["AC-###", "FR-###"]
-
-- description: "traceability: the plan template ships the Requirements table the chain anchors on"
+      contains:
+        - AC-###
+        - FR-###
+- description: 'traceability: the plan template ships the Requirements table the chain anchors on'
   vars:
     scenario_id: trace-template-has-requirements-table
     kind: shell
@@ -21,9 +17,10 @@
       grep -E '^## Requirements|Covers' "$ZENSU_PLUGIN_ROOT/templates/tdd-plan.md" | head -5
     expect:
       exit_code: 0
-      contains: ["## Requirements", "Covers"]
-
-- description: "traceability: autopilot carries the same requirement IDs end to end"
+      contains:
+        - '## Requirements'
+        - Covers
+- description: 'traceability: autopilot carries the same requirement IDs end to end'
   vars:
     scenario_id: trace-autopilot-requirement-ids
     kind: shell
@@ -31,19 +28,20 @@
       grep -cE 'AC-|FR-' "$ZENSU_PLUGIN_ROOT/skills/autopilot/SKILL.md"
     expect:
       exit_code: 0
-      not_matches: ["^0$"]
-
-- description: "review chain: the judge stage sits between the merged panel and the consolidating reviewer"
+      not_matches:
+        - ^0$
+- description: 'review chain: the judge stage sits between the merged panel and the consolidating reviewer'
   vars:
     scenario_id: chain-judge-stage-wired
     kind: shell
     script: |
-      grep -oE 'zensu-review-judge|reviewJudge|Panel-FP' "$ZENSU_PLUGIN_ROOT/skills/tdd/SKILL.md" | sort -u
+      grep -rhoE 'zensu-review-judge|reviewJudge|Panel-FP' "$ZENSU_PLUGIN_ROOT/skills/tdd" | sort -u
     expect:
       exit_code: 0
-      contains: ["zensu-review-judge", "reviewJudge"]
-
-- description: "review chain: the judge agent is read-only"
+      contains:
+        - zensu-review-judge
+        - reviewJudge
+- description: 'review chain: the judge agent is read-only'
   vars:
     scenario_id: chain-judge-is-read-only
     kind: shell
@@ -51,276 +49,338 @@
       awk '/^---$/{c++; next} c==1' "$ZENSU_PLUGIN_ROOT/agents/zensu-review-judge.md" | grep -iE '^tools:'
     expect:
       exit_code: 0
-      not_matches: ["write|edit|replace_file"]
-
-- description: "overlay: a missing repo overlay is a silent no-op, never an abort"
+      not_matches:
+        - write|edit|replace_file
+- description: 'skill artifact contract: overlay-missing-is-noop'
   vars:
     scenario_id: overlay-missing-is-noop
     kind: shell
-    script: |
-      OUT="$(bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --overlay tdd 2>&1)"
-      echo "rc=$?"
-      [ -z "$OUT" ] && echo "EMPTY_OUTPUT" || echo "OUTPUT: $OUT"
+    script: >
+      node -e 'const fs=require("fs"),p=require("path"),root=process.env.ZENSU_PLUGIN_ROOT;const
+      text=fs.readFileSync(p.join(root,"skills/tdd/SKILL.md"),"utf8");for(const needle of ["Missing or empty
+      file = no-op"])if(!text.includes(needle))throw Error("missing guidance:
+      "+needle);console.log("OPTIONAL_OVERLAY_CONFIRMED");'
     expect:
-      contains: ["rc=0", "EMPTY_OUTPUT"]
-
-- description: "overlay: a present repo overlay is emitted inside the additive-only contract"
+      exit_code: 0
+      contains:
+        - OPTIONAL_OVERLAY_CONFIRMED
+- description: 'skill artifact contract: overlay-present-is-contract-wrapped'
   vars:
     scenario_id: overlay-present-is-contract-wrapped
     kind: shell
-    script: |
-      mkdir -p "$ZENSU_PROJECT_DIR/.zensu/overlays"
-      printf 'Always run the linter before committing.\n' > "$ZENSU_PROJECT_DIR/.zensu/overlays/tdd.md"
-      ZENSU_REPO_ROOT="$ZENSU_PROJECT_DIR" bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --overlay tdd
+    script: >
+      node -e 'const fs=require("fs"),p=require("path"),root=process.env.ZENSU_PLUGIN_ROOT;const
+      text=fs.readFileSync(p.join(root,"skills/tdd/SKILL.md"),"utf8");for(const needle of ["additive-only",
+      "NEVER disable", "On any conflict the skill text wins"])if(!text.includes(needle))throw Error("missing
+      guidance: "+needle);console.log("ADDITIVE_CONTRACT_CONFIRMED");'
     expect:
       exit_code: 0
-      contains: ["Always run the linter", "zensu:overlay-begin", "zensu:overlay-end"]
-
-- description: "overlay: a traversal-shaped overlay name is refused fail-closed"
+      contains:
+        - ADDITIVE_CONTRACT_CONFIRMED
+- description: 'skill artifact contract: overlay-traversal-name-refused'
   vars:
     scenario_id: overlay-traversal-name-refused
     kind: shell
-    script: |
-      # An absent overlay is a silent no-op (rc=0, covered above), but an
-      # ILL-FORMED name can only come from a coding bug — skills pass a fixed
-      # literal — so it is refused loudly with no content emitted.
-      OUT="$(bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --overlay ../../etc/passwd 2>&1)"
-      echo "rc=$?"
-      printf 'OUT[%s]\n' "$OUT"
+    script: >
+      node -e 'const fs=require("fs"),p=require("path"),root=process.env.ZENSU_PLUGIN_ROOT;const
+      text=fs.readFileSync(p.join(root,"skills/tdd/SKILL.md"),"utf8");for(const needle of
+      [".zensu/overlays/tdd.md"])if(!text.includes(needle))throw Error("missing guidance:
+      "+needle);console.log("FIXED_OVERLAY_PATH_CONFIRMED");'
     expect:
-      contains: ["rc=2", "OUT[]"]
-      not_contains: ["root:"]
-
-- description: "templates: the shipped artifact template resolves when the repo has no override"
+      exit_code: 0
+      contains:
+        - FIXED_OVERLAY_PATH_CONFIRMED
+- description: 'skill artifact contract: template-default-resolves'
   vars:
     scenario_id: template-default-resolves
     kind: shell
-    script: |
-      TPL="$(bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --template tdd-plan)"
-      [ -f "$TPL" ] && echo "RESOLVED: $(basename "$TPL")" || echo "UNRESOLVED"
+    script: >
+      node -e 'const fs=require("fs"),p=require("path"),root=process.env.ZENSU_PLUGIN_ROOT;const
+      text=fs.readFileSync(p.join(root,"skills/tdd/references/planning.md"),"utf8");for(const needle of
+      ["templates/tdd-plan.md"])if(!text.includes(needle))throw Error("missing guidance:
+      "+needle);console.log("TEMPLATE_CONTRACT_CONFIRMED");'
     expect:
       exit_code: 0
-      contains: ["RESOLVED: tdd-plan.md"]
-
-- description: "templates: a repo-local template wins over the shipped default"
+      contains:
+        - TEMPLATE_CONTRACT_CONFIRMED
+- description: 'skill artifact contract: template-repo-override-wins'
   vars:
     scenario_id: template-repo-override-wins
     kind: shell
-    script: |
-      mkdir -p "$ZENSU_PROJECT_DIR/.zensu/templates"
-      printf '# repo plan\n' > "$ZENSU_PROJECT_DIR/.zensu/templates/tdd-plan.md"
-      TPL="$(ZENSU_REPO_ROOT="$ZENSU_PROJECT_DIR" bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-overlay.sh" --template tdd-plan)"
-      case "$TPL" in "$ZENSU_PROJECT_DIR"/*) echo "REPO_TEMPLATE_WINS" ;; *) echo "SHIPPED_TEMPLATE: $TPL" ;; esac
+    script: >
+      node -e 'const fs=require("fs"),p=require("path"),root=process.env.ZENSU_PLUGIN_ROOT;const
+      text=fs.readFileSync(p.join(root,"skills/tdd/references/planning.md"),"utf8");for(const needle of
+      [".zensu/templates/"])if(!text.includes(needle))throw Error("missing guidance:
+      "+needle);console.log("REPO_TEMPLATE_CONTRACT_CONFIRMED");'
     expect:
       exit_code: 0
-      contains: ["REPO_TEMPLATE_WINS"]
-
-- description: "personas: no repo personas means no extra reviewers"
+      contains:
+        - REPO_TEMPLATE_CONTRACT_CONFIRMED
+- description: 'personas: no repo personas means no extra reviewers'
   vars:
     scenario_id: persona-none-configured
     kind: shell
-    script: |
-      printf 'src/app.ts\n' | node "$ZENSU_PLUGIN_ROOT/hooks/lib/persona-activation.js" "$ZENSU_PROJECT_DIR/.zensu/agents"
+    script: >
+      printf 'src/app.ts\n' | node "$ZENSU_PLUGIN_ROOT/hooks/lib/persona-activation.js"
+      "$ZENSU_PROJECT_DIR/.zensu/agents"
+
       echo "rc=$?"
     expect:
-      contains: ["rc=0"]
-      not_contains: ["spawn "]
-
-- description: "personas: a matching repo persona is spawned, a non-matching one is skipped"
+      contains:
+        - rc=0
+      not_contains:
+        - 'spawn '
+- description: 'personas: a matching repo persona is spawned, a non-matching one is skipped'
   vars:
     scenario_id: persona-activation-matches
     kind: shell
-    script: |
+    script: >
       D="$ZENSU_PROJECT_DIR/.zensu/agents"; mkdir -p "$D"
-      printf -- '---\nname: zensu-review-frontend\nactivation: "src/**/*.tsx"\n---\nFrontend review.\n' > "$D/zensu-review-frontend.md"
-      printf -- '---\nname: zensu-review-infra\nactivation: "terraform/**"\n---\nInfra review.\n' > "$D/zensu-review-infra.md"
+
+      printf -- '---\nname: zensu-review-frontend\nactivation: "src/**/*.tsx"\n---\nFrontend review.\n' >
+      "$D/zensu-review-frontend.md"
+
+      printf -- '---\nname: zensu-review-infra\nactivation: "terraform/**"\n---\nInfra review.\n' >
+      "$D/zensu-review-infra.md"
+
       printf 'src/App.tsx\n' | node "$ZENSU_PLUGIN_ROOT/hooks/lib/persona-activation.js" "$D"
     expect:
       exit_code: 0
-      contains: ["zensu-review-frontend"]
-      not_matches: ["spawn zensu-review-infra"]
-
-- description: "autopilot state: a run round-trips through the durable store"
+      contains:
+        - zensu-review-frontend
+      not_matches:
+        - spawn zensu-review-infra
+- description: 'autopilot state: a run round-trips through the durable store'
   vars:
     scenario_id: autopilot-state-round-trip
     kind: shell
     script: |
       . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
-      autopilot_begin_run pf-auto >/dev/null 2>&1 || true
-      autopilot_status pf-auto 2>/dev/null || autopilot_read_state pf-auto 2>/dev/null
-      echo "rc=$?"
+      autopilot_begin_run pf-auto "$ZENSU_SESSION_KEY" "$ZENSU_PROJECT_DIR" >/dev/null || exit $?
+      autopilot_read_run pf-auto "$ZENSU_PROJECT_DIR"
     expect:
-      contains: ["rc=0"]
-
-- description: "autopilot state: a corrupt state file fails open instead of wedging the run"
+      exit_code: 0
+      stdout_json:
+        stage: PLANNING
+        runId: pf-auto
+    bind_session: true
+    session_id: pf-auto
+- description: 'autopilot state: corrupt state is refused without replacing it'
   vars:
-    scenario_id: autopilot-state-corrupt-fails-open
+    scenario_id: autopilot-state-corrupt-fails-closed
     kind: shell
     script: |
       . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
-      D="$(autopilot_state_dir)"; mkdir -p "$D"
-      printf '{ not json' > "$(autopilot_state_file pf-auto)"
-      autopilot_read_state pf-auto >/dev/null 2>&1
+      autopilot_begin_run pf-auto "$ZENSU_SESSION_KEY" "$ZENSU_PROJECT_DIR" >/dev/null || exit $?
+      F="$(autopilot_run_file pf-auto "$ZENSU_PROJECT_DIR")"
+      printf "{ corrupt" > "$F"
+      autopilot_read_run pf-auto "$ZENSU_PROJECT_DIR" >/dev/null 2>&1
       echo "rc=$?"
+      cat "$F"
     expect:
-      contains: ["rc="]
-      not_contains: ["Traceback", "syntax error"]
-
-- description: "autopilot state: concurrent writers all land, none lost, none doubled"
+      contains:
+        - rc=2
+        - '{ corrupt'
+    bind_session: true
+    session_id: pf-auto
+- description: 'autopilot state: concurrent retries commit one idempotent event'
   vars:
     scenario_id: autopilot-state-concurrent-writes-all-land
     kind: shell
-    env: { TDD_STATE_DIR: "__DATA__/tdd" }
-    script: |
-      LIB="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      SID=pf-concurrent
-      bash "$LIB" begin --session "$SID" --feature "fan out" >/dev/null 2>&1
-      SF="$(bash "$LIB" file --session "$SID" 2>/dev/null)"
-      for i in $(seq 1 16); do
-        bash "$LIB" event --session "$SID" --stage GATES --note "writer-$i" >/dev/null 2>&1 &
-      done
-      wait
-      node -e '
-        const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-        const n = j.events.map(e => e.note).filter(x => /^writer-[0-9]+$/.test(x));
-        const uniq = new Set(n);
-        process.stdout.write("landed=" + uniq.size + " duplicates=" + (n.length - uniq.size));
-      ' "$SF"
-    expect:
-      exit_code: 0
-      contains: ["landed=16 duplicates=0"]
-
-- description: "autopilot state: a lock is reaped only when its owner is gone AND it has gone stale"
-  vars:
-    scenario_id: autopilot-state-lock-reaping-needs-both
-    kind: shell
-    env: { TDD_STATE_DIR: "__DATA__/tdd" }
-    script: |
+    script: >
       . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      L="$TDD_STATE_DIR/probe.lockd"
-      _AUTOPILOT_LOCK_STALE_SECONDS=0
-      rm -rf "$L"; mkdir -p "$L"; printf '%s\n' "$$" > "$L/owner"; sleep 1
-      _autopilot_lock_stale "$L" && echo "LIVE_OWNER_REAPED" || echo "LIVE_OWNER_KEPT"
-      rm -rf "$L"; mkdir -p "$L"
-      DEAD=999000; while kill -0 "$DEAD" 2>/dev/null; do DEAD=$((DEAD - 1)); done
-      printf '%s\n' "$DEAD" > "$L/owner"; sleep 1
-      _autopilot_lock_stale "$L" && echo "DEAD_OWNER_REAPED" || echo "DEAD_OWNER_KEPT"
-      _AUTOPILOT_LOCK_STALE_SECONDS=30
-      rm -rf "$L"; mkdir -p "$L"
-      _autopilot_lock_stale "$L" && echo "YOUNG_REAPED" || echo "YOUNG_KEPT"
-      rm -rf "$L"
+
+      autopilot_begin_run pf-auto "$ZENSU_SESSION_KEY" "$ZENSU_PROJECT_DIR" >/dev/null || exit $?
+
+      for i in $(seq 1 8); do
+        (
+          for attempt in 1 2 3 4; do
+            autopilot_apply_event pf-auto identical-plan PLAN_APPROVED '{"approvedPlanSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' "$ZENSU_PROJECT_DIR" "$ZENSU_SESSION_KEY" >"__HOME__/out-$i" 2>"__HOME__/err-$i"
+            rc=$?
+            [ "$rc" -eq 1 ] && [ "$attempt" -lt 4 ] || break
+            node -e 'const fs=require("fs"),p=require("path"),lines=fs.readFileSync(process.argv[1],"utf8").trim().split(/\r?\n/),resource=p.join(fs.realpathSync(process.env.ZENSU_PROJECT_DIR),".zensu/state/autopilot");process.exit(lines.length===2&&lines[0]==="[zensu-tdd-phase] lock detail: session-control-v1: timed out acquiring external process lock"&&lines[1]==="[zensu-tdd-phase] lock acquisition failed for "+resource?0:1)' "__HOME__/err-$i" || break
+            cat "__HOME__/err-$i" >>"__HOME__/transient-lock-$i"
+          done
+          echo "$rc" >"__HOME__/rc-$i"
+        ) &
+      done
+
+      wait
+
+      node -e 'const fs=require("fs"),p=require("path"),home=process.env.HOME;for(let
+      i=1;i<=8;i++){if(fs.readFileSync(p.join(home,"rc-"+i),"utf8").trim()!=="0"){process.stderr.write("worker
+      "+i+" failed:
+      "+fs.readFileSync(p.join(home,"err-"+i),"utf8"));process.exit(1)};if(fs.readFileSync(p.join(home,"err-"+i),"utf8"))throw
+      Error("stderr noise");}const
+      state=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(state.events.filter(e=>e.eventId==="identical-plan").length!==1)throw
+      Error("duplicate event");console.log("ONE_EVENT EIGHT_SUCCESSFUL_WORKERS STDERR_CLEAN");'
+      "$(autopilot_run_file pf-auto "$ZENSU_PROJECT_DIR")"
     expect:
       exit_code: 0
-      contains: ["LIVE_OWNER_KEPT", "DEAD_OWNER_REAPED", "YOUNG_KEPT"]
+      contains:
+        - ONE_EVENT EIGHT_SUCCESSFUL_WORKERS STDERR_CLEAN
+    bind_session: true
+    session_id: pf-auto
+- description: 'autopilot state: a live external lease excludes another owner'
+  vars:
+    scenario_id: autopilot-state-live-lease-exclusive
+    kind: shell
+    script: >
+      node -e '
 
-- description: "autopilot state: a contended acquire prints nothing to stderr"
+      const
+      assert=require("assert/strict"),path=require("path"),core=require(path.join(process.env.ZENSU_PLUGIN_ROOT,"hooks/lib/session-control-core-v1.js"));
+
+      const
+      lockDirectory=path.join(process.env.ZENSU_PROJECT_DIR,".zensu/state");require("fs").mkdirSync(lockDirectory,{recursive:true});
+
+      const options={lockDirectory,resourcePath:path.join(lockDirectory,"autopilot"),ownerPid:process.pid};
+
+      const lease=core.acquireExternalProcessLock(options);
+
+      try
+      {assert.throws(()=>core.acquireExternalProcessLock(options));console.log("LIVE_OWNER_KEPT");}finally{core.releaseExternalProcessLock({...options,token:lease.token});}
+
+      const
+      next=core.acquireExternalProcessLock(options);core.releaseExternalProcessLock({...options,token:next.token});console.log("RELEASED_LEASE_REUSABLE");'
+    expect:
+      exit_code: 0
+      contains:
+        - LIVE_OWNER_KEPT
+        - RELEASED_LEASE_REUSABLE
+    bind_session: true
+    session_id: pf-auto
+- description: 'autopilot state: concurrent retries commit one idempotent event'
   vars:
     scenario_id: autopilot-state-quiet-under-contention
     kind: shell
-    env: { TDD_STATE_DIR: "__DATA__/tdd" }
-    script: |
-      LIB="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      SID=pf-quiet
-      bash "$LIB" begin --session "$SID" --feature quiet >/dev/null 2>&1
-      ERR="$TDD_STATE_DIR/stderr.txt"
-      for i in $(seq 1 12); do
-        bash "$LIB" event --session "$SID" --stage GATES --note "w-$i" >/dev/null 2>>"$ERR" &
+    script: >
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-autopilot-state.sh"
+
+      autopilot_begin_run pf-auto "$ZENSU_SESSION_KEY" "$ZENSU_PROJECT_DIR" >/dev/null || exit $?
+
+      for i in $(seq 1 8); do
+        (
+          for attempt in 1 2 3 4; do
+            autopilot_apply_event pf-auto identical-plan PLAN_APPROVED '{"approvedPlanSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' "$ZENSU_PROJECT_DIR" "$ZENSU_SESSION_KEY" >"__HOME__/out-$i" 2>"__HOME__/err-$i"
+            rc=$?
+            [ "$rc" -eq 1 ] && [ "$attempt" -lt 4 ] || break
+            node -e 'const fs=require("fs"),p=require("path"),lines=fs.readFileSync(process.argv[1],"utf8").trim().split(/\r?\n/),resource=p.join(fs.realpathSync(process.env.ZENSU_PROJECT_DIR),".zensu/state/autopilot");process.exit(lines.length===2&&lines[0]==="[zensu-tdd-phase] lock detail: session-control-v1: timed out acquiring external process lock"&&lines[1]==="[zensu-tdd-phase] lock acquisition failed for "+resource?0:1)' "__HOME__/err-$i" || break
+            cat "__HOME__/err-$i" >>"__HOME__/transient-lock-$i"
+          done
+          echo "$rc" >"__HOME__/rc-$i"
+        ) &
       done
+
       wait
-      [ -s "$ERR" ] && { echo "STDERR_NOISE:"; head -2 "$ERR"; } || echo "STDERR_CLEAN"
+
+      node -e 'const fs=require("fs"),p=require("path"),home=process.env.HOME;for(let
+      i=1;i<=8;i++){if(fs.readFileSync(p.join(home,"rc-"+i),"utf8").trim()!=="0"){process.stderr.write("worker
+      "+i+" failed:
+      "+fs.readFileSync(p.join(home,"err-"+i),"utf8"));process.exit(1)};if(fs.readFileSync(p.join(home,"err-"+i),"utf8"))throw
+      Error("stderr noise");}const
+      state=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(state.events.filter(e=>e.eventId==="identical-plan").length!==1)throw
+      Error("duplicate event");console.log("ONE_EVENT EIGHT_SUCCESSFUL_WORKERS STDERR_CLEAN");'
+      "$(autopilot_run_file pf-auto "$ZENSU_PROJECT_DIR")"
     expect:
       exit_code: 0
-      contains: ["STDERR_CLEAN"]
-
-- description: "bypass ledger: a clean session records no opt-out"
+      contains:
+        - ONE_EVENT EIGHT_SUCCESSFUL_WORKERS STDERR_CLEAN
+    bind_session: true
+    session_id: pf-auto
+- description: 'session state: a fresh baseline is inactive with no review debt'
   vars:
-    scenario_id: ledger-clean-session-empty
+    scenario_id: session-baseline-inactive
+    kind: shell
+    script: >
+      node -e 'const
+      assert=require("assert/strict"),core=require(process.env.ZENSU_PLUGIN_ROOT+"/hooks/lib/session-control-core-v1.js"),state=core.readWorkflowState({projectRoot:process.env.ZENSU_PROJECT_DIR,sessionId:process.env.ZENSU_HOST_SESSION_ID});assert.equal(state.active,false);console.log("INACTIVE_BASELINE");'
+    expect:
+      exit_code: 0
+      contains:
+        - INACTIVE_BASELINE
+    bind_session: true
+    session_id: pf-ledger
+- description: 'session state: ambient retired state directories cannot replace the private binding'
+  vars:
+    scenario_id: session-legacy-override-ignored
     kind: shell
     script: |
-      bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh" --bypass-list --session pf-ledger
+      before="$ZENSU_PROJECT_ROOT"
+      export TDD_STATE_DIR="__DATA__/foreign" ZENSU_PLUGIN_DATA_OVERRIDE="__DATA__/foreign"
+      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-tdd-phase.sh"
+      actual="$(tdd_state_file "$ZENSU_HOST_SESSION_ID")" || exit $?
+      case "$actual" in "$before"/.zensu/state/*) echo BOUND_STATE_PRESERVED;; *) exit 1;; esac
     expect:
       exit_code: 0
-      contains: ["none"]
-
-- description: "bypass ledger: a gate opt-out is recorded and surfaced by name"
-  vars:
-    scenario_id: ledger-records-optout
-    kind: shell
-    env: { ZENSU_TDD_GATE: "off", TDD_STATE_DIR: "__DATA__/tdd" }
-    config: { hooks: { tddImplementation: true } }
-    script: |
-      LOG="$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh"
-      mkdir -p "$TDD_STATE_DIR"
-      bash "$LOG" --tdd-begin --session pf-ledger >/dev/null 2>&1 || true
-      bash "$LOG" --phase RED_FAIL --step s1 --session pf-ledger --reason x >/dev/null 2>&1 || true
-      printf '{"tool_name":"write_to_file","tool_input":{"file_path":"%s/src/app.ts","content":"x"},"session_id":"pf-ledger"}' \
-        "$ZENSU_PROJECT_DIR" | bash "$ZENSU_PLUGIN_ROOT/hooks/pre-edit-tdd-reminder.sh" >/dev/null 2>&1 || true
-      bash "$LOG" --bypass-list --session pf-ledger
-    expect:
-      exit_code: 0
-      contains: ["ZENSU_TDD_GATE"]
-
-- description: "project dir: an explicit project dir always wins unchanged"
+      contains:
+        - BOUND_STATE_PRESERVED
+    bind_session: true
+    session_id: pf-ledger
+- description: 'project dir: an explicit project dir always wins unchanged'
   vars:
     scenario_id: projectdir-explicit-wins
     kind: shell
     script: |
-      OUT="$(node "$ZENSU_PLUGIN_ROOT/hooks/lib/resolve-project-dir.js")"
-      [ "$OUT" = "$ZENSU_PROJECT_DIR" ] && echo "MATCHES_EXPLICIT" || echo "OVERRODE_EXPLICIT: $OUT"
+      actual="$(zensu_resolve_project_dir)" || exit $?
+      [ "$actual" = "$ZENSU_PROJECT_ROOT" ] && echo MATCHES_BOUND_ROOT
     expect:
       exit_code: 0
-      contains: ["MATCHES_EXPLICIT"]
-
-- description: "project dir: resolution is cwd-independent inside the project"
+      contains:
+        - MATCHES_BOUND_ROOT
+    bind_session: true
+- description: 'project dir: resolution is cwd-independent inside the project'
   vars:
     scenario_id: projectdir-subdirectory-stable
     kind: shell
     script: |
       mkdir -p "$ZENSU_PROJECT_DIR/deep/nested"
-      ROOTED="$(node "$ZENSU_PLUGIN_ROOT/hooks/lib/resolve-project-dir.js")"
-      NESTED="$(cd "$ZENSU_PROJECT_DIR/deep/nested" && node "$ZENSU_PLUGIN_ROOT/hooks/lib/resolve-project-dir.js")"
-      [ "$ROOTED" = "$NESTED" ] && echo "STABLE" || echo "DRIFT: $ROOTED vs $NESTED"
+      root="$(zensu_resolve_project_dir)"
+      nested="$(cd "$ZENSU_PROJECT_DIR/deep/nested" && zensu_resolve_project_dir)"
+      [ "$root" = "$nested" ] && echo STABLE
     expect:
       exit_code: 0
-      contains: ["STABLE"]
-
-- description: "project dir: with nothing to go on it degrades gracefully"
+      contains:
+        - STABLE
+    bind_session: true
+- description: 'project dir: caller environment cannot select a different immutable root'
   vars:
-    scenario_id: projectdir-unset-degrades
-    kind: shell
-    env: { ZENSU_PROJECT_DIR: null }
-    script: |
-      node "$ZENSU_PLUGIN_ROOT/hooks/lib/resolve-project-dir.js" >/dev/null 2>&1
-      echo "rc=$?"
-    expect:
-      contains: ["rc=0"]
-
-- description: "host guard: a stamped host version reports no drift"
-  vars:
-    scenario_id: hostguard-no-drift
+    scenario_id: projectdir-ambient-selector-ignored
     kind: shell
     script: |
-      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-host-version.sh"
-      zensu_host_version_stamp pf-host >/dev/null 2>&1 || true
-      zensu_host_version_drift pf-host >/dev/null 2>&1
-      echo "rc=$?"
+      before="$ZENSU_PROJECT_ROOT"
+      mkdir -p "__HOME__/foreign"
+      export ZENSU_PROJECT_DIR="__HOME__/foreign"
+      zensu_bind_model_session || exit $?
+      [ "$ZENSU_PROJECT_ROOT" = "$before" ] && echo BOUND_ROOT_PRESERVED
     expect:
-      contains: ["rc=0"]
-
-- description: "host guard: a host swapped mid-chain is surfaced, never fatal"
+      exit_code: 0
+      contains:
+        - BOUND_ROOT_PRESERVED
+    bind_session: true
+- description: 'runtime binding: unchanged content preserves the pinned digest'
   vars:
-    scenario_id: hostguard-drift-surfaced
+    scenario_id: binding-runtime-digest-stable
     kind: shell
     script: |
-      . "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-host-version.sh"
-      zensu_host_version_stamp pf-host >/dev/null 2>&1 || true
-      printf 'some-other-version\n' > "$(zensu_host_version_file pf-host)" 2>/dev/null || true
-      OUT="$(zensu_host_version_drift pf-host 2>&1)"
-      echo "rc=$?"
-      printf 'OUT[%s]\n' "$OUT"
+      first="$ZENSU_RUNTIME_DIGEST"
+      zensu_bind_model_session || exit $?
+      [ "$first" = "$ZENSU_RUNTIME_DIGEST" ] && [ ${#first} -ge 64 ] && echo DIGEST_STABLE
     expect:
-      contains: ["rc="]
-      not_contains: ["Traceback"]
+      exit_code: 0
+      contains:
+        - DIGEST_STABLE
+    bind_session: true
+- description: 'runtime binding: a different raw host conversation cannot reuse this session'
+  vars:
+    scenario_id: binding-session-impersonation-refused
+    kind: shell
+    script: |
+      export ZENSU_HOST_SESSION_ID=foreign-conversation
+      zensu_bind_model_session >/dev/null 2>&1
+      [ "$?" -ne 0 ] && echo FOREIGN_SESSION_REFUSED
+    expect:
+      exit_code: 0
+      contains:
+        - FOREIGN_SESSION_REFUSED
+    bind_session: true

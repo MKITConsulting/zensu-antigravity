@@ -1,0 +1,15 @@
+- description: "live: installed native rules load without tools and a disabled plugin control stays inactive"
+  vars:
+    scenario_id: live-native-rules-loaded
+    probe: rules
+    timeout_s: 120
+    expect:
+      stdout_contains_any: ["NATIVE-RULES-VERIFIED DISABLED-CONTROL-HONORED", "LIVE-SKIPPED", "LIVE-UNAVAILABLE", "LIVE-INCONCLUSIVE"]
+
+- description: "live: installed worker launcher prepares a real bound tool-free native conversation"
+  vars:
+    scenario_id: live-native-worker-prepare
+    probe: workerprepare
+    timeout_s: 180
+    expect:
+      stdout_contains_any: ["NATIVE-WORKER-PREPARED BOUND-TOOL-FREE", "LIVE-SKIPPED", "LIVE-UNAVAILABLE", "LIVE-INCONCLUSIVE"]

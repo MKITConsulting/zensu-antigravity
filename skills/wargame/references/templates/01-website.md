@@ -1,4 +1,4 @@
-WARGAME ORDER. You are not executing this mission, you are wargaming it. A cheaper executor (a mid-tier model) runs the brief below later. Your job is the route it will follow.
+WARGAME ORDER. You are not executing this mission, you are wargaming it. A cheaper executor (Sonnet) runs the brief below later. Your job is the route it will follow.
 
 Recon first, read-only: the reference site and anything the build must match.
 

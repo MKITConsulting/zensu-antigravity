@@ -9,6 +9,7 @@ set -u
 : "${ZENSU_PLUGIN_ROOT:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-mcp-tools.sh" 2>/dev/null || true
 source "${ZENSU_PLUGIN_ROOT}/hooks/lib/zensu-cli-map.sh" 2>/dev/null || true
+source "${ZENSU_PLUGIN_ROOT}/tests/structure/lib-skill-text.sh"
 
 skill_unwrapped_mutation() {
   local f="$1" tok line noun verb tool
@@ -98,7 +99,9 @@ SKILL_FAIL=0
 for d in "${ZENSU_PLUGIN_ROOT}"/skills/*/; do
   F="${d}SKILL.md"
   [ -f "$F" ] || continue
-  off="$(skill_unwrapped_mutation "$F")"
+  expanded="$(skill_text_file "$d")" || { SKILL_FAIL=$((SKILL_FAIL+1)); continue; }
+  off="$(skill_unwrapped_mutation "$expanded")"
+  rm -f "$expanded"
   if [ -n "$off" ]; then
     SKILL_FAIL=$((SKILL_FAIL+1)); echo "      skill '$(basename "$d")' calls mutation tool '$off' but lacks --workflow-begin/--workflow-end"
   fi

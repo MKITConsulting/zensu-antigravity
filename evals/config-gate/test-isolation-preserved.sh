@@ -2,13 +2,15 @@
 set -u
 
 # post-review-tdd-delegate.sh subagent isolation: it acts ONLY when a completed
-# zensu:code-reviewer Agent fires; every other subagent_type is a silent
+# zensu-code-reviewer Agent fires; every other subagent_type is a silent
 # pass-through. (The pre-0.4.0 sibling post-tdd-review-delegate.sh was removed in
 # the main-thread TDD migration, so there is no longer a second hook to isolate.)
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 EVAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT_POSTREVIEW="$PLUGIN_DIR/hooks/post-review-tdd-delegate.sh"
+LOG="$PLUGIN_DIR/hooks/lib/zensu-log.sh"
+BASELINE="$PLUGIN_DIR/tests/session-control/initialize-baseline.sh"
 
 PASS=0; FAIL=0
 check() {
@@ -26,11 +28,23 @@ fi
 check "post-review-tdd-delegate.sh exists and is executable" PASS
 
 export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
-export ZENSU_PLUGIN_DATA_OVERRIDE="$(mktemp -d)"
-cleanup() { rm -rf "$ZENSU_PLUGIN_DATA_OVERRIDE"; }
+TMP_DIR="$(mktemp -d)"
+export ZENSU_PROJECT_DIR="$TMP_DIR/project"
+export STATE_DIR="$TMP_DIR/state"
+mkdir -p "$ZENSU_PROJECT_DIR" "$STATE_DIR"
+cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-TMP_CFG="/tmp/zensu-isolation-allenabled-$$.json"
+render_code_reviewer_fixture() {
+  FIXTURE="$EVAL_DIR/fixtures/stdin-code-reviewer.json" REVIEW_TICKET="$1" node -e '
+    const fs = require("fs");
+    const input = JSON.parse(fs.readFileSync(process.env.FIXTURE, "utf8"));
+    input.tool_input.prompt = input.tool_input.prompt.replace("__REVIEW_TICKET__", process.env.REVIEW_TICKET);
+    process.stdout.write(JSON.stringify(input));
+  '
+}
+
+TMP_CFG="$TMP_DIR/config.json"
 cat > "$TMP_CFG" <<'EOF'
 {
   "hooks": {
@@ -42,6 +56,11 @@ cat > "$TMP_CFG" <<'EOF'
 }
 EOF
 export ZENSU_CONFIG="$TMP_CFG"
+
+# shellcheck disable=SC1090
+source "$BASELINE" fixture-review
+bash "$LOG" --tdd-begin --session fixture-review >/dev/null
+bash "$LOG" --tdd-complete --session fixture-review >/dev/null
 
 OUT_OTHER="$("$SCRIPT_POSTREVIEW" < "$EVAL_DIR/fixtures/stdin-other-agent.json" 2>/dev/null)"
 if [ -z "$OUT_OTHER" ]; then
@@ -57,9 +76,11 @@ else
   check "post-review + tdd-manager subagent: empty stdout (got: $OUT_TDDM)" FAIL
 fi
 
-OUT_OK="$("$SCRIPT_POSTREVIEW" < "$EVAL_DIR/fixtures/stdin-code-reviewer.json" 2>/dev/null)"
+TICKET="$(bash "$LOG" --review-ticket --session fixture-review)"
+STDIN_OK="$(render_code_reviewer_fixture "$TICKET")"
+OUT_OK="$(printf '%s' "$STDIN_OK" | "$SCRIPT_POSTREVIEW" 2>/dev/null)"
 case "$OUT_OK" in
-  *"zensu:code-reviewer"*) check "post-review + code-reviewer subagent: routing directive present (re-verify via zensu:code-reviewer)" PASS ;;
+  *"zensu-code-reviewer"*) check "post-review + code-reviewer subagent: routing directive present (re-verify via zensu-code-reviewer)" PASS ;;
   *)                       check "post-review + code-reviewer subagent: routing directive present (got: $OUT_OK)" FAIL ;;
 esac
 

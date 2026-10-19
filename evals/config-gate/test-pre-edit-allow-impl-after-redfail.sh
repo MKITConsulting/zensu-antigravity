@@ -4,6 +4,7 @@ set -u
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$PLUGIN_DIR/hooks/pre-edit-tdd-reminder.sh"
 LIB="$PLUGIN_DIR/hooks/lib/zensu-tdd-phase.sh"
+BASELINE="$PLUGIN_DIR/tests/session-control/initialize-baseline.sh"
 
 PASS=0; FAIL=0
 check() {
@@ -13,27 +14,30 @@ check() {
 }
 
 export ZENSU_PLUGIN_ROOT="$PLUGIN_DIR"
-TDD_STATE_DIR="$(mktemp -d)"
-export TDD_STATE_DIR
+WORK_DIR="$(mktemp -d)"
+export ZENSU_PROJECT_DIR="$WORK_DIR/project"
+mkdir -p "$ZENSU_PROJECT_DIR"
 unset ZENSU_TDD_GATE
 
-cleanup() { rm -rf "$TDD_STATE_DIR"; }
+cleanup() { rm -rf "$WORK_DIR"; }
 trap cleanup EXIT
 
 source "$LIB"
 
-# 0.4.0+: the gate activates on chain-state (active=true), set by /zensu:tdd
+# 0.4.0+: the gate activates on chain-state (active=true), set by /zensu-tdd
 # --tdd-begin. Shim phase setup to also mark each session active (the legacy
-# ZENSU_AGENT_TYPE=zensu:tdd-manager activation was removed).
+# ZENSU_AGENT_TYPE=zensu-tdd-manager activation was removed).
 eval "$(declare -f tdd_write_phase | sed '1s/^tdd_write_phase/_zensu_orig_write_phase/')"
 tdd_write_phase() { tdd_set_flag "$1" active true >/dev/null 2>&1; _zensu_orig_write_phase "$@"; }
 
 SID_A="s-impl-a"
+# shellcheck disable=SC1090
+source "$BASELINE" "$SID_A"
 tdd_write_phase "$SID_A" "S3" "RED_WRITE" ""                  >/dev/null
 tdd_write_phase "$SID_A" "S3" "RED_FAIL"  "assertion mismatch" >/dev/null
 tdd_write_phase "$SID_A" "S3" "IMPL"      ""                  >/dev/null
 
-PAYLOAD_A='{"tool_name":"write_to_file","tool_input":{"file_path":"src/foo.ts"},"session_id":"'$SID_A'"}'
+PAYLOAD_A='{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"src/foo.ts"},"session_id":"'$SID_A'"}'
 OUT_A=$(echo "$PAYLOAD_A" | "$SCRIPT" 2>/dev/null)
 if [ -z "$OUT_A" ]; then
   check "IMPL after RED_FAIL for current step: allowed on production file" PASS
@@ -42,13 +46,15 @@ else
 fi
 
 SID_B="s-impl-b"
+# shellcheck disable=SC1090
+source "$BASELINE" "$SID_B"
 tdd_write_phase "$SID_B" "S3" "RED_WRITE" ""                  >/dev/null
 tdd_write_phase "$SID_B" "S3" "RED_FAIL"  "..."                >/dev/null
 tdd_write_phase "$SID_B" "S3" "IMPL"      ""                  >/dev/null
 tdd_write_phase "$SID_B" "S3" "GREEN_PASS" ""                 >/dev/null
 tdd_write_phase "$SID_B" "S4" "IMPL"      ""                  >/dev/null
 
-PAYLOAD_B='{"tool_name":"write_to_file","tool_input":{"file_path":"src/bar.ts"},"session_id":"'$SID_B'"}'
+PAYLOAD_B='{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"src/bar.ts"},"session_id":"'$SID_B'"}'
 OUT_B=$(echo "$PAYLOAD_B" | "$SCRIPT" 2>/dev/null)
 DECISION_B=$(node -e '
   try { const j = JSON.parse(process.argv[1]); console.log(j.hookSpecificOutput?.permissionDecision || ""); }
@@ -61,10 +67,12 @@ else
 fi
 
 SID_C="s-impl-c"
+# shellcheck disable=SC1090
+source "$BASELINE" "$SID_C"
 tdd_write_phase "$SID_C" "S3" "RED_WRITE" "" >/dev/null
 tdd_write_phase "$SID_C" "S3" "IMPL"      "" >/dev/null
 
-PAYLOAD_C='{"tool_name":"write_to_file","tool_input":{"file_path":"src/baz.ts"},"session_id":"'$SID_C'"}'
+PAYLOAD_C='{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"src/baz.ts"},"session_id":"'$SID_C'"}'
 OUT_C=$(echo "$PAYLOAD_C" | "$SCRIPT" 2>/dev/null)
 DECISION_C=$(node -e '
   try { const j = JSON.parse(process.argv[1]); console.log(j.hookSpecificOutput?.permissionDecision || ""); }
