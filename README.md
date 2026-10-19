@@ -33,6 +33,41 @@ Use `bash install.sh --dry-run`, `--stage-only <directory>` or `--uninstall` as 
 Never install directly from the installed copy: source/destination overlap can truncate it.
 Restart the IDE after updating; IDE execution remains a separate verification target.
 
+### Native package and Marketplace
+
+The native release artifact, `zensu-antigravity-native-v<VERSION>.zip`, contains a curated
+`zensu/` directory with ready-to-run, relative hook commands. Verify its checksum against
+the release's `SHA256SUMS`, extract it outside Antigravity's plugin directory, then run:
+
+```bash
+agy plugin install /absolute/path/to/extracted/zensu
+agy plugin validate ~/.gemini/config/plugins/zensu
+agy plugin list
+```
+
+Start a fresh CLI conversation and run `/zensu-help`. The plugin binds its actual installed
+root and version when the conversation begins. The native package needs no installer or
+postinstall script and preserves existing Zensu configuration. For updates, extract and
+verify the new package first, run `agy plugin uninstall zensu`, then install the extracted
+directory. Native imports merge files; uninstalling first prevents obsolete rules and hooks
+from surviving an update. The source ZIP is a separate artifact: use its `install.sh`, rather than importing
+the unrendered repository directly.
+
+Google now offers an [official curated Antigravity Marketplace](https://antigravity.google/docs/marketplace?tab=cli).
+Zensu is being prepared for inclusion and is **not yet listed**. Google reviews submissions;
+there is no documented Claude-style custom marketplace manifest to add to this repository.
+Contact **integrations@zensu.dev** for package access and support while listing is pending.
+See [distribution and submission details](docs/distribution.md).
+
+Maintainers can build the native artifact from a Git checkout without a logged-in host.
+Every packaged source file must be tracked; local-only descendants are rejected:
+
+```bash
+bash package-native.sh /absolute/path/to/output
+# Or inspect just the curated directory:
+bash install.sh --portable-stage-only /absolute/path/to/stage
+```
+
 ## Commands
 
 Each `/zensu-<name>` command loads the matching bundled skill. Commands that create a PR,

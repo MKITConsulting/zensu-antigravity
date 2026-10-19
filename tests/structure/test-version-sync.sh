@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The version invariant: plugin.json version == README badge == newest CHANGELOG
 # heading, all in the same commit. Machine-enforced here, used by
-# .github/workflows/release.yml. Antigravity has NO marketplace manifest, so the
+# .github/workflows/release.yml. Antigravity has no custom marketplace manifest, so the
 # invariant is 3 files — there is intentionally no marketplace.json to keep in
 # sync.
 set -u
@@ -30,8 +30,8 @@ else
   bad "CHANGELOG.md missing"
 fi
 
-# marketplace.json is intentionally absent (Antigravity has no marketplace).
-[ -f "$ROOT/marketplace.json" ] && bad "marketplace.json present (Antigravity has no marketplace — D8)" || ok "no marketplace.json (Antigravity has none — intentional)"
+# Google's curated Marketplace does not document a repository-owned manifest.
+[ -f "$ROOT/marketplace.json" ] && bad "unsupported custom marketplace.json present" || ok "no unsupported custom marketplace manifest"
 
 printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

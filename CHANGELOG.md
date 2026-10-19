@@ -5,6 +5,16 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- Native distribution packages with relative hooks, tracked-source validation and SHA-256 checksums, built without invoking Antigravity.
+- Official Marketplace submission guidance and the integrations@zensu.dev support contact.
+
+### Fixed
+
+- Refuse staging inside host plugin roots even before those roots exist, and reject conflicting install/stage modes.
+- Bootstrap release preparation with the same Node.js version and dependencies as CI.
+
 ## [0.2.0] - 2026-10-19
 
 ### Changed

@@ -4,8 +4,8 @@ name: Release
 # version lives in plugin.json (repo root) + the README badge + the newest
 # CHANGELOG heading — all bumped together (machine-enforced by
 # tests/structure/test-version-sync.sh, which runs in the test gate below).
-# Antigravity has NO marketplace manifest,
-# so there is no fourth file and no marketplace drift to guard against.
+# Google's curated Marketplace has no documented repository-owned manifest,
+# so there is no fourth version file.
 #
 # Flow:
 #   1. Dispatch this workflow (Actions -> Release) with a version_type.
@@ -56,7 +56,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
 
       - name: Deterministic test gate
         run: bash tests/run-all.sh
@@ -91,7 +94,7 @@ jobs:
           sed -i -E "s#version-[0-9]+\.[0-9]+\.[0-9]+-#version-${VER}-#" README.md
           echo "Bumped plugin.json, README badge -> $VER"
           # Sanity: the invariant holds (CHANGELOG joins in the next step). No
-          # marketplace.json — Antigravity has none.
+          # repository-owned marketplace.json is required by Antigravity.
           test "$(jq -r .version plugin.json)" = "$VER"
           grep -q "version-${VER}-" README.md
 
@@ -165,6 +168,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Resolve version + idempotency guard
         id: v
         run: |
@@ -197,6 +204,16 @@ jobs:
         if: steps.v.outputs.skip == 'false'
         run: git archive --format=zip -o "zensu-antigravity-v${{ steps.v.outputs.version }}.zip" HEAD
 
+      - name: Package native plugin and checksums
+        if: steps.v.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          bash package-native.sh "$RUNNER_TEMP/native-release"
+          cp "$RUNNER_TEMP/native-release/zensu-antigravity-native-v${{ steps.v.outputs.version }}.zip" .
+          cp "$RUNNER_TEMP/native-release/zensu-antigravity-native-v${{ steps.v.outputs.version }}.zip.sha256" .
+          sha256sum "zensu-antigravity-v${{ steps.v.outputs.version }}.zip" \
+            "zensu-antigravity-native-v${{ steps.v.outputs.version }}.zip" > SHA256SUMS
+
       - name: Create release
         if: steps.v.outputs.skip == 'false'
         uses: softprops/action-gh-release@v2
@@ -207,6 +224,10 @@ jobs:
           draft: false
           prerelease: false
           body_path: ${{ runner.temp }}/notes.md
-          files: zensu-antigravity-v${{ steps.v.outputs.version }}.zip
+          files: |
+            zensu-antigravity-v${{ steps.v.outputs.version }}.zip
+            zensu-antigravity-native-v${{ steps.v.outputs.version }}.zip
+            zensu-antigravity-native-v${{ steps.v.outputs.version }}.zip.sha256
+            SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
