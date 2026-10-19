@@ -5,6 +5,8 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-19
+
 ### Changed
 
 - Port the complete Zensu 0.27.0 inventory: 32 skills/commands, canonical runtime policy,
