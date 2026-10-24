@@ -38,8 +38,10 @@ checkpoint before handoff to return the review link in the agent's response.
 
 ## Validation boundary
 
-The deterministic fixtures exercise native binding, one-use helper authorization,
-child refusal, durable retries and nonblocking capture errors. An isolated native
-probe on 2026-10-24 discovered the staged plugin but timed out in its existing
-PreInvocation chain before a model response. It does not prove successful native
-AI work capture or Stop delivery; full native acceptance remains outstanding.
+Deterministic fixtures cover native binding, one-use helper authorization,
+child refusal, durable retries and nonblocking capture errors. An isolated
+staged-plugin probe on 2026-10-24 confirmed native startup and Stop-chain delivery
+for its own conversation. Antigravity then returned RESOURCE_EXHAUSTED (429)
+because the account quota was exhausted. No model result or work submission was
+produced, so full native capture acceptance remains unverified. The installed
+plugin and existing conversations were not modified.
