@@ -211,3 +211,15 @@ question can return. A direct answer decides that plan or request only; use
 configured `hooks.defaultDeliveryRoute` can decide the route without asking. The user's
 own explicit preference still wins for the current request; Autopilot and Pilot remain
 per-plan choices. See [delivery-route configuration](docs/configuration.md#hook-opt-out).
+
+## Feature context retrieval
+
+Tracked implementation loads the linked context package through
+`zensu knowledge context-pack <feature-ref> --json`, then hydrates relevant items
+with `zensu knowledge get <item-id> --json` and reads referenced files from the
+authorized checkout. Supplementary search uses `--json` so passages are retained.
+The CLI must expose `knowledge context-pack --help`; older installations report
+the missing capability instead of silently falling back. See the
+[context procedure](skills/implement/references/knowledge-context.md)
+for truncation, access failures and evidence handoff. These reads supplement feature,
+security and design context. They do not record agent usage.
