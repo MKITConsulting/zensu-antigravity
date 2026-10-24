@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 const paths = require('./session-paths.js');
 
 const HELPERS = Object.freeze({
+  'ai-work': ['node', 'hooks/antigravity/ai-work.js'],
   log: ['bash', 'hooks/lib/zensu-log.sh'],
   doctor: ['node', 'hooks/antigravity/doctor.js'],
   'work-order': ['bash', 'hooks/lib/zensu-work-order.sh'],
@@ -64,6 +65,7 @@ function parseArguments(argv) {
   if (args.some((value) => typeof value !== 'string' || value.includes('\0'))) throw new Error('Unsafe helper argument');
   const request = { sessionId, helper, args, stdinFile, stdinSha256: snapshot && snapshot.sha256,
     stdin: snapshot && snapshot.bytes };
+  if (helper === 'ai-work' && stdinFile) throw new Error('Capture does not consume input files');
   validateAuditArguments(request);
   return request;
 }

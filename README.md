@@ -211,3 +211,9 @@ question can return. A direct answer decides that plan or request only; use
 configured `hooks.defaultDeliveryRoute` can decide the route without asking. The user's
 own explicit preference still wins for the current request; Autopilot and Pilot remain
 per-plan choices. See [delivery-route configuration](docs/configuration.md#hook-opt-out).
+
+## Automatic work capture
+
+Agreed implementation goals and new clean commits can be reported through personal
+CLI OAuth in direct or workflow mode. Acceptance and revocation remain human web
+decisions. See [capture behavior and host limits](docs/ai-work-capture.md).

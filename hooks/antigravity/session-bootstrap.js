@@ -53,6 +53,7 @@ function advisory(payload, result, root = paths.pluginRoot()) {
     + `Supported helper names: ${Object.keys(require('./session-helper.js').HELPERS).join(', ')}. `
     + `Do not export session selectors or invoke state helpers directly. `
     + `Native review agents require an accepted session-bound dispatch and a verified child completion receipt.`
+    + require('./ai-work.js').primer(payload, root)
     + (result.created ? ' This session has a fresh inactive workflow baseline.' : ' The existing workflow baseline is preserved.');
 }
 

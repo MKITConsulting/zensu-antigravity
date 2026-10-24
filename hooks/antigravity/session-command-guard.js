@@ -11,14 +11,14 @@ const helpers = require('./session-helper.js');
 // Native state writers must also be recognized by basename: run_command can
 // select the adapter directory as Cwd, and Node accepts extensionless imports.
 const NATIVE_STATE_MODULES = [
-  'antigravity-shim', 'autopilot-review', 'lazy-init', 'native-agent-lifecycle',
+  'ai-work', 'antigravity-shim', 'autopilot-review', 'lazy-init', 'native-agent-lifecycle',
   'native-agent-provenance', 'native-review', 'native-spawn-allow', 'normalize-payload',
   'review-artifacts', 'review-children', 'session-bootstrap', 'session-command-guard',
   'session-helper', 'session-paths', 'session-trail', 'worker-launch', 'worker-runtime',
 ];
 const STATE_MODULES = [
   ...NATIVE_STATE_MODULES,
-  'acceptance-verify-v1', 'chain-recovery-v1', 'edit-landing-receipt-v1', 'evidence-run-v1',
+  'ai-work-capture-v1', 'acceptance-verify-v1', 'chain-recovery-v1', 'edit-landing-receipt-v1', 'evidence-run-v1',
   'external-review-v1', 'full-suite-policy-v1', 'in-thread-review', 'in-thread-review-v1',
   'plugin-data-guard-v1', 'post-review-tdd-delegate', 'review-evidence-hook-v1', 'review-evidence-lease-v1',
   'review-evidence-sweep-v1', 'review-ledger-v1', 'runtime-hook-session-v1',

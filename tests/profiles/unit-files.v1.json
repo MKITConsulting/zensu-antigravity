@@ -524,6 +524,26 @@
         }
       ],
       "summary": "The /zensu-doctor invocation allowlist."
+    },
+    {
+      "path": "tests/structure/ai-work-capture.test.js",
+      "registered": 8,
+      "runs": [
+        {
+          "driver": "tests/structure/test-ai-work-capture.sh"
+        }
+      ],
+      "summary": "Work capture: durable exact retries, account binding and human-only decisions."
+    },
+    {
+      "path": "tests/structure/ai-work-native.test.js",
+      "registered": 4,
+      "runs": [
+        {
+          "driver": "tests/structure/test-ai-work-capture.sh"
+        }
+      ],
+      "summary": "Native capture: immutable conversation binding, child refusal and one-use helper authorization."
     }
   ]
 }
