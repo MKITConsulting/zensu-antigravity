@@ -137,11 +137,11 @@ test('audit aliases pin session, project and receipt while preserving literal ar
   const prepared = helpers.prepareHelperArguments(inspected.request, {}, settings);
   assert.deepEqual(prepared.slice(0, args.length), args);
   assert.deepEqual(prepared.slice(-2), ['--receipt', path.join(project, '.zensu/state', `edit-landing-${core.sessionKey(SID)}.json`)]);
-  for (const [flag, value] of [['--session', OTHER], ['--receipt', '-']]) {
+  for (const [flag, value] of [['--session', OTHER]]) {
     assert.equal(adapter.inspectCommand(payload(command(SID, 'edit-landing', ['--log', '/tmp/run.log', flag, value]))).kind, 'deny');
   }
   for (const extra of [['--project', foreign], ['--receipt', path.join(foreign, 'receipt.json')]]) {
-    const request = helpers.parseArguments(['--session', SID, '--helper', 'edit-landing', '--', '--log', '/tmp/run.log', ...extra]);
+    const request = helpers.parseArguments(['--session', SID, '--helper', 'edit-landing', '--', '--log', '/tmp/run.log', '--session', SID, ...extra]);
     assert.throws(() => helpers.prepareHelperArguments(request, {}, settings), /immutable|current session/);
   }
   const inventory = helpers.parseArguments(['--session', SID, '--helper', 'edit-landing', '--', '--inventory', '--log', '/tmp/run.log']);
@@ -178,7 +178,7 @@ test('bootstrap publishes exact verified placeholder values', () => {
   assert.ok(text.includes('{plugin_root} = "/verified/plugin"'));
   assert.ok(text.includes('{project_root} = "/verified/project"'));
   assert.ok(text.includes(`{conversation_id} = "${SID}"`));
-  assert.ok(text.includes('edit-landing, review-ledger, autopilot-review'));
+  assert.ok(text.includes('edit-landing, workflow-artifacts, review-ledger, autopilot-review'));
 });
 
 test('autopilot adapter dispatches only owned run operations under one project lock', (t) => {
@@ -233,6 +233,33 @@ test('authorization is exact, expires, and is consumed once', (t) => {
   assert.throws(() => helpers.consumeAuthorization(inspected.request, options), /No current/);
   helpers.authorize(inspected.request, options);
   assert.throws(() => helpers.consumeAuthorization(inspected.request, { ...options, now: options.now + helpers.AUTHORIZATION_TTL_MS + 1 }), /No current/);
+});
+
+test('authorization remains valid when the clock advances between reads', (t) => {
+  const { pluginData } = fixture(t);
+  const request = adapter.inspectCommand(payload(command())).request;
+  let now = 10000;
+  t.mock.method(Date, 'now', () => now++);
+  const file = helpers.authorize(request, { pluginData });
+  const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(record.expires_at_ms - record.created_at_ms, helpers.AUTHORIZATION_TTL_MS);
+  helpers.consumeAuthorization(request, { pluginData });
+  assert.equal(fs.existsSync(file), false);
+  assert.throws(() => helpers.consumeAuthorization(request, { pluginData }), /No current/);
+});
+
+test('authorization still rejects receipts with a corrupted exact lifetime', (t) => {
+  const request = adapter.inspectCommand(payload(command())).request;
+  for (const delta of [-1, 1]) {
+    const options = fixture(t);
+    const file = helpers.authorize(request, options);
+    const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+    record.expires_at_ms += delta;
+    const corrupted = JSON.stringify(record);
+    fs.writeFileSync(file, corrupted);
+    assert.throws(() => helpers.consumeAuthorization(request, options), /receipt is invalid/);
+    assert.equal(fs.readFileSync(file, 'utf8'), corrupted);
+  }
 });
 
 test('private authorization rejects symlinks and public records', (t) => {
@@ -301,6 +328,47 @@ test('normalizer uses native authority and canonical edit fields', () => {
   assert.equal(output.tool_name, 'MultiEdit');
   assert.deepEqual(output.tool_input.edits, [{ old_string: 'old', new_string: 'new' }]);
   assert.equal(output.agent_id, undefined);
+});
+
+test('native write_file scans Content at Path without a legacy-field exemption', () => {
+  const content = ['AKIA', 'IOSFODNN7RGY4Q2B'].join('') + '\n';
+  const inspect = (args) => {
+    const output = normalizer.normalize({ conversationId: SID, workspacePaths: ['/workspace'],
+      tool_input: { file_path: '/workspace/tests/decoy.txt', content: 'harmless' },
+      toolCall: { name: 'write_file', args } }, 'PreToolUse', { correlate: false });
+    const result = spawnSync(process.execPath, [path.join(paths.pluginRoot(), 'hooks/lib/secret-scan-decide.js')],
+      { input: JSON.stringify(output), encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(output.tool_name, 'Write');
+    assert.equal(output.tool_input.file_path, args.Path);
+    assert.equal(output.tool_input.content, args.Content);
+    assert.deepEqual(output.native_tool_input, args);
+    assert.equal(output.native_tool_name, 'write_file');
+    return result.stdout;
+  };
+  assert.match(inspect({ Path: '/workspace/credentials.txt', Content: content }), /aws/i);
+  assert.match(inspect({ Path: '/workspace/credentials.txt', Content: content,
+    TargetFile: '/workspace/tests/decoy.txt', CodeContent: 'harmless' }), /aws/i);
+  assert.equal(inspect({ Path: '/workspace/tests/credentials.txt', Content: content }), '');
+  assert.equal(inspect({ Path: '/workspace/credentials.txt', Content: '' }), '');
+  for (const args of [{ Content: content }, { Path: '', Content: content },
+    { Path: '/workspace/credentials.txt' }, { Path: 123, Content: content }]) {
+    assert.throws(() => inspect(args), /write_file requires/);
+  }
+});
+
+test('native write_file post-tool correlation preserves the actual target and content', (t) => {
+  const options = fixture(t);
+  const args = { Path: '/workspace/source.js', Content: 'export const value = 1;\n' };
+  normalizer.normalize({ conversationId: SID, stepIdx: 8, workspacePaths: ['/workspace'],
+    toolCall: { name: 'write_file', args } }, 'PreToolUse', options);
+  const output = normalizer.normalize({ conversationId: SID, stepIdx: 8,
+    workspacePaths: ['/workspace'] }, 'PostToolUse', options);
+  assert.equal(output.tool_name, 'Write');
+  assert.equal(output.tool_input.file_path, args.Path);
+  assert.equal(output.tool_input.content, args.Content);
+  assert.deepEqual(output.native_tool_input, args);
+  assert.equal(output.tool_response, undefined);
 });
 
 test('PreInvocation maps to the neutral UserPromptSubmit principal contract', () => {

@@ -23,6 +23,7 @@ const HELPERS = Object.freeze({
   'review-children': ['node', 'hooks/antigravity/review-children.js'],
   'review-artifacts': ['node', 'hooks/antigravity/review-artifacts.js'],
   'edit-landing': ['bash', 'hooks/lib/zensu-edit-landing.sh'],
+  'workflow-artifacts': ['node', 'hooks/antigravity/workflow-artifacts.js'],
   'review-ledger': ['node', 'hooks/lib/review-ledger-v1.js'],
   'autopilot-review': ['bash', 'hooks/antigravity/autopilot-review.sh'],
 });
@@ -70,7 +71,7 @@ function parseArguments(argv) {
 function auditArguments(request) {
   if (!['edit-landing', 'review-ledger'].includes(request.helper)) return null;
   const flags = request.helper === 'edit-landing'
-    ? ['--log', '--project', '--baseline', '--session-epoch', '--session', '--dirty-before', '--receipt']
+    ? ['--log', '--project', '--baseline', '--session-epoch', '--session', '--dirty-before', '--predicates', '--receipt']
     : ['--log', '--root'];
   const switches = request.helper === 'edit-landing' ? ['--inventory'] : ['--report'];
   const result = new Map();
@@ -92,7 +93,6 @@ function validateAuditArguments(request) {
     if (sid && sid !== request.sessionId && sid !== require('../lib/session-control-core-v1.js').sessionKey(request.sessionId)) {
       throw new Error('Edit-landing session must match the current conversation');
     }
-    if (args.get('--receipt') === '-') throw new Error('The native edit-landing helper cannot disable its receipt');
   }
 }
 function prepareHelperArguments(request, environment, options = {}) {
@@ -102,12 +102,33 @@ function prepareHelperArguments(request, environment, options = {}) {
   const resolver = options.resolver || require('../lib/runtime-hook-session-v1.js').resolveHookSession;
   const binding = resolver({ session_id: request.sessionId }, environment);
   const root = binding.projectRoot;
+  if (request.helper === 'edit-landing' && !args.has('--inventory') && !args.has('--session')) {
+    const core = require('../lib/session-control-core-v1.js');
+    const stateFile = path.join(root, '.zensu/state', `tdd-phase-${core.sessionKey(request.sessionId)}.json`);
+    let exists = true;
+    try { fs.lstatSync(stateFile); } catch (error) { if (error.code === 'ENOENT') exists = false; else throw error; }
+    const state = exists ? core.readWorkflowState({ projectRoot: root, sessionId: request.sessionId }) : null;
+    if (state && state.active === true && state.chainDone !== true) {
+      const command = require('../lib/edit-landing-receipt-v1.js').auditRecoveryCommand({
+        projectRoot: root, sessionId: request.sessionId, state, log: args.get('--log'),
+        commandPrefix: auditCommandPrefix(request.sessionId, options.pluginRoot),
+      });
+      throw new Error('AUDIT SESSION REQUIRED — an active native workflow requires explicit --session; no claims were graded and no receipt was written.\n'
+        + `Run: ${command}\nPreserve the original dirty scope and add --predicates with current literal/hash proofs when required. Use --inventory for read-only inspection.`);
+    }
+  }
   const rootFlag = request.helper === 'edit-landing' ? '--project' : '--root';
   if (args.has(rootFlag) && fs.realpathSync.native(args.get(rootFlag)) !== root) {
     throw new Error('Audit project must match the immutable session project root');
   }
   args.set(rootFlag, root);
-  if (request.helper === 'edit-landing' && !args.has('--inventory')) {
+  if (request.helper === 'edit-landing' && !args.has('--inventory') && !args.has('--session')) {
+    if (args.has('--receipt') && args.get('--receipt') !== '-') {
+      throw new Error('A native standalone audit is noncanonical and cannot write a receipt destination. Omit --receipt or use --receipt - for inspection; supply explicit --session with the current conversation to write its canonical receipt.');
+    }
+    args.set('--receipt', '-');
+  }
+  if (request.helper === 'edit-landing' && !args.has('--inventory') && args.has('--session')) {
     const key = require('../lib/session-control-core-v1.js').sessionKey(request.sessionId);
     const receipt = path.join(root, '.zensu/state', `edit-landing-${key}.json`);
     if (args.has('--receipt') && args.get('--receipt') !== receipt) throw new Error('Edit-landing receipt must be the current session receipt');
@@ -115,6 +136,10 @@ function prepareHelperArguments(request, environment, options = {}) {
     args.set('--receipt', receipt);
   }
   return [...args].flatMap(([name, value]) => value === true ? [name] : [name, value]);
+}
+function auditCommandPrefix(sessionId, pluginRoot = paths.pluginRoot()) {
+  return ['bash', path.join(pluginRoot, 'hooks/antigravity/session-helper.sh'),
+    '--session', sessionId, '--helper', 'edit-landing', '--'];
 }
 function requestKey(request) {
   return crypto.createHash('sha256').update(JSON.stringify([request.sessionId, request.helper,
@@ -125,10 +150,10 @@ function authorize(request, options = {}) {
   const directory = paths.privateDirectory(data, 'helper-calls');
   const key = requestKey(request);
   const nonce = crypto.randomBytes(16).toString('hex');
+  const now = options.now === undefined ? Date.now() : options.now;
   const record = { schema: 'zensu.antigravity.helper-call.v1', key,
     session_id: request.sessionId, helper: request.helper,
-    created_at_ms: options.now === undefined ? Date.now() : options.now,
-    expires_at_ms: (options.now === undefined ? Date.now() : options.now) + AUTHORIZATION_TTL_MS };
+    created_at_ms: now, expires_at_ms: now + AUTHORIZATION_TTL_MS };
   const file = path.join(directory, `${key}-${nonce}.json`);
   fs.writeFileSync(file, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
   return file;
@@ -160,7 +185,7 @@ function helperEnvironment(request, options = {}) {
   for (const name of ['ZENSU_SESSION_KEY', 'ZENSU_SESSION_CONTEXT', 'ZENSU_RUNTIME_DIGEST',
     'ZENSU_PROJECT_ROOT', 'ZENSU_RUNTIME_PLUGIN_ROOT', 'ZENSU_SESSION_ADOPTED',
     'ZENSU_PROJECT_DIR', 'ZENSU_HOST_SESSION_ID', 'ZENSU_PLUGIN_ROOT', 'ZENSU_PLUGIN_DATA',
-    'ANTIGRAVITY_PLUGIN_ROOT', 'PLUGIN_ROOT', 'BASH_ENV', 'ENV', 'NODE_OPTIONS']) delete environment[name];
+    'ANTIGRAVITY_PLUGIN_ROOT', 'PLUGIN_ROOT', 'BASH_ENV', 'ENV', 'NODE_OPTIONS', 'ZENSU_AUDIT_COMMAND_JSON']) delete environment[name];
   environment.ZENSU_PLUGIN_ROOT = options.pluginRoot || paths.pluginRoot();
   environment.ZENSU_PLUGIN_DATA = options.pluginData || paths.dataRoot();
   // Plugin-internal transport only. The host did not supply an environment
@@ -168,6 +193,7 @@ function helperEnvironment(request, options = {}) {
   environment.ZENSU_HOST_SESSION_ID = request.sessionId;
   environment.ZENSU_REVIEW_EXECUTION = 'delegated';
   environment.ZENSU_CLIENT_NAME = 'zensu-antigravity';
+  environment.ZENSU_AUDIT_COMMAND_JSON = JSON.stringify(auditCommandPrefix(request.sessionId, environment.ZENSU_PLUGIN_ROOT));
   return environment;
 }
 function main(argv) {
@@ -192,5 +218,5 @@ if (require.main === module) {
     process.stderr.write(`zensu session helper: ${error.message}\n`); process.exitCode = 2;
   }
 }
-module.exports = { HELPERS, AUTHORIZATION_TTL_MS, MAX_STDIN_BYTES, stdinSnapshot, parseArguments, validateAuditArguments, prepareHelperArguments, requestKey,
+module.exports = { HELPERS, AUTHORIZATION_TTL_MS, MAX_STDIN_BYTES, stdinSnapshot, parseArguments, validateAuditArguments, prepareHelperArguments, auditCommandPrefix, requestKey,
   authorize, consumeAuthorization, helperEnvironment, main };

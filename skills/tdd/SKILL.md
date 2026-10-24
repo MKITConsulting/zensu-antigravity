@@ -28,11 +28,12 @@ For reanchor, set the shell tool's native working-directory property to the targ
 
 All state-changing helper calls use `{session-helper} --helper <name> -- <arguments>`.
 Read `{plugin_root}/docs/upstream-parity.md` when this skill names a host facility.
-Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles,
-with literal `Subagents` entries containing `TypeName`, `Role`, `Workspace: "inherit"`,
-`Model: "inherit"` and a complete `Prompt`. Follow the calling review procedure's private
-lease and actual child-UUID completion checks; a role name or model-written result is not
-proof of execution. Keep implementation in the main conversation. No source-host Agent,
+Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles.
+On agy 1.4.3, use one flat call per role with `TypeName`, `Role`, `Workspace: "inherit"`,
+`Model: "inherit"` and a complete `Prompt`. Use a legacy `Subagents` array only when the
+exposed host schema permits it; never mix both forms or add unknown arguments. Follow the
+calling review procedure's private lease and actual child-UUID completion checks; a role
+name or model-written result is not proof of execution. Keep implementation in the main conversation. No source-host Agent,
 SendMessage, Workflow, desktop transfer or implicit plan-approval callback is assumed.
 Use a direct user question for required input and a persisted step table for progress.
 
@@ -128,7 +129,7 @@ Provide a FEATURE SPECIFICATION as the input. Describe WHAT needs to be built, n
   Raw child results remain immutable; the main thread verifies and classifies the merged
   findings. Never fabricate an agent identity or replace a child receipt with prose.
 - **Ordered operations.** Run state transitions and evidence commands one at a time.
-  Wait for each result before advancing; the independent panel dispatch itself uses one native batch.
+  Wait for each result before advancing; dispatch the independent panel with one flat call per role.
   A long evidence-run command may run in the background only when its own runner records
   completion; await the completed receipt before reporting or closing the chain.
 

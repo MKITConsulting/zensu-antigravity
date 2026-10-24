@@ -1,0 +1,142 @@
+{
+  "schema": "zensu-workflow-repair-pr-evidence-v1",
+  "status": "native-acceptance-partial",
+  "originalSourceHead": "94044ffa2ef3dffc7075096b52a9ec6dbd5583a8",
+  "runtimeDigest": "sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531",
+  "nativePayloadFiles": 325,
+  "nativeArchiveSha256": "ac382c60feb7ef1226935b0b7d29f0bec98705199d032dc1fa8e36ef794fdc74",
+  "scope": "Recorded pre-PR local and native observations; not a new complete native run or GitHub CI result",
+  "deterministic": {
+    "dateUtc": "2026-10-23",
+    "finalStatus": "PASS",
+    "suites": {
+      "passed": 79,
+      "failed": 0
+    },
+    "structure": {
+      "passed": 77,
+      "failed": 0
+    },
+    "offline": {
+      "configuration": 57,
+      "promptfoo": 110
+    },
+    "outerWorkers": 2,
+    "priorFourWorkerResult": {
+      "passed": 78,
+      "failed": 1
+    },
+    "limits": "Three timing failures in the first run passed in unchanged isolated reruns and the complete two-worker rerun. Assertions and timeouts were not relaxed."
+  },
+  "fullNativeSweep": {
+    "date": "2026-10-23",
+    "host": "AGY 1.4.6",
+    "verified": 43,
+    "unverified": 2,
+    "exitCode": 1,
+    "openAtThatRun": [
+      "live-stop-block-and-resume",
+      "live-native-worker-prepare"
+    ]
+  },
+  "stopFollowup": {
+    "dateUtc": "2026-10-23",
+    "status": "PASS",
+    "continuation": {
+      "verified": true,
+      "armedUserStep": 3,
+      "blockedStep": 7,
+      "resumedStep": 9,
+      "activity": "tool-call",
+      "completedToolResults": 1
+    },
+    "workflowComplete": false,
+    "oneTimeApprovals": 1,
+    "limits": "Controlled Stop block and same-session completed tool continuation; not workflow closure or a fresh 45-scenario run."
+  },
+  "workerFollowup": {
+    "localDate": "2026-10-24",
+    "timezone": "Europe/Berlin",
+    "startedAt": "2026-10-23T22:07:49.796223+00:00",
+    "finishedAt": "2026-10-23T22:08:07.301741+00:00",
+    "host": "AGY 1.4.6",
+    "status": "UNVERIFIED",
+    "acceptanceExitCode": 1,
+    "catalogTimeoutSeconds": 180,
+    "elapsedSecondsApprox": 17.5,
+    "blocker": "RESOURCE_EXHAUSTED (code 429): Individual quota reached",
+    "reportedResetEstimate": "46h34m44s at the observed run; not current readiness",
+    "completedModelResponses": 0,
+    "toolCalls": 0,
+    "preparationReceiptExists": false,
+    "temporaryTrustEntriesRemoved": 1,
+    "settingsRestoredByteForByte": true
+  },
+  "invoice": {
+    "date": "2026-10-23",
+    "nativeCompletionPass": true,
+    "childChainPass": true,
+    "nativeChildren": 8,
+    "reportPass": true,
+    "operatorInterventions": [
+      "Unapproved consumer command was stopped; same-session continuation required project-local offline install and observable consumer cwd.",
+      "A 3600-second bounded turn timed out; same-session continuation used frozen native documentation pointers.",
+      "Premature chain-done was not approved because required current-file self-review reads were absent; the native continuation then read all nine files fully.",
+      "First closed-generation report correction fixed created-vs-total counts, vanilla mode and missing reflection.",
+      "Second literal report-only correction removed invented product advice and bounded dimension notes."
+    ],
+    "limits": [
+      "Assisted native workflow and report correction; not unattended execution or unassisted model-quality proof.",
+      "Thin consume skips standalone inspection under its frozen contract; its unsuccessful optional read remains recorded, all provenance/completion gates passed.",
+      "Security child raw assertions exceed executed security-test coverage; final report limits claims to observed checks.",
+      "Zero findings exercise verification and routing of an empty set, not live finding reproduction or a terminal fix round."
+    ]
+  },
+  "independentInvoicePackage": {
+    "date": "2026-10-23",
+    "status": "pass",
+    "originalChecksPassed": 14,
+    "directInstalledNpmBinPass": true,
+    "tarballSha256": "08c9536c204a731c159c04f0113a4d4ba8b9b922dda3e9ec5897e506d71502c7",
+    "scope": "Installed built invoice npm package from a real consumer cwd; separate from plugin/native acceptance"
+  },
+  "sourceRecordHashes": {
+    "stop-resume-local-gate-20261023.json": "cd7f62b2a8eeb38a50d1c84faf08e57a7e85b0550293df5990494bf3031b184f",
+    "stop-resume-native-20261023.json": "e5e9b45fdfd8b9c69aee9b9bbcae7d07254e48460bb6ef9dc7f40138a77b7bd0",
+    "worker-recheck-native-20261024.json": "f80293b94ae50ce50abfaf89bcee299a96ea1b112fdf012f31716a57b68804c2",
+    "native-repairs-live-20261023.json": "a532f237b72b8b93a65cb2a63be84a0d0999324bbb4184e4b669ae286b37ed2f",
+    "native-repairs-invoice-20261023.json": "83840a0cc1cb33b6e4492ba68e806ac725a9e298955b9bb2775de6aef5579f37",
+    "native-20261023-package.json": "a8585b60ca0cec617809606a3396e463450c9c5e1888203ba7786f03a76002e9",
+    "native-repairs-audit-20261023.json": "437a2faf5a756e1df3283e48eba0df14d144ea8d1eec8fd70b8a786bb63d9284",
+    "native-20261023-readme.json": "9d2922644fdfb8e372b8d7c1b866039e1d462dadcfce70d5e7140f64752c5dd7"
+  },
+  "freshPrChecks": {
+    "startedAt": "2026-10-24T17:21:04.190109+00:00",
+    "finishedAt": "2026-10-24T17:22:42.433295+00:00",
+    "scope": "Fresh focused deterministic checks and native ZIP verification in the isolated PR worktree; no model calls",
+    "allStepsPassed": true,
+    "interactiveTests": 57,
+    "workflowTests": {
+      "auditScope": 22,
+      "nativeAuditSessionFixtures": 7,
+      "workflowArtifacts": 6,
+      "workflowGuidance": 6
+    },
+    "liveProviderAssertions": 71,
+    "pairedGateVerdictsPassed": true,
+    "testRegistryPassed": true,
+    "nativePackage": {
+      "fileCount": 325,
+      "allFilesMatchPreviouslyTestedFrozenPlugin": true,
+      "archiveSha256": "8c5f1160c98bcd49c1ad38b7f5e3fc65c54e3dfc3788fac818f412111896e41d",
+      "runtimeDigest": "sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531"
+    },
+    "firstAttempt": {
+      "status": "FAIL",
+      "failedInteractiveCases": 3,
+      "reason": "Direct isolated test invocation omitted the existing tests/prepare-runtime.js prerequisite; hooks.json was missing. The normal full runner already performs this step.",
+      "resolution": "Regenerated the local ignored hooks.json through tests/prepare-runtime.js and reran unchanged tests; no source or gate edits."
+    },
+    "recordSha256": "e3f96c17dbeb2bff48b2875b439680603c20b0dc301d0a07f043efcf82bd0edb"
+  }
+}

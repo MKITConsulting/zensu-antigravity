@@ -231,3 +231,219 @@ test('verified native child uses the real read-only gate and actual Stop result 
   assert.equal(result.sourceTree, child.provenance.sourceTree);
   assert.equal(result.observedStop.responseStep, 5);
 });
+
+function useFlatArguments(f) {
+  f.parentPayload.native_tool_input = { ...f.descriptor };
+  f.parentRows[1].tool_calls[0].args = { ...f.descriptor };
+  f.writeRows(f.parent, f.parentRows);
+  return f;
+}
+test('flat native arguments and the legacy batch produce the same bounded descriptor without rewriting host input', (t) => {
+  const f = fixture(t);
+  const batch = api.inspectLaunch(f.parentPayload);
+  useFlatArguments(f);
+  const before = JSON.stringify(f.parentPayload);
+  const flat = api.inspectLaunch(f.parentPayload);
+  assert.equal(flat.length, 1);
+  assert.deepEqual(flat.map(({ canonicalPayload, ...entry }) => entry),
+    batch.map(({ canonicalPayload, ...entry }) => entry));
+  assert.deepEqual(flat[0].canonicalPayload.tool_input, batch[0].canonicalPayload.tool_input);
+  assert.equal(JSON.stringify(f.parentPayload), before);
+  assert.deepEqual(flat[0].canonicalPayload.native_tool_input, f.descriptor);
+});
+test('native dispatch refuses mixed forms and unknown wrapper or descriptor fields', (t) => {
+  const f = fixture(t);
+  for (const input of [
+    { ...f.descriptor, Subagents: [f.descriptor] },
+    { Subagents: [f.descriptor], Extra: true },
+    { Subagents: [f.descriptor], Prompt: f.descriptor.Prompt },
+    { ...f.descriptor, Extra: true },
+    { Subagents: [{ ...f.descriptor, Extra: true }] },
+  ]) assert.throws(() => api.inspectLaunch({ ...f.parentPayload, native_tool_input: input }), /unsupported|mixed/);
+});
+test('flat and batch descriptors retain required fields and inheritance checks', (t) => {
+  const f = fixture(t);
+  const bad = [
+    ...['TypeName', 'Role', 'Prompt'].flatMap(key => [undefined, null, '', false].map(value => ({ ...f.descriptor, [key]: value }))),
+    ...['Model', 'Workspace'].flatMap(key => [null, false, '', 'other'].map(value => ({ ...f.descriptor, [key]: value }))),
+    { ...f.descriptor, TypeName: '../outside' }, { ...f.descriptor, Role: 'line\nbreak' },
+    { ...f.descriptor, Prompt: 'embedded\0byte' },
+  ];
+  for (const entry of bad) {
+    for (const input of [entry, { Subagents: [entry] }]) {
+      assert.throws(() => api.inspectLaunch({ ...f.parentPayload, native_tool_input: input }));
+    }
+  }
+  for (const input of [null, [], 'invalid', {}, { Subagents: null }, { Subagents: {} },
+    { Subagents: [] }, { Subagents: '[invalid' }, { Subagents: Array(17).fill(f.descriptor) }]) {
+    assert.throws(() => api.inspectLaunch({ ...f.parentPayload, native_tool_input: input }));
+  }
+});
+test('accepted flat launch retains packet admission and exact actual child provenance', (t) => {
+  const f = useFlatArguments(fixture(t, 'transcript_full.jsonl'));
+  let checked = 0;
+  f.options.validateReviewLaunch = ({ entries, binding, sourceTree, parentId }) => {
+    checked += 1;
+    assert.equal(entries.length, 1); assert.equal(entries[0].prompt, f.descriptor.Prompt);
+    assert.equal(parentId, f.parent); assert.equal(binding, f.binding);
+    assert.equal(sourceTree, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+  };
+  const accepted = f.authorize();
+  assert.equal(checked, 1); assert.equal(accepted.authorized, true);
+  const child = api.prepare(f.childPayload, f.options);
+  assert.equal(child.status, 'child', child.reason);
+  assert.equal(child.payload.agent_id, f.child); assert.equal(child.payload.session_id, f.parent);
+  assert.equal(child.provenance.spawnStepIndex, 3);
+  assert.equal(child.provenance.promptSha256, crypto.createHash('sha256').update(f.descriptor.Prompt).digest('hex'));
+  assert.equal(child.provenance.runtimeDigest, f.binding.context.runtime_digest);
+  assert.equal(child.provenance.sourceTree, accepted.receipt.sourceTree);
+  const final = api.latestChildResponse(f.childPayload, f.options);
+  assert.equal(final.text, '{"findings":[]}'); assert.equal(final.stepIndex, 5);
+});
+test('flat child authority still requires an exact valid actual parent invocation', (t) => {
+  for (const mutate of [
+    (f) => { f.parentRows[1].tool_calls[0].args.Prompt = 'Different prompt'; },
+    (f) => { f.parentRows[1].tool_calls[0].args.Role = 'Different role'; },
+    (f) => { f.parentRows[1].tool_calls[0].args.TypeName = 'zensu-plm'; },
+    (f) => { f.parentRows[1].tool_calls[0].args.Workspace = 'share'; },
+    (f) => { f.parentRows[1].tool_calls[0].args.Subagents = [f.descriptor]; },
+    (f) => { f.parentRows[1].tool_calls[0].args.Extra = true; },
+  ]) {
+    const f = useFlatArguments(fixture(t)); f.authorize(); mutate(f); f.writeRows(f.parent, f.parentRows);
+    assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+  }
+});
+test('flat launch cannot bypass review packet admission or manufacture child completion', (t) => {
+  const f = useFlatArguments(fixture(t));
+  f.options.validateReviewLaunch = () => { throw new Error('Canonical review packet mismatch'); };
+  assert.throws(() => f.authorize(), /Canonical review packet mismatch/);
+  assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+  delete f.options.validateReviewLaunch;
+  f.authorize();
+  const lifecycle = require('../../hooks/antigravity/native-agent-lifecycle.js');
+  assert.equal(lifecycle.stopChild({ ...f.childPayload, termination_reason: 'USER_CANCELED', fully_idle: true }, f.options).captured, false);
+  assert.equal(lifecycle.stopChild({ ...f.childPayload, termination_reason: 'NO_TOOL_CALL' }, f.options).status, 'pending');
+  f.childRows[2].tool_calls = [{ name: 'send_message' }]; f.writeRows(f.child, f.childRows);
+  assert.throws(() => api.latestChildResponse(f.childPayload, f.options), /terminal/);
+});
+
+function useSingularResult(f) {
+  f.parentRows[2].content = f.parentRows[2].content
+    .replace('Created the following subagents:\n', 'Created the following subagent:\n')
+    .replace('The subagents will', 'The subagent will');
+  f.writeRows(f.parent, f.parentRows);
+  return f;
+}
+test('flat dispatch with a singular host result binds the actual child and captures normal idle completion', (t) => {
+  for (const filename of ['transcript.jsonl', 'transcript_full.jsonl']) {
+    const f = useSingularResult(useFlatArguments(fixture(t, filename))); f.authorize();
+    const child = api.prepare(f.childPayload, f.options);
+    assert.equal(child.status, 'child', child.reason);
+    assert.equal(child.provenance.childSessionId, f.child);
+    assert.equal(child.provenance.parentSessionId, f.parent);
+    assert.equal(child.provenance.spawnStepIndex, 3);
+    const lifecycle = require('../../hooks/antigravity/native-agent-lifecycle.js');
+    assert.equal(lifecycle.stopChild({ ...f.childPayload, termination_reason: 'NO_TOOL_CALL', fully_idle: true, execution_num: 1 }, f.options).status, 'completed');
+    const completed = lifecycle.completedChild(f.parent, f.child, f.options);
+    assert.equal(completed.finalText, '{"findings":[]}');
+    assert.equal(completed.runtimeDigest, f.binding.context.runtime_digest);
+    assert.equal(completed.sourceTree, child.provenance.sourceTree);
+  }
+});
+test('host result parser accepts singular one-child and legacy plural result forms', () => {
+  const children = [crypto.randomUUID(), crypto.randomUUID()].map(conversationId => ({
+    conversationId, logAbsoluteUri: `file:///fixture/${conversationId}/transcript.jsonl`, workspaceUris: ['file:///fixture'],
+  }));
+  const result = (label, values) => 'Created At: 2026-10-20T13:38:55+02:00\nCompleted At: 2026-10-20T13:38:59+02:00\n'
+    + `Created the following ${label}:\n${values.map(value => JSON.stringify(value, null, 2)).join('\n')}\n`
+    + `The ${label} will send you a message when finished.`;
+  assert.deepEqual(api.spawnedChildren(result('subagent', children.slice(0, 1))), children.slice(0, 1));
+  assert.deepEqual(api.spawnedChildren(result('subagents', children.slice(0, 1))), children.slice(0, 1));
+  assert.deepEqual(api.spawnedChildren(result('subagents', children)), children);
+});
+test('host result parser rejects missing, ambiguous, malformed and singular multi-child results', () => {
+  const child = JSON.stringify({ conversationId: crypto.randomUUID() });
+  const singular = `Created the following subagent:\n${child}`;
+  const plural = `Created the following subagents:\n${child}`;
+  for (const value of [null, '', `prefix ${plural}`, `${plural}\n${plural}`, `${singular}\n${plural}`,
+    `${plural}\n${singular}`, `${singular}\n${child}`, 'Created the following subagent:\n[]',
+    'Created the following subagent:\n{"conversationId":', 'Created the following subagents:\n{broken}',
+    `${plural}\n{`, 'Created the following subagents:\n' + Array(17).fill(child).join('\n')]) {
+    assert.throws(() => api.spawnedChildren(value), undefined, String(value));
+  }
+});
+test('singular host result still refuses substituted child identity, workspace, transcript and count', (t) => {
+  for (const mutate of [
+    (f) => { f.parentRows[2].content = f.parentRows[2].content.replaceAll(f.child, f.sibling); },
+    (f) => { f.parentRows[2].content = f.parentRows[2].content.replace(pathToFileURL(f.workspace).href, pathToFileURL(f.tmp).href); },
+    (f) => { f.parentRows[2].content = f.parentRows[2].content.replace('transcript.jsonl', 'unrelated.jsonl'); },
+    (f) => { f.parentRows[2].content = f.parentRows[2].content.replace('\nThe subagent', '\n{"conversationId":"extra"}\nThe subagent'); },
+  ]) {
+    const f = useSingularResult(useFlatArguments(fixture(t))); f.authorize(); mutate(f);
+    f.writeRows(f.parent, f.parentRows);
+    assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+  }
+});
+
+function parallelFixture(t) {
+  const f = useSingularResult(useFlatArguments(fixture(t, 'transcript_full.jsonl')));
+  f.otherDescriptor = { ...f.descriptor, Role: 'Second reviewer', Prompt: 'Read the other approved evidence.' };
+  f.parentRows[1].tool_calls.push({ name: 'invoke_subagent', args: f.otherDescriptor });
+  f.parentRows.push({ ...f.parentRows[2], step_index: 4,
+    content: f.parentRows[2].content.replaceAll(f.child, f.sibling) });
+  f.writeRows(f.parent, f.parentRows);
+  f.writeRows(f.sibling, f.childRows.map(row => ({ ...row,
+    content: row.content?.replace(f.descriptor.Prompt, f.otherDescriptor.Prompt) })));
+  f.sidecar.spawnStepIndex = 4;
+  fs.writeFileSync(f.sidecarFile, JSON.stringify(f.sidecar));
+  f.otherSidecarFile = path.join(path.dirname(f.sidecarFile), `${f.sibling}.json`);
+  fs.writeFileSync(f.otherSidecarFile, JSON.stringify({ ...f.sidecar, conversationId: f.sibling,
+    subagentDescriptor: { typeName: f.otherDescriptor.TypeName, role: f.otherDescriptor.Role } }));
+  f.authorizeBoth = () => {
+    f.authorize();
+    api.authorizeLaunch({ ...f.parentPayload, step_idx: 4, native_tool_input: f.otherDescriptor }, f.options);
+  };
+  return f;
+}
+test('parallel flat children sharing the final sidecar step bind separate exact accepted results', (t) => {
+  const f = parallelFixture(t); f.authorizeBoth();
+  for (const [child, step, descriptor] of [[f.child, 3, f.descriptor], [f.sibling, 4, f.otherDescriptor]]) {
+    const payload = { ...f.childPayload, session_id: child, transcript_path: f.transcript(child) };
+    const result = api.prepare(payload, f.options);
+    assert.equal(result.status, 'child', result.reason);
+    assert.equal(result.provenance.spawnStepIndex, step);
+    assert.equal(result.provenance.role, descriptor.Role);
+    assert.equal(result.provenance.prompt, descriptor.Prompt);
+    assert.equal(result.provenance.launchReceiptId, crypto.createHash('sha256').update(`${f.parent}:${step}`).digest('hex'));
+    const lifecycle = require('../../hooks/antigravity/native-agent-lifecycle.js');
+    assert.equal(lifecycle.stopChild({ ...payload, fully_idle: true, termination_reason: 'NO_TOOL_CALL' }, f.options).status, 'completed');
+    assert.equal(lifecycle.completedChild(f.parent, child, f.options).finalText, '{"findings":[]}');
+  }
+});
+test('a sibling receipt cannot authorize the child whose own dispatch was never accepted', (t) => {
+  const f = parallelFixture(t);
+  api.authorizeLaunch({ ...f.parentPayload, step_idx: 4, native_tool_input: f.otherDescriptor }, f.options);
+  assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+});
+test('parallel correlation rejects ambiguity, reordered calls and foreign batch anchors', (t) => {
+  for (const mutate of [
+    f => { f.parentRows[3].content = f.parentRows[2].content; },
+    f => { f.parentRows[1].tool_calls.reverse(); },
+    f => { f.parentRows[1].tool_calls[0].args.Prompt = 'Forged'; },
+    f => { f.parentRows[3].status = 'IN_PROGRESS'; },
+    f => { f.parentRows[3].source = 'SYSTEM'; },
+    f => { f.parentRows.reverse(); },
+    f => { f.sidecar.spawnStepIndex = 2; },
+    f => { f.sidecar.spawnStepIndex = 8;
+      f.parentRows.push({ ...f.parentRows[1], step_index: 7, tool_calls: [f.parentRows[1].tool_calls[1]] },
+        { ...f.parentRows[3], step_index: 8 }); },
+    f => { f.sidecar.subagentDescriptor.role = f.otherDescriptor.Role; },
+    f => { f.binding.context.runtime_digest = 'changed'; },
+    f => { f.options.now += 24 * 60 * 60 * 1000 + 1; },
+    f => { f.parentRows[2].content = f.parentRows[2].content.replace(pathToFileURL(f.workspace).href, pathToFileURL(f.tmp).href); },
+  ]) {
+    const f = parallelFixture(t); f.authorizeBoth(); mutate(f);
+    f.writeRows(f.parent, f.parentRows); fs.writeFileSync(f.sidecarFile, JSON.stringify(f.sidecar));
+    assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+  }
+});

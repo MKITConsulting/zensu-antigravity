@@ -77,7 +77,13 @@ function decodeArgument(value) {
   try { return JSON.parse(value); } catch { return value; }
 }
 function descriptors(args) {
-  const items = decodeArgument(args && args.Subagents);
+  if (!args || typeof args !== 'object' || Array.isArray(args)) fail('invalid native dispatch arguments');
+  // Current native calls expose one descriptor; earlier calls used a batch.
+  // Parse both here so admission and actual parent transcript checks agree.
+  // Never choose one interpretation of mixed arguments or rewrite host input.
+  const batch = Object.hasOwn(args, 'Subagents');
+  if (batch && Object.keys(args).some((key) => key !== 'Subagents')) fail('unsupported or mixed native dispatch wrapper field');
+  const items = batch ? decodeArgument(args.Subagents) : [args];
   if (!Array.isArray(items) || !items.length || items.length > 16) fail('Subagents must contain between one and sixteen roles');
   const roles = new Set();
   return items.map((entry, index) => {
@@ -123,6 +129,9 @@ function authorizeLaunch(payload, options = {}) {
   const snapshot = computeTree(binding.projectRoot, dirs.root), sourceTree = snapshot.tree;
   if (!(typeof sourceTree === 'string' && /^[a-f0-9]{40,64}$/.test(sourceTree))
       && !(sourceTree === null && snapshot.reason === 'not a git work tree')) fail('source tree snapshot is unavailable');
+  (options.validateReviewLaunch || require('./native-review-packet.js').validateLaunch)({
+    entries, binding, sourceTree, parentId: source.sessionId,
+  });
   const record = { schema: SCHEMA, parentSessionId: source.sessionId, spawnStepIndex: payload.step_idx,
     workspaceRoot: root, brain: source.brain, parentTranscript: source.transcript,
     pluginRoot: binding.pluginRoot, runtimeDigest: binding.context.runtime_digest,
@@ -153,9 +162,11 @@ function initialParentMessage(rows) {
   return null;
 }
 function spawnedChildren(content) {
-  const marker = 'Created the following subagents:\n';
-  if (typeof content !== 'string' || !content.includes(marker)) fail('native dispatch result is missing');
-  let rest = content.slice(content.indexOf(marker) + marker.length).trimStart();
+  if (typeof content !== 'string') fail('native dispatch result is missing');
+  const marker = /^Created the following (subagents?):\n/gm;
+  const match = marker.exec(content);
+  if (!match || marker.exec(content)) fail('native dispatch result is missing or ambiguous');
+  let rest = content.slice(match.index + match[0].length).trimStart();
   const values = [];
   while (rest.startsWith('{')) {
     let depth = 0, quote = false, escaped = false, end = -1;
@@ -170,11 +181,23 @@ function spawnedChildren(content) {
     values.push(JSON.parse(rest.slice(0, end)));
     rest = rest.slice(end).trimStart();
   }
-  if (!values.length || values.length > 16) fail('native dispatch result has an invalid child count');
+  if (!values.length || values.length > 16 || (match[1] === 'subagent' && values.length !== 1)) fail('native dispatch result has an invalid child count');
   return values;
+}
+function launchBatch(rows, step) {
+  if (!rows.every((row, index) => !index || row.step_index > rows[index - 1].step_index)) fail('parent transcript steps are not ordered');
+  const planner = [...rows].reverse().find((row) => row.step_index < step
+    && row.source === 'MODEL' && row.type === 'PLANNER_RESPONSE');
+  if (!planner || planner.status !== 'DONE' || !Array.isArray(planner.tool_calls)
+      || !planner.tool_calls.length || planner.tool_calls.length > 256) fail('native dispatch batch is unavailable');
+  const index = step - planner.step_index - 1;
+  if (index < 0 || index >= planner.tool_calls.length
+      || planner.tool_calls[index]?.name !== 'invoke_subagent') fail('native dispatch step is not an agent call in this batch');
+  return { planner, index };
 }
 function verifyParentLaunch(receipt, childId, childTranscript, options = {}) {
   const rows = transcriptRows(receipt.parentTranscript);
+  const { planner, index } = launchBatch(rows, receipt.spawnStepIndex);
   const result = rows.find((row) => row.step_index === receipt.spawnStepIndex);
   if (!result || result.source !== 'MODEL' || result.type !== 'GENERIC' || result.status !== 'DONE') fail('the accepted native dispatch has no completed host result');
   const children = spawnedChildren(result.content);
@@ -187,11 +210,30 @@ function verifyParentLaunch(receipt, childId, childTranscript, options = {}) {
   const observed = location({ session_id: childId, transcript_path: childTranscript });
   if (published.brain !== observed.brain || path.dirname(published.transcript) !== path.dirname(observed.transcript)) fail('native dispatch child path or workspace does not match');
   readHostFile(published.transcript);
-  const planner = [...rows].reverse().find((row) => row.step_index < receipt.spawnStepIndex
-    && row.source === 'MODEL' && row.type === 'PLANNER_RESPONSE' && row.status === 'DONE');
-  const calls = planner && Array.isArray(planner.tool_calls) ? planner.tool_calls.filter((call) => call.name === 'invoke_subagent') : [];
-  if (!calls.some((call) => same(descriptors(call.args), receipt.entries))) fail('native dispatch arguments differ from the accepted invocation');
+  if (!same(descriptors(planner.tool_calls[index].args), receipt.entries)) fail('native dispatch arguments differ from the accepted invocation');
   return { resultStep: result.step_index, children };
+}
+function resolveLaunchStep(source, parent, sidecar) {
+  // AGY 1.4.5 can stamp all sidecars in one parallel batch with its last
+  // result step. Treat that step only as a batch anchor. Authority still comes
+  // from one exact accepted call and its actual child result, never the hint.
+  const transcript = path.join(source.brain, parent.parentSessionId, '.system_generated', 'logs', path.basename(source.transcript));
+  const rows = transcriptRows(transcript);
+  const { planner } = launchBatch(rows, sidecar.spawnStepIndex);
+  const anchor = rows.find(row => row.step_index === sidecar.spawnStepIndex);
+  if (!anchor || anchor.type !== 'GENERIC' || anchor.source !== 'MODEL' || anchor.status !== 'DONE') fail('native sidecar batch anchor is incomplete');
+  spawnedChildren(anchor.content);
+  const candidates = [];
+  for (let index = 0; index < planner.tool_calls.length; index += 1) {
+    if (planner.tool_calls[index]?.name !== 'invoke_subagent') continue;
+    const step = planner.step_index + index + 1;
+    const result = rows.find(row => row.step_index === step);
+    if (!result || result.type !== 'GENERIC' || result.source !== 'MODEL' || result.status !== 'DONE') continue;
+    const children = spawnedChildren(result.content);
+    for (const child of children) if (child.conversationId === source.sessionId) candidates.push(step);
+  }
+  if (candidates.length !== 1) fail('native child has no unique result in its sidecar batch');
+  return candidates[0];
 }
 function validateReceipt(receipt, source, workspace, options) {
   const now = options.now === undefined ? Date.now() : options.now;
@@ -214,11 +256,12 @@ function verifyChild(payload, options = {}) {
   if (sidecar.conversationId !== source.sessionId || !Number.isSafeInteger(sidecar.spawnStepIndex)
       || sidecar.spawnStepIndex < 0 || !sidecar.subagentDescriptor || !validType(sidecar.subagentDescriptor.typeName)
       || !same(sidecar.workspaceUris, [pathToFileURL(workspace).href])) fail('native child descriptor does not match');
-  const dirs = recordDirs(options), file = launchFile(dirs, parent.parentSessionId, sidecar.spawnStepIndex);
-  return core.withFileLock(dirs.locks, `launch-${hash(`${parent.parentSessionId}:${sidecar.spawnStepIndex}`)}`, () => {
+  const spawnStepIndex = resolveLaunchStep(source, parent, sidecar);
+  const dirs = recordDirs(options), file = launchFile(dirs, parent.parentSessionId, spawnStepIndex);
+  return core.withFileLock(dirs.locks, `launch-${hash(`${parent.parentSessionId}:${spawnStepIndex}`)}`, () => {
     const receipt = paths.readPrivateJson(file);
     validateReceipt(receipt, source, workspace, options);
-    if (receipt.parentSessionId !== parent.parentSessionId || receipt.spawnStepIndex !== sidecar.spawnStepIndex) fail('launch receipt selectors do not match');
+    if (receipt.parentSessionId !== parent.parentSessionId || receipt.spawnStepIndex !== spawnStepIndex) fail('launch receipt selectors do not match');
     const entries = receipt.entries.filter((entry) => entry.typeName === sidecar.subagentDescriptor.typeName
       && entry.role === sidecar.subagentDescriptor.role && entry.prompt === parent.prompt && entry.promptSha256 === hash(parent.prompt));
     if (entries.length !== 1) fail('native child prompt or role differs from the accepted dispatch');
@@ -231,7 +274,7 @@ function verifyChild(payload, options = {}) {
     }
     const provenance = { schema: CHILD_SCHEMA, parentSessionId: parent.parentSessionId,
       childSessionId: source.sessionId, typeName: entry.typeName, readOnlyProfile: TYPES.has(entry.typeName), role: entry.role,
-      prompt: entry.prompt, promptSha256: entry.promptSha256, spawnStepIndex: sidecar.spawnStepIndex,
+      prompt: entry.prompt, promptSha256: entry.promptSha256, spawnStepIndex,
       workspaceRoot: workspace, childTranscript: source.transcript, parentTranscript: receipt.parentTranscript,
       runtimeDigest: receipt.runtimeDigest, sourceTree: receipt.sourceTree, launchReceiptId: receipt.launchReceiptId, launchCreatedAtMs: receipt.createdAtMs };
     const childFile = path.join(dirs.children, `${hash(source.sessionId)}.json`);

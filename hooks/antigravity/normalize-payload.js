@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const paths = require('./session-paths.js');
-const TOOL_NAMES = Object.freeze({ run_command: 'Bash', write_to_file: 'Write',
+const TOOL_NAMES = Object.freeze({ run_command: 'Bash', write_to_file: 'Write', write_file: 'Write',
   replace_file_content: 'Edit', multi_replace_file_content: 'MultiEdit',
   view_file: 'Read', grep_search: 'Grep', find_by_name: 'Glob',
   read_url_content: 'WebFetch', search_web: 'WebSearch' });
@@ -85,10 +85,15 @@ function normalize(input, event = '', options = {}) {
   out.tool_name = TOOL_NAMES[nativeName] || nativeName;
   if (nativeName) out.native_tool_name = nativeName;
   out.native_tool_input = { ...args };
+  // AGY 1.4.3 writes through Path/Content. Compatibility fields must never
+  // shadow the actual target or body (including an empty-file write).
+  if (nativeName === 'write_file' && (typeof args.Path !== 'string' || !args.Path
+      || typeof args.Content !== 'string')) throw new Error('write_file requires Path and Content strings');
   const ti = { ...prior };
   const command = firstString(args.CommandLine, args.command, prior.command);
   if (command) ti.command = command;
-  const file = firstString(args.TargetFile, args.AbsolutePath, args.FilePath, args.file_path, prior.file_path);
+  const file = nativeName === 'write_file' ? args.Path
+    : firstString(args.TargetFile, args.AbsolutePath, args.FilePath, args.file_path, prior.file_path);
   if (file) ti.file_path = file;
   if (nativeName === 'grep_search') {
     if (Object.prototype.hasOwnProperty.call(args, 'SearchPath')) ti.path = args.SearchPath;
@@ -108,7 +113,8 @@ function normalize(input, event = '', options = {}) {
     if (Object.prototype.hasOwnProperty.call(args, 'Recipient')) ti.recipient = args.Recipient;
     if (Object.prototype.hasOwnProperty.call(args, 'Message')) ti.message = args.Message;
   }
-  const content = firstString(args.CodeContent, args.Content, args.content, args.NewContent, args.CodeEdit, prior.content);
+  const content = nativeName === 'write_file' ? args.Content
+    : firstString(args.CodeContent, args.Content, args.content, args.NewContent, args.CodeEdit, prior.content);
   if (content) ti.content = content;
   const replacement = firstString(args.ReplacementContent, args.NewContent, args.new_string, prior.new_string);
   if (replacement) ti.new_string = replacement;
@@ -126,7 +132,8 @@ function normalize(input, event = '', options = {}) {
   }
   if (edits.length) ti.edits = edits;
   const bodies = [content, replacement, ...edits.map((edit) => edit.new_string)].filter(Boolean);
-  if (bodies.length) ti.content = bodies.join('\n');
+  if (nativeName === 'write_file') ti.content = content;
+  else if (bodies.length) ti.content = bodies.join('\n');
   if (out.tool_name === 'Edit' && !ti.new_string && content) ti.new_string = content;
   out.tool_input = ti;
   const workspaces = Array.isArray(raw.workspacePaths) ? raw.workspacePaths : raw.workspace_paths;

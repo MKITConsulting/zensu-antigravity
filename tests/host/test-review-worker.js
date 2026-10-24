@@ -113,18 +113,27 @@ function assertBoundReviewReceipt(t, execution) {
   const config=path.join(tmp,'config.json');fs.writeFileSync(config,'{"hooks":{"reviewPanel":"lean","aspectActivation":false}}');
   const env={PATH:process.env.PATH,HOME:home,ZENSU_PLUGIN_ROOT:root,ZENSU_PLUGIN_DATA:data,
     ZENSU_PROJECT_DIR:project,ZENSU_HOST_SESSION_ID:sid,ZENSU_CONFIG:config,ZENSU_REVIEW_EXECUTION:execution};
-  const runReview = argv => review.main(argv, env, { execution, verifyReport: (report, lease, binding) => {
+  const packet = require('../../hooks/antigravity/native-review-packet.js');
+  const fixturePacket = {schema:'zensu-review-packet-v1',payload:{evidence:'isolated routing fixture'}};
+  const runReview = argv => review.main(argv, env, { execution,
+    prepareLease:lease=>execution==='delegated'?{...lease,packet:fixturePacket,packetHash:'a'.repeat(64),primaryRequired:false}:lease,
+    verifyReport: (report, lease, binding) => {
     const native = require('../../hooks/antigravity/native-review.js');
     const crypto = require('node:crypto');
-    return native.verifyReport(report, lease, binding, {parentId:sid,completedChild:(parentId,childId) => {
+    return native.verifyReport(report, lease, binding, {parentId:sid,validatePacket:()=>{},completedChild:(parentId,childId) => {
+      if(childId===report.consumer.childId) {
+        const finalText=JSON.stringify({schema:'zensu-code-review-result-v1',report:'# Code Review Report\n- Verdict: PASS'});
+        return {parentId,childId,runtimeDigest:binding.context.runtime_digest,sourceTree:lease.tree,descriptor:{typeName:'zensu-code-reviewer',role:'consume',prompt:native.assignmentPrefix(lease.ticket,lease.tree,'consume')+packet.block(lease.packet)},finalText,finalHash:crypto.createHash('sha256').update(finalText).digest('hex')};
+      }
       const item=report.perspectives.find(p=>p.childId===childId);
       const finalText=JSON.stringify({schema:native.childSchema,ticket:lease.ticket,tree:lease.tree,role:item.role,summary:item.summary,findings:item.findings});
-      return {parentId,childId,runtimeDigest:binding.context.runtime_digest,sourceTree:lease.tree,descriptor:{typeName:'zensu-review-aspect',role:item.role,prompt:native.assignmentPrefix(lease.ticket,lease.tree,item.role)+'REVIEW PACKET v1\nInspect source.txt'},finalText,finalHash:crypto.createHash('sha256').update(finalText).digest('hex')};
+      return {parentId,childId,runtimeDigest:binding.context.runtime_digest,sourceTree:lease.tree,descriptor:{typeName:'zensu-review-aspect',role:item.role,prompt:native.assignmentPrefix(lease.ticket,lease.tree,item.role)+packet.block(lease.packet)+'Inspect source.txt'},finalText,finalHash:crypto.createHash('sha256').update(finalText).digest('hex')};
     }});
   }});
   const issued=cp.spawnSync('bash',[path.join(root,'hooks/lib/zensu-log.sh'),'--review-ticket'],{cwd:project,env,encoding:'utf8',timeout:30000});
   assert.equal(issued.status,0,issued.stderr);const token=issued.stdout.trim();assert.ok(token);
   const begun=runReview(['--begin','--ticket',token]);
+  if(execution==='delegated') Object.assign(begun.reportTemplate,{judges:[],consumer:{childId:'fixture-consume-child'}});
   assert.deepEqual(begun.roles,['correctness','design','security']);
   assert.deepEqual(begun.reportTemplate.perspectives.map(p=>p.role),begun.roles);
   for(const [index,perspective] of begun.reportTemplate.perspectives.entries()) {
@@ -144,6 +153,11 @@ function assertBoundReviewReceipt(t, execution) {
   const changed=begun.reportTemplate;changed.perspectives[0].summary='A different report.';
   fs.writeFileSync(reportFile,JSON.stringify(changed));
   assert.throws(()=>runReview(['--ticket',token,'--report',reportFile]),/different content/);
+  const closed=core.mutateWorkflowState({projectRoot:project,sessionId:sid,workflowState:'fixture',event:'fixture-close'},s=>Object.assign(s,{chainDone:true}));
+  const before=JSON.stringify(closed), status=runReview(['--begin','--ticket',token]);
+  assert.equal(status.status,'closed');assert.equal(status.reportOnly,true);
+  assert.equal(JSON.stringify(core.readWorkflowState({projectRoot:project,sessionId:sid})),before,'closed re-entry never changes the generation');
+  assert.throws(()=>runReview(['--begin','--ticket','foreign-ticket']),/current implementation-complete/);
 }
 test('a real bound in-thread review consumes one ticket, rejects source drift and replays only its exact report', (t) => {
   assertBoundReviewReceipt(t, 'in-thread');

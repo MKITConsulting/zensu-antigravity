@@ -83,8 +83,16 @@ manual hotfix follow the invariant by hand.
   pulse capture initialize lazily through `session-bootstrap.js` and the startup chain.
 - **Native reviewers use actual host provenance.** On agy 1.4.2, correctly typed YAML
   `tools` arrays register named profiles and `invoke_subagent` creates distinct child UUIDs.
-  The exact request is `Subagents: [{TypeName, Role, Workspace: "inherit", Model: "inherit",
-  Prompt}]`. Bind each child from the actual parent spawn step, metadata and initial parent
+  That historical request used `Subagents: [{TypeName, Role, Workspace: "inherit",
+  Model: "inherit", Prompt}]`. The observed agy 1.4.3 host instead accepts flat
+  `{TypeName, Role, Workspace: "inherit", Model: "inherit", Prompt}` arguments through
+  native validation and rejects the `Subagents` property. Use one flat call per role.
+  The [public hooks reference](https://antigravity.google/docs/hooks/#agent-collaboration)
+  still documents the array; retain this contradiction rather than treating those docs as
+  current launch proof. The adapter accepts each shape separately, rejects mixed/unknown
+  fields, and never rewrites native arguments. Legacy arrays are usable only when the
+  actual exposed tool schema accepts them. A new shape still needs live child/result proof.
+  Bind each child from the actual parent spawn step, metadata and initial parent
   linkage before its first tool call; never trust a model-authored agent id. Only normal,
   fully idle child Stop supplies completed-result evidence. Native read-only reviewers cannot
   mutate files/tasks, run commands or spawn children. Plan/PR workers additionally obey a

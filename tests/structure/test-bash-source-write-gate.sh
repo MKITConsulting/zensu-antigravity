@@ -353,6 +353,8 @@ run "W5a anchored path still judges the real target past the budget cap" \
 # (A) clobber existing tracked source -> DENY
 run "W6 append >> tracked .rs"              "printf 'x\n' >> src/app.rs"            DENY
 run "W7 clobber > tracked .rs"              "printf 'x\n' > src/app.rs"             DENY
+run "W7a explicit physical directory before tracked write" \
+  "cd -- '$PROJ' && printf '%s\\n' 'changed probe content' > '$PROJ/src/app.rs'" DENY
 run "W8 glued >>tracked (no space)"         "printf x >>src/app.rs"                 DENY
 run "W9 tee tracked .rs"                    "echo x | tee src/app.rs"               DENY
 run "W10 tee -a tracked .rs"               "echo x | tee -a src/app.rs"            DENY

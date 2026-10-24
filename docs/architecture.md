@@ -116,8 +116,10 @@ threshold IMPORTANT findings are parked for terminal self-review; with self-revi
 remain routable. Enabled critical reproduction requires a failing test for a re-review CRITICAL;
 NOT-REPRODUCED and NOT-TESTABLE findings remain visible under Open and do not auto-fix.
 
-A native `invoke_subagent` batch launches the fixed reviewer types with inherited model and
-workspace. A fresh ticket opens a lease bound to the runtime, source tree, generation, expiry
+On agy 1.4.3, one flat native `invoke_subagent` call per role launches the fixed reviewer
+types with inherited model and workspace. The adapter separately supports the historical
+`Subagents` array when the exposed host schema allows it; mixed or malformed shapes fail.
+A fresh ticket opens a lease bound to the runtime, source tree, generation, expiry
 and required roles. Each actual child must match its parent spawn descriptor and complete
 normally. Report submission keeps the raw child results unchanged, checks their protected
 receipts and consumes the one-shot ticket. The lead's separately verified merged report and

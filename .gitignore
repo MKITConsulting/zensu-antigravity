@@ -19,6 +19,10 @@ Thumbs.db
 node_modules/
 vendor/
 
+# Python transport bytecode is generated locally, never plugin source.
+__pycache__/
+*.pyc
+
 # Generated at install time (machine-absolute hook paths) — never committed
 /hooks.json
 

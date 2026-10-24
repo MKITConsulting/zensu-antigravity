@@ -9,7 +9,7 @@
         "instructions-02.md",
         "instructions-03.md"
       ],
-      "bodySha256": "8d1bbd9ddad5c7baef0224f0f0f95183044c26da668312d22aa8dc37a9769104"
+      "bodySha256": "ec852954df8e420c55f041e2007b13741dd5b28f6840275b6e817ac6425a246a"
     },
     {
       "skill": "autopilot",
@@ -17,7 +17,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "2d2e8ba394c6dd50350214fa759064804f5156f0f36d9ccd1579d5cb9ac0240c"
+      "bodySha256": "47abc2bd127f3f0678d32c64c07194b0c6d4b1d1ae6007776e30bbe70caeb118"
     },
     {
       "skill": "gauntlet-loop",
@@ -25,7 +25,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "1c863fa9f32f15a6136e5d0f47da8639f9a69d8765d851de54b10b92f18347cb"
+      "bodySha256": "1ea81d7d80bfdcef4a79e12ccb8e2e7d99b1989f43777781a1cc2f66b5c47e33"
     },
     {
       "skill": "ghost-scan",
@@ -33,7 +33,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "781f3b1e40575a66637497fb6f424df567f23c557ff283fdf16e76c976b09c7e"
+      "bodySha256": "01094236e9faca105c72e5f0499050e5b12e5b8eeef848f68ead8921a756b8af"
     },
     {
       "skill": "plan-review",
@@ -41,7 +41,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "49a95b8b995d8947d7b1149371816e5a649c7499e2e6af3b6f4672596404230c"
+      "bodySha256": "583d7837e57c4bedaba35046ffc1b355dc973b1c11fd725835388ab605c6242c"
     },
     {
       "skill": "self-review",
@@ -49,7 +49,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "7f2ab257f2918c8393b1041b59ee41d03d2caa1f851d5d4e87f6a7604429af07"
+      "bodySha256": "b02757686193c999275b11b3c0c3b1f05e1ebaadb7829247b63d40d4143ac70c"
     },
     {
       "skill": "verify-feature",
@@ -58,7 +58,7 @@
         "instructions-02.md",
         "instructions-03.md"
       ],
-      "bodySha256": "76e6513471ed83de7b006c9b5ed3afb968d7b73e18a32a2f664b66cae6d02c51"
+      "bodySha256": "2a85f35cb1010fad662d24ae4f61e6270015ca20cc778df85da88a0dd9671bc9"
     }
   ]
 }

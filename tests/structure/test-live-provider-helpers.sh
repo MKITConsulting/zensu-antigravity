@@ -28,7 +28,7 @@ OUT="$(node -e '
   const m = require(process.env.PROVIDER);
   process.stdout.write(Object.keys(m).sort().join(","));
 ' 2>&1)"
-EXPECTED_SURFACE="countHook,digest,fireReport,gateVerdict,installedPluginRoot,isAgyPluginRoot,logSnapshot,logWrittenDuring,makeWorkspace,matchingDecisions,nativeAgentIdentities,nativeAgentVerdict,parseTraceLine,readDecisions,readTrace,resolveTraceFile,sourceWriteProof,stopContinuationProof,stopVerdicts,toolProbeArgs,unavailableReason"
+EXPECTED_SURFACE="countHook,digest,fireReport,gateRequest,gateVerdict,installedPluginRoot,isAgyPluginRoot,logSnapshot,logWrittenDuring,makeWorkspace,matchingDecisions,nativeAgentIdentities,nativeAgentTranscriptIdentities,nativeAgentVerdict,parseTraceLine,readDecisions,readTrace,resolveTraceFile,sourceWriteCommand,sourceWriteProof,stopContinuationProof,stopCyclePrompt,stopVerdicts,toolProbeArgs,unavailableReason"
 [ "$OUT" = "$EXPECTED_SURFACE" ] \
   && ok "requiring the provider exports the helpers without running a probe" \
   || bad "unexpected module surface: $OUT"
@@ -291,13 +291,30 @@ NOROOT="$(HOME="$TMP/empty-home" node -e '
   && ok "no identifiable install returns null instead of the repo checkout" \
   || bad "expected null with no install, got '$NOROOT'"
 
+# --- permission boundary ----------------------------------------------------
+# Permission-limited print mode must remain a refusal, never silently opt into
+# a permission bypass. Interactive probes leave every actual approval to the
+# operator; their argument list cannot contain an automatic permission grant.
+INTERACTIVE_FIXTURE="$TMP/interactive"
+mkdir -p "$INTERACTIVE_FIXTURE/evidence/workspaces" "$INTERACTIVE_FIXTURE/plugin/hooks/antigravity" "$INTERACTIVE_FIXTURE/plugin/hooks/lib"
+touch "$INTERACTIVE_FIXTURE/plugin/hooks.json" "$INTERACTIVE_FIXTURE/plugin/hooks/antigravity/antigravity-shim.sh" "$INTERACTIVE_FIXTURE/plugin/hooks/lib/zensu-log.sh"
+INTERACTIVE_FIXTURE="$(cd "$INTERACTIVE_FIXTURE" && pwd -P)"
+export INTERACTIVE_FIXTURE
+check "headless synthetic tool probes refuse rather than bypass permissions" "true" \
+  '(() => { const fs=require("fs"),os=require("os"),p=require("path"); delete process.env.ZENSU_LIVE_INTERACTIVE; delete process.env.ZENSU_LIVE_PLUGIN_ROOT; delete process.env.ZENSU_LIVE_EVIDENCE_DIR; const ws=fs.realpathSync(fs.mkdtempSync(p.join(os.tmpdir(),"zensu-live-"))); try{try{H.toolProbeArgs(ws);return false}catch(e){return /interactive/i.test(e.message)}}finally{fs.rmSync(ws,{recursive:true,force:true})} })()'
+check "interactive mode without an explicit evidence directory refuses" "true" \
+  '(() => { const fs=require("fs"),os=require("os"),p=require("path"); process.env.ZENSU_LIVE_INTERACTIVE="1"; delete process.env.ZENSU_LIVE_EVIDENCE_DIR; const ws=fs.realpathSync(fs.mkdtempSync(p.join(os.tmpdir(),"zensu-live-"))); try{try{H.toolProbeArgs(ws);return false}catch(e){return /ZENSU_LIVE_EVIDENCE_DIR/.test(e.message)}}finally{fs.rmSync(ws,{recursive:true,force:true})} })()'
+ZENSU_LIVE_INTERACTIVE=1 ZENSU_LIVE_EVIDENCE_DIR="$INTERACTIVE_FIXTURE/evidence" ZENSU_LIVE_PLUGIN_ROOT="$INTERACTIVE_FIXTURE/plugin" \
+  check "interactive tool probes supply no automatic permission arguments" "[]" \
+  '(() => { const fs=require("fs"),p=require("path"); const ws=fs.realpathSync(fs.mkdtempSync(p.join(process.env.ZENSU_LIVE_EVIDENCE_DIR,"workspaces/zensu-live-"))); try{return JSON.stringify(H.toolProbeArgs(ws))}finally{fs.rmSync(ws,{recursive:true,force:true})} })()'
+ZENSU_LIVE_INTERACTIVE=1 ZENSU_LIVE_EVIDENCE_DIR="$INTERACTIVE_FIXTURE/evidence" ZENSU_LIVE_PLUGIN_ROOT="$INTERACTIVE_FIXTURE/plugin" \
+  check "interactive tool probes reject an ordinary directory" "true" \
+  '(() => { try{H.toolProbeArgs(process.env.TMP);return false}catch(e){return /physical disposable live-probe/.test(e.message)} })()'
+ZENSU_LIVE_INTERACTIVE=1 ZENSU_LIVE_EVIDENCE_DIR="$INTERACTIVE_FIXTURE/evidence" ZENSU_LIVE_PLUGIN_ROOT="$INTERACTIVE_FIXTURE/plugin" \
+  check "a live-named symlink cannot authorize a real project" "true" \
+  '(() => { const fs=require("fs"),p=require("path"); const ws=p.join(process.env.ZENSU_LIVE_EVIDENCE_DIR,"workspaces/zensu-live-test"+process.pid); fs.symlinkSync(process.env.TMP,ws); try{try{H.toolProbeArgs(ws);return false}catch(e){return /physical disposable live-probe/.test(e.message)}}finally{fs.unlinkSync(ws)} })()'
+
 # --- unavailableReason ------------------------------------------------------
-check "synthetic tool probes can auto-approve only in their disposable workspace" "--dangerously-skip-permissions" \
-  '(() => { const fs=require("fs"),os=require("os"),p=require("path"); const ws=fs.mkdtempSync(p.join(os.tmpdir(),"zensu-live-")); try{return H.toolProbeArgs(ws).join(" ")}finally{fs.rmSync(ws,{recursive:true,force:true})} })()'
-check "tool auto-approval rejects an ordinary directory" "true" \
-  '(() => { try{H.toolProbeArgs(process.env.TMP);return false}catch(e){return /disposable live-probe/.test(e.message)} })()'
-check "a live-named symlink cannot authorize a real project" "true" \
-  '(() => { const fs=require("fs"),os=require("os"),p=require("path"); const ws=p.join(os.tmpdir(),"zensu-live-test"+process.pid); fs.symlinkSync(process.env.TMP,ws); try{try{H.toolProbeArgs(ws);return false}catch(e){return /disposable live-probe/.test(e.message)}}finally{fs.unlinkSync(ws)} })()'
 check "a clean run is available" "" \
   'unavailableReason({exit_code: 0, stdout: "READY", stderr: "", signal: "", spawn_error: ""})'
 check "a quota wall on stderr is unavailability" "quota reached" \

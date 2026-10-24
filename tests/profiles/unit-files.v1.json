@@ -2,8 +2,18 @@
   "schemaVersion": 1,
   "files": [
     {
+      "path": "tests/structure/agy-interactive-run.test.js",
+      "registered": 57,
+      "runs": [
+        {
+          "driver": "tests/structure/test-interactive-live-runner.sh"
+        }
+      ],
+      "summary": "Interactive live transport: exact native turn and child provenance, refusal of permission bypass, one-time operator input, private reasoning redaction and hermetic PTY relay."
+    },
+    {
       "path": "tests/host/native-agent-provenance.test.js",
-      "registered": 22,
+      "registered": 35,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
@@ -53,7 +63,7 @@
     },
     {
       "path": "tests/host/test-native-review.js",
-      "registered": 10,
+      "registered": 16,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
@@ -93,7 +103,7 @@
     },
     {
       "path": "tests/host/test-session-adapter.js",
-      "registered": 22,
+      "registered": 26,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
@@ -182,7 +192,7 @@
     },
     {
       "path": "tests/structure/finding-verify-v1.test.js",
-      "registered": 28,
+      "registered": 31,
       "runs": [
         {
           "driver": "tests/structure/test-semantic-units.sh"
@@ -524,6 +534,66 @@
         }
       ],
       "summary": "The /zensu-doctor invocation allowlist."
+    },
+    {
+      "path": "tests/structure/edit-landing-scope-v1.test.js",
+      "registered": 22,
+      "runs": [
+        {
+          "driver": "tests/structure/test-workflow-repairs.sh"
+        }
+      ],
+      "summary": "Persistent audit scope, bounded proofs, Git faults and receipt freshness."
+    },
+    {
+      "path": "tests/host/native-audit-session.test.js",
+      "registered": 7,
+      "runs": [
+        {
+          "driver": "tests/structure/test-workflow-repairs.sh"
+        }
+      ],
+      "summary": "Authoritative native audit identity, explicit session recovery, and terminal freshness gates."
+    },
+    {
+      "path": "tests/structure/workflow-artifacts-v1.test.js",
+      "registered": 6,
+      "runs": [
+        {
+          "driver": "tests/structure/test-workflow-repairs.sh"
+        }
+      ],
+      "summary": "Generation-bound execution markers and evidence-derived native plan progress."
+    },
+    {
+      "path": "tests/structure/workflow-guidance.test.js",
+      "registered": 6,
+      "runs": [
+        {
+          "driver": "tests/structure/test-workflow-repairs.sh"
+        }
+      ],
+      "summary": "Bounded native guidance, safe diagnostics, routing and observed acceptance reuse."
+    },
+    {
+      "path": "tests/structure/review-packet-v1.test.js",
+      "registered": 9,
+      "runs": [
+        {
+          "driver": "tests/structure/test-review-packet.sh"
+        }
+      ],
+      "summary": "Canonical immutable packets and cumulative actual change inventories."
+    },
+    {
+      "path": "tests/structure/autopilot-budget-lock.test.js",
+      "registered": 5,
+      "runs": [
+        {
+          "driver": "tests/structure/test-autopilot-budget-lock.sh"
+        }
+      ],
+      "summary": "Budget transactions under the real Core lease: eight slow-start writers, bounded contention refusal, semantic rollback and storage substitution while waiting. Atomic replacement faults preserve the failure code, state and lease cleanup."
     }
   ]
 }

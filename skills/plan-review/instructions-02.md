@@ -26,12 +26,14 @@ Capture the single `lease_id=...` line. The helper validates the native host ses
 
 ### Phase C — Confined Parallel Spawn
 
-Call the native `invoke_subagent` tool once with one `Subagents` array containing every
-accepted persona exactly once. Each item is `{ "TypeName": "zensu-plan-review-worker",
+Call the native `invoke_subagent` tool once per accepted persona, covering every persona
+exactly once. On agy 1.4.3, each call has flat arguments `{ "TypeName": "zensu-plan-review-worker",
 "Role": "<persona-id>", "Workspace": "inherit", "Model": "inherit", "Prompt": "<complete packet>" }`.
+Use a legacy `Subagents` array only when the exposed host schema accepts it; never mix
+the two forms or add unknown arguments.
 Expand every placeholder. The tool has no `schema` parameter: include the exact raw-JSON
-schema in each prompt. Record the actual returned `conversation_id` per role from
-`subagent_info.subagents[]`; never guess an ID from a title, message or newest transcript.
+schema in each prompt. Record the actual returned `conversation_id` per role from the
+native tool result; never guess a result envelope or an ID from a title, message or newest transcript.
 The adapter verifies the parent spawn step, exact type/role/prompt and workspace before
 binding this real child to the existing private lease. Each child has a separate context.
 
@@ -134,7 +136,7 @@ Overall verdict (worst-of, weighted by convergence + confidence):
 - **Confined native reviewers.** Every actual child is bound to the private exact-file/safe-root lease. Native read tools are checked on every call, and final raw JSON is accepted only from that child's normal Stop receipt.
 - **Materialize the plan** to `<DIR>/PLAN.md` so every role reviews byte-identical input.
 - **Repeat the full role packet for each pass** — persona focus, output schema, plan/evidence/manifest paths and untrusted-data boundary. Shared context does not establish independent review.
-- **One native batch.** Dispatch the full accepted cast through one `invoke_subagent` call; finalize only after all real children complete.
+- **Complete native cast.** Dispatch every accepted persona through its own flat `invoke_subagent` call; finalize only after all real children complete.
 - **Always cast `devils-advocate`** — the red-team seat is the highest-signal seat for plan review.
 - **Default requested N = 6**, also parsed from natural language and clamped 3–10; the final accepted, deduplicated cast determines `ROLE_COUNT` and the required result set.
 - **Advisory, not executory.** The skill outputs a verdict + amendments and stops. It writes no code, does not approve the plan, and does not trigger the TDD workflow.

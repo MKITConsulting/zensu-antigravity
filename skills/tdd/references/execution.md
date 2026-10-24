@@ -19,7 +19,12 @@ Tasks are not optional decoration — they are the only channel the user watches
 
 ## Phase 4: Execute TDD Cycles
 
-Log `EXECUTION STARTED` before the first step. All log-append commands in this phase use the writer from Principle 3: `{session-helper} --helper log -- append --log {log_file} --message "<message>" --start $SESSION_EPOCH`. Do not inline `[$(date +%H:%M:%S)]` — the user-configured `logging.timestampStyle` may suppress or reformat the prefix — and do not redirect into `{log_file}` yourself, which skips the path redaction that makes the artifact safe to commit.
+Before the first step run
+`{session-helper} --helper workflow-artifacts -- start --log "{log_file}"`.
+It binds the matching plan/log to the active generation, emits `EXECUTION STARTED` exactly
+once and creates the plan's evidence-derived lifecycle status table. A refusal blocks
+execution; do not append a replacement marker or backdate an omitted transition.
+Read the current plan before editing progress rows and preserve the managed status block. All log-append commands in this phase use the writer from Principle 3: `{session-helper} --helper log -- append --log {log_file} --message "<message>" --start $SESSION_EPOCH`. Do not inline `[$(date +%H:%M:%S)]` — the user-configured `logging.timestampStyle` may suppress or reformat the prefix — and do not redirect into `{log_file}` yourself, which skips the path redaction that makes the artifact safe to commit.
 
 ### Feature Cycle (per step)
 

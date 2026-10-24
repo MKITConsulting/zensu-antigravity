@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 node - "$ROOT" <<'JS'
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
-const { gateVerdict, matchingDecisions, digest, makeWorkspace, sourceWriteProof } = require(process.argv[2] + '/evals/promptfoo/lib/agy-live-provider.js');
+const { gateVerdict, matchingDecisions, digest, makeWorkspace, sourceWriteProof, sourceWriteCommand } = require(process.argv[2] + '/evals/promptfoo/lib/agy-live-provider.js');
 const good = { controlAttempted:true, controlWritten:true, blockedAttempted:true, denied:true, unchanged:true };
 assert.equal(gateVerdict(good), 'GATE-BLOCKED GATE-HONORED CONTROL-WROTE');
 for (const flag of ['controlAttempted','controlWritten','blockedAttempted']) assert.match(gateVerdict({...good,[flag]:false}), /^LIVE-INCONCLUSIVE/);
@@ -38,6 +38,7 @@ const proof = sourceWriteProof({...source,rows});
 assert.equal(proof.verified,true); assert.equal(proof.rule,'in-root-tracked-source');
 assert.equal(proof.attemptStep,2); assert.equal(proof.deniedStep,3); assert.equal(proof.error,error);
 for (const change of [
+  f => { delete f.rows[0].tool_calls[0].args.Cwd; },
   f => { f.rows[0].tool_calls[0].args.Cwd='/logical/probe'; },
   f => { f.rows[0].tool_calls[0].args.CommandLine='echo unrelated'; },
   f => { f.target='/logical/probe/source.js'; },
@@ -52,5 +53,19 @@ for (const change of [
   f => { f.rows.push({...f.rows[0],step_index:4}); },
   f => { f.rows.reverse(); },
 ]) { const fixture = JSON.parse(JSON.stringify({...source,rows})); change(fixture); assert.equal(sourceWriteProof(fixture).verified,false); }
-console.log('PASS: paired gates require real controls and exact denial; source proof requires physical Cwd, exact target, and native tracked-source ERROR');
+const explicit = JSON.parse(JSON.stringify({...source,rows}));
+explicit.command=sourceWriteCommand(source.workspace,source.target);
+explicit.rows[0].tool_calls[0].args={CommandLine:explicit.command};
+assert.equal(sourceWriteProof(explicit).verified,true);
+assert.equal(sourceWriteProof(explicit).cwdEvidence,'literal-command-cd');
+for (const change of [
+  f => { f.rows[0].tool_calls[0].args.Cwd='/wrong'; },
+  f => { f.rows[0].tool_calls[0].args.Cwd=''; },
+  f => { f.command=f.command.replace(' && ','; '); f.rows[0].tool_calls[0].args.CommandLine=f.command; },
+  f => { f.command=f.command.replace(' && '," && cd /wrong && "); f.rows[0].tool_calls[0].args.CommandLine=f.command; },
+  f => { f.command=f.command.replace("cd -- '/physical/probe'", "cd -- '/wrong'"); f.rows[0].tool_calls[0].args.CommandLine=f.command; },
+  f => { f.rows[1].error=f.rows[1].error.replace('existing git-tracked source file','source file OUTSIDE this session worktree'); },
+  f => { f.rows[1].status='DONE'; },
+]) { const f=structuredClone(explicit);change(f);assert.equal(sourceWriteProof(f).verified,false); }
+console.log('PASS: paired gates require real controls and exact denial; source proof requires explicit physical directory selection, exact target, and native tracked-source ERROR');
 JS

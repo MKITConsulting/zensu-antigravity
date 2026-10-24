@@ -91,6 +91,11 @@ When no pre-merged marker is present:
 
 Filter, deduplicate, and sort findings CRITICAL -> IMPORTANT -> SUGGESTION -> file path. Verdict is NEEDS CHANGES for any CRITICAL, PASS WITH SUGGESTIONS for remaining findings, otherwise PASS.
 
+This is the review quality verdict only. The native routing helper applies the effective
+project `autoFixSeverity` policy to verified, non-exempt findings. PASS WITH SUGGESTIONS
+may still route an IMPORTANT fix. Never invent a threshold, hard-code critical-only routing,
+append a competing continuation directive, or override the helper's returned route.
+
 ```text
 # Code Review Report
 

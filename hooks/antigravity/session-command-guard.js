@@ -12,9 +12,9 @@ const helpers = require('./session-helper.js');
 // select the adapter directory as Cwd, and Node accepts extensionless imports.
 const NATIVE_STATE_MODULES = [
   'antigravity-shim', 'autopilot-review', 'lazy-init', 'native-agent-lifecycle',
-  'native-agent-provenance', 'native-review', 'native-spawn-allow', 'normalize-payload',
+  'native-agent-provenance', 'native-review', 'native-review-packet', 'native-spawn-allow', 'normalize-payload',
   'review-artifacts', 'review-children', 'session-bootstrap', 'session-command-guard',
-  'session-helper', 'session-paths', 'session-trail', 'worker-launch', 'worker-runtime',
+  'session-helper', 'session-paths', 'session-trail', 'worker-launch', 'worker-runtime', 'workflow-artifacts',
 ];
 const STATE_MODULES = [
   ...NATIVE_STATE_MODULES,
@@ -24,7 +24,7 @@ const STATE_MODULES = [
   'review-evidence-sweep-v1', 'review-ledger-v1', 'runtime-hook-session-v1',
   'runtime-session-control-v1', 'session-adopt-report-v1', 'session-auto-adopt-v1',
   'session-control-core-v1', 'session-reanchor-v1', 'verify-consent-v1',
-  'work-order-v1', 'worktree-keep-v1', 'zen-anchor-v1',
+  'work-order-v1', 'workflow-artifacts-v1', 'worktree-keep-v1', 'zen-anchor-v1',
   'zensu-autopilot-state', 'zensu-bypass-ledger', 'zensu-delivery-route',
   'zensu-doctor', 'zensu-doctor-report', 'zensu-edit-landing', 'zensu-full-suite',
   'zensu-full-suite-transport', 'zensu-log', 'zensu-marker-write', 'zensu-overlay',

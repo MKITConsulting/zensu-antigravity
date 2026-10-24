@@ -22,7 +22,17 @@ function ownTranscript(installed, sid) {
   const file = path.join(os.homedir(), '.gemini/antigravity-cli/brain', sid, '.system_generated/logs/transcript_full.jsonl');
   return require(path.join(installed, 'hooks/antigravity/native-agent-provenance.js')).transcriptRows(file);
 }
-function successRunProof(run, log, rows, ws, prompt, expected) {
+function successRunProof(run, log, rows, ws, prompt, expected, pluginRoot) {
+  if (run.nativeSessionId || run.nativeEvidence) {
+    const proof = run.nativeEvidence, sid = run.nativeSessionId;
+    if (run.exit_code !== 0 || run.signal || run.spawn_error || !UUID.test(sid || '')
+        || !proof || proof.verified !== true || proof.sessionId !== sid || proof.workspace !== ws
+        || !pluginRoot || proof.pluginRoot !== pluginRoot || typeof proof.runtimeDigest !== 'string'
+        || !/^sha256:[a-f0-9]{64}$/.test(proof.runtimeDigest)
+        || run.stdout?.trim() !== expected || !log.includes(ws) || !log.includes(sid)
+        || !noToolTranscriptProof(rows, prompt, expected)) return null;
+    return sid;
+  }
   let output;
   try { output = JSON.parse(run.stdout); } catch { return null; }
   if (run.exit_code !== 0 || run.signal || run.spawn_error || output.status !== 'SUCCESS'
@@ -32,7 +42,7 @@ function successRunProof(run, log, rows, ws, prompt, expected) {
   return output.conversation_id;
 }
 function initializeGit(ws) {
-  fs.writeFileSync(path.join(ws, '.gitignore'), '.zensu/\n.gemini/\n');
+  fs.writeFileSync(path.join(ws, '.gitignore'), '.zensu/\n.gemini/\n.agents/\n');
   for (const args of [['init', '-q'], ['add', '--', 'note.txt', '.gitignore'],
     ['-c', 'user.name=Zensu Live Probe', '-c', 'user.email=probe@invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'test: native probe fixture']]) {
     const result = spawnSync('git', args, { cwd: ws, encoding: 'utf8' });
@@ -53,10 +63,19 @@ function rulesProbe({ ws, installed, traceFile, timeout, runAgy, unavailableReas
       ZENSU_SHIM_DECISIONS: `${traceFile}.${name}.decisions` }, ['--output-format', 'json', '--log-file', logFile]);
     const unavailable = unavailableReason(run);
     if (unavailable) throw Error(`LIVE-UNAVAILABLE ${unavailable}`);
-    let output; try { output = JSON.parse(run.stdout); } catch { throw Error(`${name}: no native JSON response`); }
-    const rows = ownTranscript(installed, output.conversation_id);
-    const sid = successRunProof(run, fs.readFileSync(logFile, 'utf8'), rows, ws, prompt, expected);
-    if (!sid) throw Error(`${name}: own no-tool response did not match the active-rule expectation (conversation ${output.conversation_id}; response ${JSON.stringify(output.response)})`);
+    let conversationId, response, rows;
+    if (run.nativeSessionId || run.nativeEvidence) {
+      conversationId = run.nativeSessionId;
+      response = run.stdout;
+      rows = run.transcriptRows;
+    } else {
+      let output; try { output = JSON.parse(run.stdout); } catch { throw Error(`${name}: no native JSON response`); }
+      conversationId = output.conversation_id;
+      response = output.response;
+      rows = ownTranscript(installed, conversationId);
+    }
+    const sid = successRunProof(run, fs.readFileSync(logFile, 'utf8'), rows, ws, prompt, expected, installed);
+    if (!sid) throw Error(`${name}: own no-tool response did not match the active-rule expectation (conversation ${conversationId}; response ${JSON.stringify(response)})`);
     proofs.push({ leg: name, conversation_id: sid, tool_calls: 0 });
   }
   leg('installed', 'Without calling tools or reading files, return only the exact first-level Markdown heading of the active Zensu plugin policy rules, omitting its leading hash and space. If no such rule is loaded, reply NO_ZENSU_RULESET.', title);
@@ -76,11 +95,23 @@ function rulesProbe({ ws, installed, traceFile, timeout, runAgy, unavailableReas
     installed_heading: title, proofs };
 }
 function workerPrepareProbe({ ws, installed, timeout, logSnapshot, logWrittenDuring }) {
+  let settingsFile, settingsBefore;
+  if (process.env.ZENSU_LIVE_INTERACTIVE === '1') {
+    settingsFile = path.join(os.homedir(), '.gemini/antigravity-cli/settings.json');
+    settingsBefore = fs.readFileSync(settingsFile);
+    const settings = JSON.parse(settingsBefore);
+    if (!Array.isArray(settings.trustedWorkspaces) || !settings.trustedWorkspaces.includes(ws)) {
+      return { unavailable: true, stdout: 'LIVE-UNAVAILABLE worker preparation requires separately authorized trust for this exact disposable workspace' };
+    }
+  }
   initializeGit(ws);
   const before = logSnapshot();
   const result = spawnSync('node', [path.join(installed, 'harness/launcher.js'), '--prepare', '--project', ws], {
-    cwd: ws, env: { ...process.env, ZENSU_CHAIN: '' }, encoding: 'utf8', timeout: (Math.max(150, Number(timeout) || 180) + 30) * 1000,
+    cwd: ws, env: { ...process.env, PWD: ws, ZENSU_PROJECT_DIR: ws, ZENSU_CHAIN: '' }, encoding: 'utf8', timeout: (Math.max(150, Number(timeout) || 180) + 30) * 1000,
   });
+  if (settingsBefore && !fs.readFileSync(settingsFile).equals(settingsBefore)) {
+    throw Error('Native settings changed during worker preparation');
+  }
   if (result.error || result.signal) return { unavailable: true, stdout: `LIVE-UNAVAILABLE native worker preparation did not finish: ${result.error?.message || result.signal}` };
   let output; try { output = JSON.parse(result.stdout); } catch { throw Error(`worker preparation returned no receipt: ${String(result.stderr).slice(0, 500)}`); }
   if (result.status !== 0 || output.event !== 'conversation_prepared' || !UUID.test(output.conversation_id || '')) throw Error('worker preparation did not produce one native conversation receipt');

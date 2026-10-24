@@ -28,11 +28,12 @@ For reanchor, set the shell tool's native working-directory property to the targ
 
 All state-changing helper calls use `{session-helper} --helper <name> -- <arguments>`.
 Read `{plugin_root}/docs/upstream-parity.md` when this skill names a host facility.
-Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles,
-with literal `Subagents` entries containing `TypeName`, `Role`, `Workspace: "inherit"`,
-`Model: "inherit"` and a complete `Prompt`. Follow the calling review procedure's private
-lease and actual child-UUID completion checks; a role name or model-written result is not
-proof of execution. Keep implementation in the main conversation. No source-host Agent,
+Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles.
+On agy 1.4.3, use one flat call per role with `TypeName`, `Role`, `Workspace: "inherit"`,
+`Model: "inherit"` and a complete `Prompt`. Use a legacy `Subagents` array only when the
+exposed host schema permits it; never mix both forms or add unknown arguments. Follow the
+calling review procedure's private lease and actual child-UUID completion checks; a role
+name or model-written result is not proof of execution. Keep implementation in the main conversation. No source-host Agent,
 SendMessage, Workflow, desktop transfer or implicit plan-approval callback is assumed.
 Use a direct user question for required input and a persisted step table for progress.
 
@@ -116,7 +117,7 @@ when its phase starts, and read it again when a context compaction dropped it.
 |---|---|---|
 | A.1 Scout, worktree, and the main-thread evidence packet | `references/scout.md` | when Step 0 is done, in delegated mode after `references/delegated.md` |
 | A.2 Persona cast and the private evidence lease | `references/cast.md` | when the evidence packet is complete |
-| B Confined native reviewer batch | `references/spawn.md` | when the private lease is registered |
+| B Confined native reviewer dispatch | `references/spawn.md` | when the private lease is registered |
 | C Finalize, collect, Challenge Round, Finding Verification Gate, `_debate.json` | `references/debate.md` | when every native child result is finalized and collected |
 | D Synthesis, body and inline templates, anchor validation, forge publish | `references/publish.md` | when `_debate.json` is written |
 
@@ -156,7 +157,7 @@ Delegated mode keeps the ref without asking.
 - **Never `git checkout` the PR ref in the main working tree.** The main thread uses a detached worktree under an `mktemp -d` workspace (`git worktree add --force --detach "$WORKTREE" "$SHA"`) and keeps the main checkout's branch and uncommitted work untouched. Role passes read the evidence packet and exact candidate files.
 - **Always cast the holistic core on code PRs — `coverage-audit`, `bug-hunter`, `maintainability`, `adversarial`.** Not trigger-gated; guarantees every code PR gets a coverage, functional-correctness, design/complexity, and anti-groupthink pass even when no specialist trigger fires. Docs-only PRs stay lean (`docs-only` + `coverage-audit`). The `adversarial` report drives the Phase C Challenge Round (convergence != correctness).
 - **Always cast `coverage-audit` and always render the `### Test Coverage` section.** The explicit test-coverage evaluation — uncovered files + uncovered paths — is guaranteed on every run, docs-only included. Coverage is advisory (verdict unchanged) unless `--coverage-gate` is passed, which escalates to `REQUEST_CHANGES` when changed production files are uncovered. The main thread alone may run the coverage process when `--run-coverage` is passed; otherwise it supplies static mapping + any existing report. Reviewers only consume `_coverage-evidence.md`.
-- Run the cast through one native batch on the same leased evidence. Finalize and collect every actual child UUID before synthesis.
+- Run every cast member through its own flat native call on the same leased evidence. Finalize and collect every actual child UUID before synthesis.
 - Validate each role before accepting its findings.
 - Each role yields the upstream JSON schema. The main thread writes its report, validates it with `hooks/antigravity/review-artifacts.js`, and consolidates only accepted results.
 - Submit ONE review with bundled inline comments — never N single-comment reviews. This is the GitHub atomic path; on GitLab the driver posts a summary note + one discussion per inline finding (GitLab has no atomic review object — spec §7), which is the intended degrade, not N ad-hoc reviews.

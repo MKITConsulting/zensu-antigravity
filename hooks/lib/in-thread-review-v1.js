@@ -77,13 +77,15 @@ function argumentsOf(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
-    if (!['--begin', '--ticket', '--report'].includes(key) || Object.hasOwn(out, key)) fail('unknown or duplicate argument');
+    if (!['--begin', '--ticket', '--report', '--packet-input', '--baseline'].includes(key) || Object.hasOwn(out, key)) fail('unknown or duplicate argument');
     if (key === '--begin') out[key] = true;
     else { if (!argv[i + 1] || argv[i + 1].startsWith('--')) fail(`missing ${key}`); out[key] = argv[++i]; }
   }
   if (!/^[a-zA-Z0-9_.:-]{8,160}$/.test(out['--ticket'] || '')) fail('a review ticket is required');
   if (!!out['--begin'] === !!out['--report']) fail('choose --begin or --report');
   if (out['--report'] && !path.isAbsolute(out['--report'])) fail('report must be an absolute path');
+  if (out['--packet-input'] && !path.isAbsolute(out['--packet-input'])) fail('packet input must be an absolute path');
+  if (!out['--begin'] && (out['--packet-input'] || out['--baseline'])) fail('packet arguments require --begin');
   return out;
 }
 
@@ -120,6 +122,18 @@ function validateAssurance(assurance, report, lease) {
         || !/^[a-f0-9]{64}$/.test(child.finalHash || '')) fail('child evidence is malformed or reused');
     ids.add(child.id); roles.add(child.role);
   }
+  if (lease.packetHash) {
+    if (assurance.packetHash !== lease.packetHash || !Array.isArray(assurance.judges)
+        || (lease.primaryRequired && !assurance.judges.some(child => child.role === 'judge'))
+        || !assurance.consumer || assurance.consumer.role !== 'consume') fail('packet, primary judge or consume completion evidence is missing');
+    const stageRoles = new Set();
+    for (const child of [...assurance.judges, assurance.consumer]) {
+      if (!child || !['judge', 'judge-b', 'consume'].includes(child.role) || stageRoles.has(child.role)
+          || typeof child.id !== 'string' || !child.id || ids.has(child.id)
+          || !/^[a-f0-9]{64}$/.test(child.finalHash || '')) fail('stage completion evidence is malformed or reused');
+      ids.add(child.id); stageRoles.add(child.role);
+    }
+  }
   return assurance;
 }
 
@@ -131,6 +145,8 @@ function main(argv, env = process.env, options = {}) {
   const binding = binder.resolveHookSession({ session_id: session }, env);
   const state = core.readWorkflowState({ projectRoot: binding.projectRoot, sessionId: binding.sessionKey });
   const ticket = args['--ticket'];
+  if (state.chainDone && state.reviewTicket === ticket) return { status: 'closed', reportOnly: true, ticket,
+    generation: state.reviewGeneration || null, instructions: 'This generation is closed. Report its existing evidence; do not create review or fix work.' };
   if (!state.active || !state.implComplete || state.chainDone || state.reviewTicket !== ticket) fail('ticket does not name the current implementation-complete chain');
   const dir = privateDirectory(binding.pluginData, ['in-thread-review', 'v1', binding.sessionKey]);
   const leaseFile = path.join(dir, `${hash(ticket)}.json`);
@@ -148,12 +164,16 @@ function main(argv, env = process.env, options = {}) {
       fail('review panel configuration is unavailable');
     }
     const roles = reviewRoles(configLines[0], state.reviewRound, configLines[1] === 'on');
-    const lease = { schema: activeSchema, execution, ticket, tree: tree.tree,
+    let lease = { schema: activeSchema, execution, ticket, tree: tree.tree,
       sessionKey: binding.sessionKey, runtimeDigest: binding.context.runtime_digest,
+      generation: state.reviewGeneration || null,
       round: state.reviewRound + 1, roles, createdAt: Date.now(), expiresAt: Date.now() + ttl };
+    if (typeof options.prepareLease === 'function') lease = options.prepareLease(lease, binding, args, state);
     if (fs.existsSync(leaseFile)) {
       const old = read(leaseFile);
-      if (old.execution !== execution || old.schema !== activeSchema || old.tree !== lease.tree || old.runtimeDigest !== lease.runtimeDigest || Date.now() >= old.expiresAt) fail('existing review lease is stale; issue a fresh ticket');
+      if (old.execution !== execution || old.schema !== activeSchema || old.tree !== lease.tree || old.runtimeDigest !== lease.runtimeDigest
+          || old.generation !== lease.generation || old.round !== lease.round || old.packetHash !== lease.packetHash
+          || Date.now() >= old.expiresAt) fail('existing review lease is stale; issue a fresh ticket');
       return { ...old, reportTemplate: { schema: activeSchema, execution, ticket, tree: old.tree,
         perspectives: old.roles.map(role => ({ role, summary: '', findings: [] })) } };
     }
@@ -163,6 +183,8 @@ function main(argv, env = process.env, options = {}) {
   }
   const lease = read(leaseFile);
   if (lease.runtimeDigest !== binding.context.runtime_digest || lease.sessionKey !== binding.sessionKey) fail('review provenance changed');
+  if (lease.generation !== (state.reviewGeneration || null)
+      || lease.round !== state.reviewRound + (state.reviewTicketConsumed ? 0 : 1)) fail('review generation or round changed');
   if (lease.execution !== execution || lease.schema !== activeSchema) fail('review execution does not match its lease');
   const report = validateReport(read(args['--report']), lease, tree.tree);
   let assurance;

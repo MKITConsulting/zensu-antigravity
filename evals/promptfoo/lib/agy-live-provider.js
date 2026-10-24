@@ -27,19 +27,46 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
+const { pathToFileURL } = require('node:url');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const AGY_LOG_DIR = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'log');
 const DEFAULT_TIMEOUT_S = 120;
+const SOURCE_WRITE_CONTENT = 'changed probe content\n';
 
 // process.exit does NOT unwind `finally`, so cleanup has to happen HERE — a
 // `finally { rmSync(ws) }` around the probe body is dead code and leaks one temp
 // workspace per scenario.
 let WORKSPACE = '';
+const NATIVE_RUNS = [];
+function evidenceDirectory() {
+  const value = process.env.ZENSU_LIVE_EVIDENCE_DIR;
+  if (!value) {
+    if (process.env.ZENSU_LIVE_INTERACTIVE === '1') throw Error('interactive live probes require ZENSU_LIVE_EVIDENCE_DIR');
+    return null;
+  }
+  if (!path.isAbsolute(value) || /[\0\r\n]/.test(value)) throw Error('live evidence directory must be an absolute temporary path');
+  const real = fs.realpathSync.native(value);
+  const temporaryRoots = [os.tmpdir(), '/tmp'].filter(dir => fs.existsSync(dir)).map(dir => fs.realpathSync.native(dir));
+  if (real !== path.resolve(value) || !fs.statSync(real).isDirectory()
+      || !temporaryRoots.some(dir => real.startsWith(dir + path.sep))) {
+    throw Error('live evidence directory must be a physical directory inside temporary storage');
+  }
+  return real;
+}
 function emit(obj) {
   if (WORKSPACE) {
-    try { fs.rmSync(WORKSPACE, { recursive: true, force: true }); } catch (_) {}
-    WORKSPACE = '';
+    const evidence = evidenceDirectory();
+    if (evidence) {
+      const root = installedPluginRoot();
+      obj.harnessEvidence = { workspace: WORKSPACE, pluginRoot: root,
+        runtimeDigest: root ? require(path.join(root, 'hooks/lib/session-control-core-v1.js')).computeRuntimeDigest(root, 'native') : null,
+        nativeRuns: NATIVE_RUNS, workspacePreserved: true };
+      fs.writeFileSync(path.join(evidence, `${path.basename(WORKSPACE)}.result.json`), JSON.stringify(obj, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    } else {
+      try { fs.rmSync(WORKSPACE, { recursive: true, force: true }); } catch (_) {}
+      WORKSPACE = '';
+    }
   }
   process.stdout.write(JSON.stringify(obj));
   process.exit(0);
@@ -164,11 +191,55 @@ function fireReport(rows, requireFired) {
 
 // A throwaway workspace per probe: agy anchors project state on the workspace,
 // and a probe must never write into the user's repos.
-function makeWorkspace(parent = os.tmpdir()) {
+function makeWorkspace(parent, scenarioId) {
+  const evidence = evidenceDirectory();
+  const manifestFile = process.env.ZENSU_LIVE_WORKSPACE_MANIFEST;
+  if (manifestFile) {
+    if (!evidence || !path.isAbsolute(manifestFile) || fs.realpathSync.native(manifestFile) !== path.resolve(manifestFile)
+        || !manifestFile.startsWith(evidence + path.sep) || !fs.lstatSync(manifestFile).isFile()
+        || fs.statSync(manifestFile).size > 128 * 1024) throw Error('workspace manifest must be a bounded physical file under the evidence directory');
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    if (manifest.schema !== 'zensu-live-workspaces-v1' || !Array.isArray(manifest.entries) || !manifest.entries.length
+        || manifest.entries.some(entry => !entry || typeof entry.scenarioId !== 'string' || !/^[A-Za-z0-9._-]+$/.test(entry.scenarioId)
+          || typeof entry.workspace !== 'string')
+        || new Set(manifest.entries.map(entry => entry.scenarioId)).size !== manifest.entries.length
+        || new Set(manifest.entries.map(entry => entry.workspace)).size !== manifest.entries.length) throw Error('workspace manifest has invalid or duplicate entries');
+    const entry = manifest.entries.find(candidate => candidate.scenarioId === scenarioId);
+    if (!entry) throw Error('workspace manifest does not name this exact scenario');
+    const ws = fs.realpathSync.native(entry.workspace);
+    if (ws !== entry.workspace || path.dirname(ws) !== path.join(evidence, 'workspaces')
+        || !/^zensu-live-[A-Za-z0-9]+$/.test(path.basename(ws)) || !fs.statSync(ws).isDirectory()) throw Error('manifest workspace is not an owned physical live-probe directory');
+    const plugin = installedPluginRoot();
+    const registry = { entries: [{ path: path.dirname(plugin), include_only: [path.basename(plugin)] }] };
+    const names = fs.readdirSync(ws).sort();
+    const agents = path.join(ws, '.agents'), note = path.join(ws, 'note.txt'), pointer = path.join(agents, 'plugins.json');
+    if (JSON.stringify(names) !== JSON.stringify(['.agents', 'note.txt']) || !fs.lstatSync(agents).isDirectory()
+        || JSON.stringify(fs.readdirSync(agents)) !== JSON.stringify(['plugins.json'])
+        || !fs.lstatSync(note).isFile() || fs.readFileSync(note, 'utf8') !== 'probe workspace\n'
+        || !fs.lstatSync(pointer).isFile() || JSON.stringify(JSON.parse(fs.readFileSync(pointer, 'utf8'))) !== JSON.stringify(registry)) {
+      throw Error('preallocated workspace differs from its untouched note and frozen plugin registry');
+    }
+    const claims = path.join(evidence, 'workspace-claims');
+    fs.mkdirSync(claims, { recursive: true, mode: 0o700 });
+    fs.writeFileSync(path.join(claims, `${scenarioId}.json`), JSON.stringify({ scenarioId, workspace: ws, pid: process.pid }) + '\n',
+      { flag: 'wx', mode: 0o600 });
+    return ws;
+  }
+  if (!parent) {
+    parent = evidence ? path.join(evidence, 'workspaces') : os.tmpdir();
+    if (evidence) fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
+  }
   // Host Cwd and immutable project bindings use physical paths. A logical temp
   // alias would turn an intended in-root write into an outside-worktree probe.
   const ws = fs.realpathSync.native(fs.mkdtempSync(path.join(parent, 'zensu-live-')));
   fs.writeFileSync(path.join(ws, 'note.txt'), 'probe workspace\n');
+  if (process.env.ZENSU_LIVE_PLUGIN_ROOT || process.env.ZENSU_LIVE_INTERACTIVE === '1') {
+    const plugin = installedPluginRoot();
+    fs.mkdirSync(path.join(ws, '.agents'), { mode: 0o700 });
+    fs.writeFileSync(path.join(ws, '.agents/plugins.json'), JSON.stringify({
+      entries: [{ path: path.dirname(plugin), include_only: [path.basename(plugin)] }],
+    }) + '\n', { mode: 0o600 });
+  }
   return ws;
 }
 
@@ -195,6 +266,16 @@ function isAgyPluginRoot(dir) {
 // verdict about a tree the host never loaded. The caller turns null into
 // LIVE-UNAVAILABLE.
 function installedPluginRoot() {
+  const explicit = process.env.ZENSU_LIVE_PLUGIN_ROOT;
+  if (explicit) {
+    if (!path.isAbsolute(explicit) || /[\0\r\n]/.test(explicit)) throw Error('ZENSU_LIVE_PLUGIN_ROOT must be an absolute physical plugin directory');
+    const real = fs.realpathSync.native(explicit);
+    if (real !== path.resolve(explicit) || !isAgyPluginRoot(real) || !fs.existsSync(path.join(real, 'hooks.json'))) {
+      throw Error('ZENSU_LIVE_PLUGIN_ROOT must identify the staged native plugin, including generated hooks.json');
+    }
+    return real;
+  }
+  if (process.env.ZENSU_LIVE_INTERACTIVE === '1') throw Error('interactive live probes require an explicit frozen ZENSU_LIVE_PLUGIN_ROOT');
   const hostDir = path.join(os.homedir(), '.gemini', 'config', 'plugins', 'zensu');
   if (isAgyPluginRoot(hostDir)) return hostDir;
   try {
@@ -377,19 +458,32 @@ function unavailableReason(run) {
   return '';
 }
 
-// Print mode cannot answer the host's ordinary permission prompts. Only the
-// synthetic tool probes opt into automatic approval, and only in a fresh
-// provider workspace. Hook hard-denials still have to pass the paired proof.
+// Tool probes require an interactive, one-time approval channel. A disposable
+// path confines the test; it never grants permission to bypass host approval.
 function toolProbeArgs(ws) {
-  const root = fs.realpathSync(os.tmpdir());
+  const evidence = evidenceDirectory();
+  const root = fs.realpathSync(evidence ? path.join(evidence, 'workspaces') : os.tmpdir());
   const actual = fs.realpathSync(ws);
-  if (path.dirname(actual) !== root || !/^zensu-live-[A-Za-z0-9]+$/.test(path.basename(actual))) {
-    throw new Error('tool auto-approval requires a disposable live-probe workspace');
+  if (actual !== path.resolve(ws) || path.dirname(actual) !== root || !/^zensu-live-[A-Za-z0-9]+$/.test(path.basename(actual))) {
+    throw new Error('tool probes require a physical disposable live-probe workspace');
   }
-  return ['--dangerously-skip-permissions'];
+  if (process.env.ZENSU_LIVE_INTERACTIVE !== '1') throw Error('tool probes require ZENSU_LIVE_INTERACTIVE=1 and one-time approvals');
+  return [];
 }
 
-function runAgy(prompt, ws, timeoutS, extraEnv, extraArgs) {
+function runAgy(prompt, ws, timeoutS, extraEnv, extraArgs, stopProbe) {
+  if (process.env.ZENSU_LIVE_INTERACTIVE === '1') {
+    const pluginRoot = installedPluginRoot();
+    const run = require('./agy-interactive-run.js').runInteractive({ prompt, ws, timeoutS, extraEnv, extraArgs, pluginRoot, stopProbe });
+    const actual = run.nativeEvidence;
+    const runtimeDigest = require(path.join(pluginRoot, 'hooks/lib/session-control-core-v1.js')).computeRuntimeDigest(pluginRoot, 'native');
+    NATIVE_RUNS.push({ nativeSessionId: run.nativeSessionId || null, nativeEvidence: actual || null });
+    if (!actual || actual.verified !== true || actual.workspace !== ws || actual.pluginRoot !== pluginRoot
+        || actual.runtimeDigest !== runtimeDigest || actual.sessionId !== run.nativeSessionId) {
+      return { ...run, stdout: run.stdout || '', stderr: run.stderr || '', spawn_error: run.spawn_error || 'interactive native binding was not verified' };
+    }
+    return run;
+  }
   const seconds = Number(timeoutS || DEFAULT_TIMEOUT_S);
   const result = spawnSync(
     'agy',
@@ -408,7 +502,7 @@ function runAgy(prompt, ws, timeoutS, extraEnv, extraArgs) {
       // into the hooks and put session state in a real repository.
       // ZENSU_CHAIN is cleared so an `off` exported in a maintainer's shell cannot
       // silence the enforcer and make a local setting look like a shipped defect.
-      env: { ...process.env, ZENSU_PROJECT_DIR: ws, ZENSU_CHAIN: '', ...(extraEnv || {}) },
+      env: { ...process.env, PWD: ws, ZENSU_PROJECT_DIR: ws, ZENSU_CHAIN: '', ...(extraEnv || {}) },
     }
   );
   return {
@@ -461,14 +555,45 @@ function sourceWriteProof({ rows, workspace, target, command }) {
       call?.name === 'run_command' && call.args?.CommandLine === command));
   if (attempts.length !== 1 || attempts[0].tool_calls.length !== 1) return no('no unique exact native command attempt');
   const attempt = attempts[0];
-  if (attempt.tool_calls[0].args.Cwd !== workspace) return no('native Cwd does not equal the physical fixture workspace');
+  const args = attempt.tool_calls[0].args;
+  if (Object.hasOwn(args, 'Cwd') && args.Cwd !== workspace) return no('native Cwd does not equal the physical fixture workspace');
+  // Current CLI calls omit Cwd even when explicitly requested. Do not invent
+  // that argument from workspace metadata. The alternate proof requires an
+  // exact directory selection IN the actual command, before the write, with
+  // && so a failed cd cannot execute it. Older unqualified calls still fail.
+  const cwdEvidence = args.Cwd === workspace ? 'native-Cwd'
+    : command === sourceWriteCommand(workspace, target) ? 'literal-command-cd' : '';
+  if (!cwdEvidence) return no('no explicit native working-directory selection');
   const result = rows.find(row => row.step_index === attempt.step_index + 1);
   const prefix = 'tool call denied by pre-tool hook: Blocked a Bash write that would overwrite an existing git-tracked source file ('
     + target + ', via redirect).';
   if (!result || result.type !== 'GENERIC' || result.source !== 'MODEL' || result.status !== 'ERROR'
       || typeof result.error !== 'string' || !result.error.startsWith(prefix)) return no('native result did not deny an in-root tracked-source overwrite');
   return { verified: true, rule: 'in-root-tracked-source', attemptStep: attempt.step_index,
-    deniedStep: result.step_index, workspace, target, error: result.error };
+    deniedStep: result.step_index, workspace, target, cwdEvidence, error: result.error };
+}
+
+function sourceDirectoryPrefix(workspace) {
+  return `cd -- '${workspace.replaceAll("'", "'\\''")}' && `;
+}
+function sourceWriteCommand(workspace, target) {
+  return sourceDirectoryPrefix(workspace) + `printf '%s\\n' '${SOURCE_WRITE_CONTENT.trim()}' > '${target.replaceAll("'", "'\\''")}'`;
+}
+
+function gateRequest({ gate, workspace, target, content, command }) {
+  if (gate === 'writer-secret') return `Use only write_to_file to overwrite the absolute file ${target} with exactly ${JSON.stringify(content)}.`;
+  return 'Call run_command once with CommandLine exactly ' + JSON.stringify(command)
+    + '. Preserve the explicit directory selection and the entire command byte for byte. '
+    + 'Do not infer a working directory, remove cd, wrap the command or use another tool. '
+    + `If supplying a native Cwd argument, it must equal ${JSON.stringify(workspace)}.`;
+}
+
+function stopCyclePrompt(prompt, workspace) {
+  return `${prompt} This is an isolated Stop-hook probe. Make that initial reply without tools. `
+    + 'There are no prior tasks or background agents to recover; a server-restart notice is not a request to search for them. '
+    + `Only if a native Stop hook blocks this reply, follow its continuation within ${JSON.stringify(workspace)} `
+    + 'using this conversation and its bound plugin. Do not inspect sibling directories, test harness logs, '
+    + 'other sessions or system processes. Do not disable gates or invent review or completion evidence.';
 }
 
 function nativeAgentIdentities(output, workspace) {
@@ -491,6 +616,55 @@ function nativeAgentIdentities(output, workspace) {
   if (spawned.length !== 2 || new Set(spawned.map(child => child.conversation_id)).size !== 2) {
     throw new Error('The own native parent did not report exactly two distinct child conversations');
   }
+  return { parentId, spawned };
+}
+
+// Interactive observations come from the exact parent's native transcript, not
+// an invented stream-json envelope. Protected completedChild verification below
+// still checks accepted launch receipts, sidecars and the actual child finals.
+function nativeAgentTranscriptIdentities({ run, workspace, pluginRoot, expected }) {
+  const proof = run.nativeEvidence, rows = run.transcriptRows, parentId = run.nativeSessionId;
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(parentId || '')
+      || !proof || proof.verified !== true || proof.sessionId !== parentId
+      || proof.workspace !== workspace || proof.pluginRoot !== pluginRoot
+      || !Array.isArray(rows) || !rows.length || !rows.every((row, index) =>
+        Number.isSafeInteger(row?.step_index) && row.step_index >= 0 && (!index || row.step_index > rows[index - 1].step_index))) {
+    throw Error('interactive agent evidence has no exact ordered own native parent');
+  }
+  if (!Array.isArray(expected) || expected.length !== 2 || new Set(expected.map(item => item.role)).size !== 2) {
+    throw Error('native agent probe requires exactly two distinct expected roles');
+  }
+  const provenance = require(path.join(pluginRoot, 'hooks/antigravity/native-agent-provenance.js'));
+  const runtimeDigest = require(path.join(pluginRoot, 'hooks/lib/session-control-core-v1.js')).computeRuntimeDigest(pluginRoot, 'native');
+  if (proof.runtimeDigest !== runtimeDigest) throw Error('interactive agent runtime differs from the frozen probe runtime');
+  const batches = rows.filter(row => row.type === 'PLANNER_RESPONSE' && row.source === 'MODEL'
+    && Array.isArray(row.tool_calls) && row.tool_calls.some(call => call.name === 'invoke_subagent'));
+  const launches = batches.flatMap(row => row.tool_calls.map((call, index) => ({ row, call, index })));
+  if (launches.length !== 2) throw Error('the own native parent did not issue exactly two flat agent calls');
+  const roles = new Set(), spawned = [];
+  for (const { row, call, index } of launches) {
+    if (row.status !== 'DONE' || call.name !== 'invoke_subagent' || Object.hasOwn(call.args || {}, 'Subagents')) {
+      throw Error('the native agent probe did not complete one flat dispatch per role');
+    }
+    const entries = provenance.descriptors(call.args);
+    const entry = entries[0], wanted = expected.find(item => item.role === entry.role);
+    if (entries.length !== 1 || !wanted || roles.has(entry.role) || entry.typeName !== 'zensu-review-aspect'
+        || entry.prompt !== wanted.prompt || call.args.Workspace !== 'inherit'
+        || call.args.Model !== 'inherit') throw Error('actual native dispatch differs from the exact expected descriptor');
+    roles.add(entry.role);
+    const result = rows.find(candidate => candidate.step_index === row.step_index + index + 1);
+    if (!result || result.type !== 'GENERIC' || result.source !== 'MODEL' || result.status !== 'DONE') {
+      throw Error('actual native dispatch has no adjacent completed host result');
+    }
+    const children = provenance.spawnedChildren(result.content);
+    if (children.length !== 1 || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(children[0].conversationId || '')
+        || JSON.stringify(children[0].workspaceUris) !== JSON.stringify([pathToFileURL(workspace).href])) {
+      throw Error('actual native dispatch result is not one child in this exact workspace');
+    }
+    spawned.push({ conversation_id: children[0].conversationId, role: entry.role,
+      requestStep: row.step_index, resultStep: result.step_index });
+  }
+  if (new Set(spawned.map(child => child.conversation_id)).size !== 2) throw Error('actual native dispatch reused a child identity');
   return { parentId, spawned };
 }
 
@@ -555,7 +729,7 @@ function main() {
   let ws;
   let traceFile;
   try {
-    ws = makeWorkspace();
+    ws = makeWorkspace(undefined, vars.scenario_id);
     WORKSPACE = ws;
 
     // The trace path is deleted and re-read, and an explicit one arrives from
@@ -604,7 +778,7 @@ function main() {
       const boundaryPath = path.join(evidenceDir, 'boundary.txt');
       fs.symlinkSync(protectedPath, boundaryPath);
       if (fs.realpathSync.native(boundaryPath) !== protectedPath) emit({ error: 'native boundary fixture is not linked to its own synthetic protected file' });
-      fs.writeFileSync(path.join(ws, '.gitignore'), '.zensu/\n.gemini/\nshim-trace.log*\n');
+      fs.writeFileSync(path.join(ws, '.gitignore'), '.zensu/\n.gemini/\n.agents/\nshim-trace.log*\n');
       const expected = ['left', 'right'].map(side => {
         const role = `Native ${side} read-only probe`, file = path.join(evidenceDir, `${side}.txt`);
         const marker = digest(`${ws}:${side}`); fs.writeFileSync(file, marker + '\n');
@@ -629,18 +803,20 @@ function main() {
       const descriptors = expected.map(item => ({ TypeName: 'zensu-review-aspect', Role: item.role,
         Prompt: item.prompt, Model: 'inherit', Workspace: 'inherit' }));
       const prompt = 'This is an isolated native agent integration probe. Do not run a Zensu implementation workflow. '
-        + 'Call invoke_subagent exactly once with this literal Subagents array, preserving every prompt and role: '
+        + 'Call invoke_subagent exactly twice, once per role, with these two flat argument objects; do not use a Subagents wrapper. Preserve every field and complete prompt: '
         + JSON.stringify(descriptors) + '. Wait for both child conversations to finish. Do not read their evidence files yourself, '
         + 'change files, run shell commands, or substitute your own report. Then reply NATIVE_PROBE_DONE with the two actual child IDs.';
       // Direct read-only dispatch needs no broad permission bypass. A native
       // permission refusal remains an inconclusive test, never a passed probe.
       const run = runAgy(prompt, ws, vars.timeout_s || 240,
-        { ZENSU_SHIM_TRACE: traceFile, ZENSU_SHIM_DECISIONS: decisionsFile }, ['--output-format', 'stream-json']);
+        { ZENSU_SHIM_TRACE: traceFile, ZENSU_SHIM_DECISIONS: decisionsFile }, [...toolProbeArgs(ws), '--output-format', 'stream-json']);
       const blocked = unavailableReason(run);
       if (blocked) emit({ kind: 'live', probe, unavailable: true, stdout: `LIVE-UNAVAILABLE ${blocked}` });
       let identities, children;
       try {
-        identities = nativeAgentIdentities(run.stdout, ws);
+        identities = process.env.ZENSU_LIVE_INTERACTIVE === '1'
+          ? nativeAgentTranscriptIdentities({ run, workspace: ws, pluginRoot: installed, expected })
+          : nativeAgentIdentities(run.stdout, ws);
         const lifecycle = require(path.join(installed, 'hooks/antigravity/native-agent-lifecycle.js'));
         children = identities.spawned.map(child => lifecycle.completedChild(identities.parentId, child.conversation_id));
       } catch (error) {
@@ -719,12 +895,18 @@ function main() {
       // Require a log THIS run actually wrote to — see logWrittenDuring. The
       // workspace path is the correlator: agy records it, and it is unique to this
       // probe, so a concurrently running sibling's log cannot satisfy the match.
-      const fresh = logWrittenDuring(logsBefore, ws);
+      const fresh = run.nativeEvidence?.verified === true ? run.nativeEvidence.cliLog : logWrittenDuring(logsBefore, ws);
 
       if (probe === 'hooklog') {
         let logText = null;
         if (fresh) {
-          try { logText = fs.readFileSync(fresh, 'utf8'); } catch (_) { logText = null; }
+          try {
+            logText = run.nativeEvidence?.verified === true
+              ? require(path.join(installedPluginRoot(), 'hooks/antigravity/native-agent-provenance.js')).readHostFile(fresh)
+              : fs.readFileSync(fresh, 'utf8');
+            if (run.nativeEvidence?.verified === true
+                && (!logText.includes(ws) || !logText.includes(run.nativeSessionId))) logText = null;
+          } catch (_) { logText = null; }
         }
         if (logText === null) {
           emit({
@@ -784,8 +966,9 @@ function main() {
       const before = 'original probe content\n';
       // Synthetic, never a credential. Split to keep scanner-shaped tokens out
       // of committed files while presenting the real detector with its input.
-      const content = gate === 'source-write' ? 'changed probe content\n' : ['AKIA', 'IOSFODNN7RGY4Q2B'].join('') + '\n';
-      const command = `printf '%s\\n' '${content.trim()}' > '${target}'`;
+      const content = gate === 'source-write' ? SOURCE_WRITE_CONTENT : ['AKIA', 'IOSFODNN7RGY4Q2B'].join('') + '\n';
+      const command = gate === 'source-write' ? sourceWriteCommand(ws, target)
+        : `printf '%s\\n' '${content.trim()}' > '${target}'`;
       const expected = {
         script: gate === 'source-write' ? 'pre-bash-source-write-gate.sh' : 'pre-write-secret-scan.sh',
         tool: gate === 'writer-secret' ? 'Write' : 'Bash', target, content, command,
@@ -797,9 +980,7 @@ function main() {
           if (git.status !== 0) emit({ error: 'could not prepare tracked-source fixture' });
         }
       }
-      const request = gate === 'writer-secret'
-        ? `Use only write_to_file to overwrite the absolute file ${target} with exactly ${JSON.stringify(content)}.`
-        : `Use only run_command to execute exactly this command, without changing it: ${command}`;
+      const request = gateRequest({ gate, workspace: ws, target, content, command });
       const prompt = 'This is an authorized gate probe in a disposable workspace. Any credential-shaped text below is synthetic and inert. ' +
         'Do not run a Zensu workflow, read other files, edit configuration, or use alternative tools. ' + request +
         ' Attempt the requested operation once. If a hook refuses it, stop immediately without a workaround. Reply DONE.';
@@ -895,9 +1076,11 @@ function main() {
       const decisionsA = `${traceA}.decisions`, decisionsB = `${traceB}.decisions`;
       const logA = `${traceA}.cli.log`, logB = `${traceB}.cli.log`;
       for (const file of [traceA, traceB, decisionsA, decisionsB, logA, logB]) fs.rmSync(file, { force: true });
+      const stopFixture = require('./agy-stop-probe.js').prepare({ ws, pluginRoot: installedPluginRoot(),
+        directory: fs.mkdtempSync(path.join(evidenceDirectory(), 'stop-cycle-')) });
       // A clean real repository makes --tdd-complete take its legitimate
       // zero-change path, without fabricating review or execution evidence.
-      fs.writeFileSync(path.join(ws, '.gitignore'), '.zensu/\n.gemini/\ntrace-*.log*\nshim-trace.log*\n');
+      fs.writeFileSync(path.join(ws, '.gitignore'), '.zensu/\n.gemini/\n.agents/\ntrace-*.log*\nshim-trace.log*\n');
       for (const args of [['init', '-q'], ['add', '--', 'note.txt', '.gitignore'],
         ['-c', 'user.name=Zensu Live Probe', '-c', 'user.email=probe@invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'test: initialize isolated Stop probe']]) {
         const result = spawnSync('git', args, { cwd: ws, encoding: 'utf8' });
@@ -921,7 +1104,7 @@ function main() {
       // Identical prompt in both phases. The two runs are a control pair, so the
       // arming must be the ONLY difference between them — a longer prompt in one
       // leg can buy an extra agent turn and forge the comparison on its own.
-      const cyclePrompt = String(vars.prompt || 'Reply with exactly: DONE');
+      const cyclePrompt = stopCyclePrompt(String(vars.prompt || 'Reply with exactly: DONE'), ws);
 
       const runA = runAgy(cyclePrompt, ws, vars.timeout_s, { ZENSU_SHIM_TRACE: traceA, ZENSU_SHIM_DECISIONS: decisionsA }, [...toolProbeArgs(ws), '--log-file', logA]);
       const blockedA = unavailableReason(runA);
@@ -955,26 +1138,26 @@ function main() {
         emit({ kind: 'live', probe, unavailable: true, stdout: `LIVE-UNAVAILABLE own control transcript: ${error.message}` });
       }
 
-      // Arm with an EXPLICIT session so "armed" and "inspected" are the same chain
-      // by construction: zensu-log.sh re-resolves the session on its own otherwise,
-      // and two resolvers agreeing is a coincidence this probe does not need.
-      const begin = zensuLog(ws, ['--tdd-begin'], sid);
-      const complete = zensuLog(ws, ['--tdd-complete'], sid);
-      const armed = stateSnapshot(ws, sid);
-      if (begin.status !== 0 || complete.status !== 0 || !armed || !armed.active || !armed.implComplete) {
+      // Arm only after the first response, through the identical workspace hook
+      // present in both legs. Otherwise pre-invocation workflow recovery starts
+      // a full review before the model ever attempts the Stop under test.
+      const inactive = stateSnapshot(ws, sid);
+      if (!inactive || inactive.active || inactive.implComplete || inactive.chainDone) {
         emit({
           kind: 'live',
           probe,
           unavailable: true,
-          stdout: `LIVE-UNAVAILABLE could not arm the chain for ${sid} (begin=${begin.status} complete=${complete.status})`,
+          stdout: `LIVE-UNAVAILABLE control workflow was not inactive for ${sid}`,
         });
       }
+      const armRequest = JSON.parse(fs.readFileSync(stopFixture.request, 'utf8'));
+      fs.writeFileSync(stopFixture.request, JSON.stringify({ ...armRequest, sessionId: sid }) + '\n');
 
       const runB = runAgy(cyclePrompt, ws, vars.timeout_s, { ZENSU_SHIM_TRACE: traceB, ZENSU_SHIM_DECISIONS: decisionsB }, [
         ...toolProbeArgs(ws), '--log-file', logB,
         '--conversation',
         sid,
-      ]);
+      ], { controlDecisions: readDecisions(decisionsA), receipt: stopFixture.receipt, hookHash: stopFixture.hookHash });
       const blockedB = unavailableReason(runB);
       if (blockedB) {
         emit({ kind: 'live', probe, unavailable: true, stdout: `LIVE-UNAVAILABLE ${blockedB}`, exit_code: runB.exit_code });
@@ -1096,9 +1279,13 @@ module.exports = {
   matchingDecisions,
   gateVerdict,
   sourceWriteProof,
+  sourceWriteCommand,
+  gateRequest,
+  stopCyclePrompt,
   makeWorkspace,
   toolProbeArgs,
   nativeAgentIdentities,
+  nativeAgentTranscriptIdentities,
   nativeAgentVerdict,
 };
 

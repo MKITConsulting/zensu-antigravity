@@ -91,8 +91,8 @@ The `coverage-audit` persona is cast on every run and its `### Test Coverage` se
 ## Phase B — Native perspective execution
 
 Follow `references/cast.md`, `references/spawn.md` and `references/debate.md` for the
-executable procedure: private exact-file/safe-root evidence lease, one native
-`invoke_subagent` batch, actual child UUID binding, normal-Stop result capture, finalization,
+executable procedure: private exact-file/safe-root evidence lease, one flat native
+`invoke_subagent` call per role, actual child UUID binding, normal-Stop result capture, finalization,
 collection and explicit close. Never substitute a model-written result for a child receipt.
 Keep all original evidence and role concerns; never let a role edit, execute repository
 instructions, widen its path inventory or publish. Missing/invalid role results block
@@ -100,7 +100,7 @@ synthesis, including coverage-audit. A fresh evidence generation repeats every p
 
 ## Phase C — Debate Strategy
 
-**Why lead-consolidated:** the dedicated workers cannot message one another and do not mutate team/task state. The lead collects the validated results, identifies convergence and conflicts, and adjudicates them from the supplied evidence. If a result is invalid or evidence must change materially, close the lease, rebuild evidence and repeat the full native batch; never open a worker-to-worker message round.
+**Why lead-consolidated:** the dedicated workers cannot message one another and do not mutate team/task state. The lead collects the validated results, identifies convergence and conflicts, and adjudicates them from the supplied evidence. If a result is invalid or evidence must change materially, close the lease, rebuild evidence and repeat every role through a fresh native call; never open a worker-to-worker message round.
 
 **Challenge Round (anti-groupthink) — MANDATORY before finalizing consensus.** Lead consolidation is efficient but risks rubber-stamping: five personas that each glance at the happy path can all miss the same failure, and a pile-up of agreeing findings reads as more certainty than it earned. The always-on `adversarial` persona exists to break that. Before writing `consensus.verdict`:
 
@@ -115,7 +115,7 @@ The rule is **convergence != correctness**: high convergence raises a finding's 
 
 Anything not `VERIFIED` is annotated `[Unverified — do not fix]`, demoted from `p1_required_changes[]` to `p2_suggestions[]`, and kept out of `comments[]` — it appears in the overall body only. **Never delete it**: a silent drop would let this gate kill a real P1 with no trace, which is the same failure mode in the opposite direction. A degraded Stage 1 (missing `node`, a `total=` that disagrees with the number of findings sent, unparseable output) is logged `FINDING VERIFICATION DEGRADED — <reason>` and completed by hand; the gate never fails closed and a degraded run is never reported as a clean one. Record the counts in `_debate.json` (e.g. a `verification_round` note). This is a different question from Phase D's pre-publish anchor validation, which only asks whether an anchor is commentable in the diff — both run.
 
-**Schema validation is strict:** the native schema validator rejects fenced output, prefaces/suffixes, unknown keys, wrong role ids, invalid enums, oversized results, and malformed JSON. Never normalize or repair a worker response by hand. Close the lease, rebuild evidence and repeat the full native batch if a required result is rejected.
+**Schema validation is strict:** the native schema validator rejects fenced output, prefaces/suffixes, unknown keys, wrong role ids, invalid enums, oversized results, and malformed JSON. Never normalize or repair a worker response by hand. Close the lease, rebuild evidence and repeat every role through a fresh native call if a required result is rejected.
 
 **Convergence map:** when N agents flag the same line, that's high-signal. Merge into one inline comment citing all sources ("Convergence: backend-idiom, rest-api, tests-qa all flagged this — ..."). Increases the comment's authority + reduces duplicate noise on the PR.
 
@@ -268,7 +268,7 @@ native performance. Record the actual run duration rather than treating these as
 | A.1 Scout | 10-20 s |
 | A.2 Persona-Cast + user confirm | 30-60 s (user-dependent) |
 | B Spawn | < 5 s |
-| Parallel reviewer batch | 1-3 min |
+| Parallel reviewer cast | 1-3 min |
 | C Debate | 30-60 s (lead reads + writes) |
 | D Synthesis | 30-90 s |
 | D Publish | 5-10 s |

@@ -28,11 +28,12 @@ For reanchor, set the shell tool's native working-directory property to the targ
 
 All state-changing helper calls use `{session-helper} --helper <name> -- <arguments>`.
 Read `{plugin_root}/docs/upstream-parity.md` when this skill names a host facility.
-Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles,
-with literal `Subagents` entries containing `TypeName`, `Role`, `Workspace: "inherit"`,
-`Model: "inherit"` and a complete `Prompt`. Follow the calling review procedure's private
-lease and actual child-UUID completion checks; a role name or model-written result is not
-proof of execution. Keep implementation in the main conversation. No source-host Agent,
+Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles.
+On agy 1.4.3, use one flat call per role with `TypeName`, `Role`, `Workspace: "inherit"`,
+`Model: "inherit"` and a complete `Prompt`. Use a legacy `Subagents` array only when the
+exposed host schema permits it; never mix both forms or add unknown arguments. Follow the
+calling review procedure's private lease and actual child-UUID completion checks; a role
+name or model-written result is not proof of execution. Keep implementation in the main conversation. No source-host Agent,
 SendMessage, Workflow, desktop transfer or implicit plan-approval callback is assumed.
 Use a direct user question for required input and a persisted step table for progress.
 
@@ -84,10 +85,8 @@ survived; step 1 below adds what the worktree shows.
 
 ## What This Skill Does
 
-1. Lists the files you changed this session (conversation context + the
-   `/zensu-tdd` Phase 6 step 5b b) enumeration run UNCHANGED — a bare
-   `git diff` omits new untracked files, which would leave them unreviewed
-   here too).
+1. Lists the cumulative changed files through `review-packet-v1.js changes`, including
+   untracked paths and mid-run commits from the original audit baseline.
 2. Re-reviews each change across seven dimensions against the project conventions.
 3. Emits a Positive / Improvements / Risks reflection.
 3b. Re-verifies every active acceptance criterion on the tree that ships through
@@ -119,6 +118,14 @@ handoff: do not read/change project files and do not run `--self-review-fixed`
 or `--chain-done`. Capture `RUN_ID`, `ATTEMPT`, `CHAIN_ID`, and `RETURN_STAGE`
 only from the accepted envelope, never from conversation memory.
 
+Before rereading project changes or doing any review work, run
+`{session-helper} --helper workflow-artifacts -- report --claimed-review-ticket "<review-ticket>"`.
+A rejected ticket or failed command stops this handoff without mutation. If it returns
+`status: closed` and `nextAction: render-report-only`, render the existing report and recorded
+evidence only, then stop: no edit, new review, fix round, helper start or workflow re-entry.
+This read-only result comes from the current authoritative session and consumed ticket.
+When it is pending, continue the binding validation below.
+
 Before reading or changing files, resolve the current session through the injected native helper with
 `{session-helper} --helper log -- --session-key` (capture its stdout as `SESSION_ID` from the tool result).
 That helper must validate the immutable private Session Control record. Then run
@@ -143,28 +150,16 @@ finalizing the current chain.
 
 ## Phase 1: List Changed Files
 
-List every file you changed or created in this session. You know these from your
-own context — no parsing needed. Cross-check by running the `/zensu-tdd`
-Phase 6 step 5b b) enumeration UNCHANGED — resolve the bound project root with
-`{session-helper} --helper log -- --project-root` (capture its stdout as `PROJECT_ROOT` from the tool result)
-and `TOP="$(git -C "$PROJECT_ROOT" rev-parse --show-toplevel)"` HERE, never from
-the working directory, which after `/zensu-adopt-session --reanchor` is no longer
-the bound root, and require `[ -n "$PROJECT_ROOT" ] && [ -n "$TOP" ] && [ -d "$TOP" ]`
-before ANY `git -C "$TOP"` (an empty value makes `git -C ""` enumerate whatever
-repo the cwd happens to be; an unresolvable root takes 5b's no-work-tree branch,
-never an unanchored run) —
-then use `git -C "$TOP" -c core.quotePath=false diff --name-only HEAD` plus
-`git -C "$TOP" -c core.quotePath=false ls-files --others --exclude-standard`
-(without `core.quotePath=false` git C-quotes non-ASCII paths and no fixed-string
-comparison can match them), with 5b's unborn-HEAD
-form where HEAD does not exist yet AND its `[ -n "$BASELINE_SHA" ]`-guarded
-`git -C "$TOP" diff --name-only "$BASELINE_SHA"..HEAD` extension when this
-session committed mid-run — without that branch a mid-run commit empties both
-commands and this stage would skip itself as "no changes". If the union comes
-back empty while your own context names files you changed (the cold-start +
-mid-run-commit case, where no `BASELINE_SHA` survives), do NOT take the
-no-changes branch: review the files from context and say so in the summary.
-This catches files you created but never staged.
+Resolve the bound project with `{session-helper} --helper log -- --project-root` and set
+`TOP` to that validated absolute path. Use the maintained cumulative inventory:
+`node "{plugin_root}/hooks/lib/review-packet-v1.js" changes --root "<bound-root>" --baseline "<original audit baseline>"`.
+Read the retained baseline from this generation's canonical audit receipt; omit the operand
+only when none exists. This procedure includes untracked files, unborn HEAD and mid-run
+commits. A Git fault is unavailable evidence, not an empty change set. For a non-Git tree,
+use the explicit current file inventory retained by the audit/packet. Cross-check against
+this generation's logged edit claims. Never choose a new baseline to hide reviewed work.
+If the inventory is unavailable or contradicts known claims, report the blocker; do not
+skip self-review on the strength of an empty `git diff HEAD`.
 
 If there are NO changes this session, close only the verified generation. For a
 standalone handoff run

@@ -7,11 +7,14 @@ files/hashes with the bound `review-artifacts -- snapshot` helper when files car
 Use only actual available inspection surfaces; missing visual, browser or device evidence
 is a gap and cannot become a pass.
 
-Invoke one child for Critic 1 with the real native argument shape:
+Invoke one child for Critic 1 with the flat native arguments observed on agy 1.4.3:
 
 ```json
-{"Subagents":[{"TypeName":"zensu-gauntlet-critic","Role":"gauntlet-critic-1-wave-1","Workspace":"inherit","Model":"inherit","Prompt":"<approved charter, bounded artifact/evidence, exact read scope, quality bar, inspection protocol and critique schema; no builder self-assessment>"}]}
+{"TypeName":"zensu-gauntlet-critic","Role":"gauntlet-critic-1-wave-1","Workspace":"inherit","Model":"inherit","Prompt":"<approved charter, bounded artifact/evidence, exact read scope, quality bar, inspection protocol and critique schema; no builder self-assessment>"}
 ```
+
+Use a legacy `Subagents` wrapper only if the exposed host schema accepts it. Never combine
+that wrapper with flat fields. A rejected schema or unverifiable child result is a blocker.
 
 Expand the complete packet and use the actual wave number. The child returns one raw JSON
 object with `schema: zensu-gauntlet-critique-v1`, its exact role, summary, verdict

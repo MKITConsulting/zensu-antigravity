@@ -240,69 +240,11 @@ _tdd_paths_safe() {
     native_home_root="$(_tdd_native_path "$HOME")" || return 1
   fi
   MSYS2_ARG_CONV_EXCL='*' node -e '
-      const fs = require("fs");
-      const path = require("path");
-      const within = (base, candidate) => {
-        const rel = path.relative(base, candidate);
-        return rel === "" || (rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
-      };
-      const [projectRoot, tempRoot, homeRoot, ...args] = process.argv.slice(1);
-      const trusted = [projectRoot, tempRoot, homeRoot]
-        .filter(Boolean).map(value => path.resolve(value));
-      const validModes = new Set(["regular", "regular-or-absent", "directory", "directory-or-absent"]);
-      for (let pair = 0; pair < args.length; pair += 2) {
-        const target = path.resolve(args[pair]);
-        const mode = args[pair + 1];
-        if (!validModes.has(mode)) process.exit(3);
-        const candidates = trusted.filter(value => within(value, target)).sort((a, b) => b.length - a.length);
-        let anchor = candidates[0] || "";
-        if (!anchor) {
-          let cursor = path.dirname(target);
-          for (;;) {
-            try {
-              const st = fs.lstatSync(cursor);
-              if (st.isDirectory() && !st.isSymbolicLink()) {
-                anchor = cursor;
-                break;
-              }
-            } catch (error) {
-              if (error.code !== "ENOENT") process.exit(3);
-            }
-            const parent = path.dirname(cursor);
-            if (parent === cursor) process.exit(3);
-            cursor = parent;
-          }
-        }
-        let physicalAnchor;
-        try { physicalAnchor = fs.realpathSync(anchor); }
-        catch (_) { process.exit(3); }
-        const rel = path.relative(anchor, target);
-        if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) process.exit(3);
-        const parts = rel ? rel.split(path.sep).filter(Boolean) : [];
-        let current = physicalAnchor;
-        let missing = false;
-        for (let i = 0; i < parts.length; i += 1) {
-          current = path.join(current, parts[i]);
-          const leaf = i === parts.length - 1;
-          if (missing) continue;
-          let st;
-          try { st = fs.lstatSync(current); }
-          catch (error) {
-            if (error.code !== "ENOENT") process.exit(3);
-            missing = true;
-            continue;
-          }
-          if (st.isSymbolicLink()) process.exit(3);
-          if (!leaf && !st.isDirectory()) process.exit(3);
-          if (leaf) {
-            if ((mode === "regular" || mode === "regular-or-absent")
-                && (!st.isFile() || st.nlink !== 1)) process.exit(3);
-            if ((mode === "directory" || mode === "directory-or-absent") && !st.isDirectory()) process.exit(3);
-          }
-        }
-        if (missing && (mode === "regular" || mode === "directory")) process.exit(3);
-      }
-    ' "$native_project_root" "$native_temp_root" "$native_home_root" \
+      const [modulePath, projectRoot, tempRoot, homeRoot, ...args] = process.argv.slice(1);
+      try { require(modulePath).assertPathsSafe([projectRoot, tempRoot, homeRoot], ...args); }
+      catch (_) { process.exit(3); }
+    ' "${_ZENSU_TDD_NATIVE_PLUGIN_ROOT}/hooks/lib/state-storage-v1.js" \
+      "$native_project_root" "$native_temp_root" "$native_home_root" \
       "${native_path_args[@]}" >/dev/null 2>&1
 }
 
@@ -370,6 +312,10 @@ _tdd_atomic_replace_regular() {
               workflowState: draft.workflow_state,
               event: "state-update",
             }, () => draft);
+            if (core.readWorkflowState({ projectRoot: process.env.PROJECT_ROOT, sessionId: process.env.SID }).workflowArtifacts) {
+        require(require("node:path").join(require("node:path").dirname(process.env.CONTROL_CORE), "workflow-artifacts-v1.js"))
+          .syncProgress({ projectRoot: process.env.PROJECT_ROOT, sessionId: process.env.SID });
+      }
             fs.unlinkSync(process.env.SOURCE_FILE);
           } catch (_) { process.exit(3); }
         ' >/dev/null 2>&1
@@ -379,23 +325,10 @@ _tdd_atomic_replace_regular() {
   native_source_file="$(_tdd_native_path "$source_file")" || return 1
   native_target_file="$(_tdd_native_path "$target_file")" || return 1
   SOURCE_FILE="$native_source_file" TARGET_FILE="$native_target_file" node -e '
-    const fs = require("fs");
-    const source = process.env.SOURCE_FILE;
-    const target = process.env.TARGET_FILE;
     try {
-      const before = fs.lstatSync(source);
-      if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) process.exit(3);
-      try {
-        const existing = fs.lstatSync(target);
-        if (!existing.isFile() || existing.isSymbolicLink() || existing.nlink !== 1) process.exit(3);
-      } catch (error) {
-        if (error.code !== "ENOENT") process.exit(3);
-      }
-      fs.renameSync(source, target);
-      const after = fs.lstatSync(target);
-      if (!after.isFile() || after.isSymbolicLink() || after.nlink !== 1) process.exit(3);
+      require(process.argv[1]).replaceRegular(process.env.SOURCE_FILE, process.env.TARGET_FILE, []);
     } catch (_) { process.exit(3); }
-  ' >/dev/null 2>&1
+  ' "${_ZENSU_TDD_NATIVE_PLUGIN_ROOT}/hooks/lib/state-storage-v1.js" >/dev/null 2>&1
 }
 
 tdd_is_test_path() {
@@ -927,6 +860,10 @@ _tdd_write_flag_critical() {
         if (process.env.KEY === "codeReviewDone" && value) state.stopBlockCount = 0;
         return state;
       });
+      if (core.readWorkflowState({ projectRoot: process.env.PROJECT_ROOT, sessionId: process.env.SID }).workflowArtifacts) {
+        require(require("node:path").join(require("node:path").dirname(process.env.CONTROL_CORE), "workflow-artifacts-v1.js"))
+          .syncProgress({ projectRoot: process.env.PROJECT_ROOT, sessionId: process.env.SID });
+      }
     ' 2>/dev/null
 }
 
@@ -1134,6 +1071,8 @@ _tdd_write_chain_reset_critical() {
       event: "chain-reset",
     }, (s) => {
       if (s.deferredReviewClaim !== "") throw new Error("cancel deferred-review claim first");
+      s.reviewGeneration = require("node:crypto").randomUUID();
+      delete s.workflowArtifacts;
       s.implComplete = false; s.chainDone = false;
       s.codeReviewDone = false; s.selfReviewFixed = false;
       s.reviewTicket = ""; s.reviewTicketConsumed = true; s.reviewRound = 0;
@@ -1195,6 +1134,8 @@ _tdd_begin_session_critical() {
       }
       if (typeof s.phase !== "string") s.phase = "UNINITIALIZED";
       if (!Array.isArray(s.history)) s.history = [];
+      s.reviewGeneration = require("node:crypto").randomUUID();
+      delete s.workflowArtifacts;
       s.active = true;
       s.vanilla = process.env.VANILLA === "true";
       s.implComplete = process.env.IMPL_COMPLETE === "true";
@@ -1359,7 +1300,11 @@ _tdd_mark_impl_complete_bound_critical() {
         if(!stillExact)throw new Error("stale autopilot generation");
         s.implComplete=true;return s;
       });
-    ' 2>/dev/null
+        if (core.readWorkflowState({ projectRoot: process.env.PROJECT_ROOT, sessionId: process.env.SID }).workflowArtifacts) {
+        require(require("node:path").join(require("node:path").dirname(process.env.CONTROL_CORE), "workflow-artifacts-v1.js"))
+          .syncProgress({ projectRoot: process.env.PROJECT_ROOT, sessionId: process.env.SID });
+      }
+  ' 2>/dev/null
 }
 
 tdd_mark_impl_complete_bound() {
@@ -1397,6 +1342,10 @@ _tdd_mark_impl_complete_standalone_critical() {
         throw new Error("stale standalone generation");
       draft.implComplete=true;return draft;
     });
+      if (core.readWorkflowState({ projectRoot: process.env.PROJECT_ROOT, sessionId: process.env.SID }).workflowArtifacts) {
+        require(require("node:path").join(require("node:path").dirname(process.env.CONTROL_CORE), "workflow-artifacts-v1.js"))
+          .syncProgress({ projectRoot: process.env.PROJECT_ROOT, sessionId: process.env.SID });
+      }
   ' 2>/dev/null
 }
 
