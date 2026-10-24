@@ -39,6 +39,10 @@ was verified. Submission is an expression of publisher interest, not Marketplace
 The repository remains private. The intake form does not require a public repository URL.
 Do not change repository visibility as part of submission.
 
+The [versioned submission evidence](marketplace/2026-10-19/README.md) contains the original
+Google confirmation screenshot, the local submission record and SHA-256 checksums.
+These preserve the submission evidence; they do not establish Marketplace approval.
+
 | Required field | Value |
 |---|---|
 | Email | integrations@zensu.dev |
