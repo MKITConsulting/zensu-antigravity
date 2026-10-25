@@ -22,8 +22,8 @@ fixture edit received individual native permission confirmations. No permanent
 tool allow rules were added. Temporary trust entries for the two test directories
 were removed afterward; the original CLI settings bytes were restored exactly.
 
-The subsequent merge of main's 0.2.1 release changed only version metadata and
-changelog content. All 278 staged files under `hooks/`, `agents/`, `rules/`,
+The subsequent merge of main's 0.2.1 release and the 0.3.0 release preparation
+changed only version metadata and changelog content. All 278 staged files under `hooks/`, `agents/`, `rules/`,
 `skills/` and `commands/` matched the refreshed source byte-for-byte. This report
 and the capture guide update do not change that tested runtime.
 
