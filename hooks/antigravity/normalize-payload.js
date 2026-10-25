@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const paths = require('./session-paths.js');
-const TOOL_NAMES = Object.freeze({ run_command: 'Bash', write_to_file: 'Write',
+const TOOL_NAMES = Object.freeze({ run_command: 'Bash', write_to_file: 'Write', write_file: 'Write', edit_file: 'Edit', read_file: 'Read',
   replace_file_content: 'Edit', multi_replace_file_content: 'MultiEdit',
   view_file: 'Read', grep_search: 'Grep', find_by_name: 'Glob',
   read_url_content: 'WebFetch', search_web: 'WebSearch' });
@@ -85,10 +85,13 @@ function normalize(input, event = '', options = {}) {
   out.tool_name = TOOL_NAMES[nativeName] || nativeName;
   if (nativeName) out.native_tool_name = nativeName;
   out.native_tool_input = { ...args };
-  const ti = { ...prior };
+  const currentFileTool = ['read_file', 'write_file', 'edit_file'].includes(nativeName);
+  // Native fields are authoritative: compatibility aliases cannot redirect a file gate.
+  const ti = currentFileTool ? {} : { ...prior };
   const command = firstString(args.CommandLine, args.command, prior.command);
   if (command) ti.command = command;
-  const file = firstString(args.TargetFile, args.AbsolutePath, args.FilePath, args.file_path, prior.file_path);
+  const file = currentFileTool ? firstString(args.Path)
+    : firstString(args.TargetFile, args.AbsolutePath, args.FilePath, args.file_path, prior.file_path);
   if (file) ti.file_path = file;
   if (nativeName === 'grep_search') {
     if (Object.prototype.hasOwnProperty.call(args, 'SearchPath')) ti.path = args.SearchPath;
@@ -108,14 +111,20 @@ function normalize(input, event = '', options = {}) {
     if (Object.prototype.hasOwnProperty.call(args, 'Recipient')) ti.recipient = args.Recipient;
     if (Object.prototype.hasOwnProperty.call(args, 'Message')) ti.message = args.Message;
   }
-  const content = firstString(args.CodeContent, args.Content, args.content, args.NewContent, args.CodeEdit, prior.content);
+  const content = currentFileTool ? (nativeName === 'write_file' ? firstString(args.Content) : '')
+    : firstString(args.CodeContent, args.Content, args.content, args.NewContent, args.CodeEdit, prior.content);
   if (content) ti.content = content;
-  const replacement = firstString(args.ReplacementContent, args.NewContent, args.new_string, prior.new_string);
+  const replacement = currentFileTool ? '' : firstString(args.ReplacementContent, args.NewContent, args.new_string, prior.new_string);
   if (replacement) ti.new_string = replacement;
-  const old = firstString(args.TargetContent, args.old_string, prior.old_string);
+  const old = currentFileTool ? '' : firstString(args.TargetContent, args.old_string, prior.old_string);
   if (old) ti.old_string = old;
+  // CLI 1.4.7 uses Path/Target/Replacement, including an empty replacement for deletion.
+  if (nativeName === 'edit_file') {
+    if (typeof args.Target === 'string') ti.old_string = args.Target;
+    if (typeof args.Replacement === 'string') ti.new_string = args.Replacement;
+  }
   const edits = [];
-  for (const chunks of [args.ReplacementChunks, args.Chunks, args.Edits]) {
+  for (const chunks of currentFileTool ? [] : [args.ReplacementChunks, args.Chunks, args.Edits]) {
     if (!Array.isArray(chunks)) continue;
     for (const chunk of chunks) {
       if (typeof chunk === 'string') edits.push({ new_string: chunk });
@@ -125,7 +134,7 @@ function normalize(input, event = '', options = {}) {
     }
   }
   if (edits.length) ti.edits = edits;
-  const bodies = [content, replacement, ...edits.map((edit) => edit.new_string)].filter(Boolean);
+  const bodies = [content, nativeName === 'edit_file' ? ti.new_string : replacement, ...edits.map((edit) => edit.new_string)].filter(Boolean);
   if (bodies.length) ti.content = bodies.join('\n');
   if (out.tool_name === 'Edit' && !ti.new_string && content) ti.new_string = content;
   out.tool_input = ti;

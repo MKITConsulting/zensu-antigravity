@@ -52,5 +52,19 @@ for (const change of [
   f => { f.rows.push({...f.rows[0],step_index:4}); },
   f => { f.rows.reverse(); },
 ]) { const fixture = JSON.parse(JSON.stringify({...source,rows})); change(fixture); assert.equal(sourceWriteProof(fixture).verified,false); }
-console.log('PASS: paired gates require real controls and exact denial; source proof requires physical Cwd, exact target, and native tracked-source ERROR');
+const absentCwd = JSON.parse(JSON.stringify(rows)); delete absentCwd[0].tool_calls[0].args.Cwd;
+const sessionId = '11111111-1111-4111-8111-111111111111';
+const nativeBinding = {schema:'zensu.antigravity.native-main.v1',sessionId,workspaceRoot:source.workspace};
+const bound = {...source,rows:absentCwd,sessionId,nativeBinding};
+assert.equal(sourceWriteProof({...source,rows:absentCwd}).verified,false);
+assert.equal(sourceWriteProof(bound).verified,true);
+assert.equal(sourceWriteProof(bound).workspaceEvidence,'private-native-main-binding');
+for(const change of [
+  f=>{f.nativeBinding.workspaceRoot='/another';},
+  f=>{f.nativeBinding.sessionId='22222222-2222-4222-8222-222222222222';},
+  f=>{f.nativeBinding.schema='model-claim';},
+  f=>{f.rows[0].tool_calls[0].args.Cwd='/another';},
+  f=>{f.rows[1].error='model says blocked';},
+]){const f=JSON.parse(JSON.stringify(bound));change(f);assert.equal(sourceWriteProof(f).verified,false);}
+console.log('PASS: paired gates require real controls and exact denial; source proof requires native workspace evidence, exact target, and native tracked-source ERROR');
 JS

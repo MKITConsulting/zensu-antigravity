@@ -25,24 +25,24 @@ presence of the primer, capture helper and human acceptance boundary.
 
 ## Native candidate evidence
 
-- Native conversation: `b31c5eb3-380b-4c52-afc8-f79eeb7873c2`.
-- The real user input was recorded at 21:28:53 UTC. Its first native system
-  context and first model step were recorded at 21:29:00 UTC: approximately seven
+- Native conversation: `2ca814bd-c641-4880-b5a6-e584710b7cfd`.
+- The real user input was recorded at 21:57:21 UTC. Its first native system
+  context and first model step were recorded at 21:57:29 UTC: approximately eight
   seconds, at the transcript's one-second resolution.
 - The first invocation contained the Session Control primer and exact bound
   helper. No second prompt or restart was needed. The host log contained no
   hook-parse rejection or custom-hook timeout/failure.
 - The unchanged frozen package was loaded through the disposable project's
-  `.agents/plugins/zensu` directory, using `--new-project --add-dir`. All 323
+  `.agents/plugins/zensu` directory, using `--new-project --add-dir`. All 324
   staged file hashes remained unchanged during the run. Subsequent documentation
   and test-harness edits do not change the tested runtime.
 - Native `begin` returned `recording`; a native edit appended one requested line,
   and the model committed only README.md and verified a clean worktree.
-- Fixture commit: `0e540fb79129a6fa2f1ddb63a40b63bedfb5b1df`.
+- Fixture commit: `88d6197ece4c17da54df6ba81677bd5aadec84a6`.
 - First checkpoint: `submitted_for_review`; repeated checkpoint and native Stop
   backstop: `already_submitted`.
-- Work unit: `3b7f205f-96ca-46d8-bdd9-7d8ea4812481`.
-- Result: `155a9ba1-8249-4d39-8072-6c7b8828300c`.
+- Work unit: `f2f2c354-f163-427c-b438-1921558380a9`.
+- Result: `c09f2fdd-521a-414c-bf8e-c6d6f316a9d6`.
 - Independent authenticated CLI read after Stop: version 2, exactly `started`
   and `submitted`, matching owner/reporting/result actor, `cli_authenticated`
   provenance, exact fixture commit and `native-startup-v1` criteria.
@@ -54,9 +54,42 @@ The model used the existing real login and process-local model selection.
 Commands and the fixture edit received individual native approvals. The frozen
 runtime was not patched, session identifiers were not invented, and provider/API
 responses were not mocked. The model's generation time and time spent waiting
-for approvals are separate from the seven-second startup measurement.
+for approvals are separate from the eight-second startup measurement.
 
 This validates the modified startup plus the native capture/tool/Stop path in
 one real conversation. It does not certify every orchestration skill, a separate
 IDE host or future model reliability. The broader native suite and deterministic
 CI are separate release checks.
+
+## Native compatibility and broader probes
+
+The real CLI 1.4.7 uses `read_file`, `write_file` and `edit_file`. The old
+normalizer did not classify these names, so write-specific gates could be missed.
+The candidate maps their actual `Path`, `Content`, `Target` and `Replacement`
+fields, including empty replacements. Those fields take precedence over conflicting
+legacy aliases. The final frozen candidate above includes this fix; all 279
+runtime files match the current source by SHA-256.
+
+Paired native controls verified that an allowed fixture write succeeds and that
+the enabled secret and tracked-source gates deny the corresponding write. The
+tracked-source proof requires an exact native command and actual adjacent tool
+error. CLI 1.4.7 omits `Cwd`; in that case the probe additionally verifies the
+protected main-session workspace binding and native transcript location. Missing
+or mismatched evidence fails verification.
+
+The broad live suite was run with an isolated candidate package. All 32 command
+resolution probes and the negative command control completed. Final-runtime
+probes verified hook parsing, startup/write/Bash hook inventories, secret-write
+and shell-secret controls, native roundtrip, plugin rules and worker preparation.
+Targeted reruns also verified tracked-source denial and Stop block/resume. The
+armed Stop probe intentionally does not complete its workflow and can hit the
+probe's 120-second print budget; its positive verdict requires actual enforcing
+Stop events and a blocked-then-resumed trace. This is distinct from the startup
+handler's 90-second deadline.
+
+The native agent-delegation probe remains **inconclusive**: its own parent did
+not issue exactly one completed agent batch, including after a focused retry.
+It supplies no evidence of successful delegation and is not counted as passed.
+The broad native suite therefore is not claimed fully green. This release's
+startup, capture and gate evidence above is separate from that open model-driven
+orchestration check and from the deterministic CI gate.

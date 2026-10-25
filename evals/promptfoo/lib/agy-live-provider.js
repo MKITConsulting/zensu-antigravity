@@ -482,7 +482,7 @@ function gateVerdict({ controlAttempted, controlWritten, blockedAttempted, denie
 
 // Require the actual native tool-result error, not the model's description of
 // its refusal. The single-call probe makes the adjacent result unambiguous.
-function sourceWriteProof({ rows, workspace, target, command }) {
+function sourceWriteProof({ rows, workspace, target, command, sessionId, nativeBinding }) {
   const no = reason => ({ verified: false, reason });
   if (!path.isAbsolute(workspace || '') || path.normalize(workspace) !== workspace
       || path.dirname(target || '') !== workspace) return no('target is not inside the exact fixture workspace');
@@ -493,14 +493,23 @@ function sourceWriteProof({ rows, workspace, target, command }) {
       call?.name === 'run_command' && call.args?.CommandLine === command));
   if (attempts.length !== 1 || attempts[0].tool_calls.length !== 1) return no('no unique exact native command attempt');
   const attempt = attempts[0];
-  if (attempt.tool_calls[0].args.Cwd !== workspace) return no('native Cwd does not equal the physical fixture workspace');
+  const cwd = attempt.tool_calls[0].args.Cwd;
+  if (cwd !== undefined && cwd !== workspace) return no('native Cwd does not equal the physical fixture workspace');
+  // CLI 1.4.7 omits Cwd. Its private, host-created main binding supplies the
+  // workspace; an absent field alone or a model-authored claim is insufficient.
+  if (cwd === undefined && (!/^[a-f0-9-]{36}$/i.test(sessionId || '')
+      || nativeBinding?.schema !== 'zensu.antigravity.native-main.v1'
+      || nativeBinding.sessionId !== sessionId || nativeBinding.workspaceRoot !== workspace)) {
+    return no('missing verified native workspace binding for a command without Cwd');
+  }
   const result = rows.find(row => row.step_index === attempt.step_index + 1);
   const prefix = 'tool call denied by pre-tool hook: Blocked a Bash write that would overwrite an existing git-tracked source file ('
     + target + ', via redirect).';
   if (!result || result.type !== 'GENERIC' || result.source !== 'MODEL' || result.status !== 'ERROR'
       || typeof result.error !== 'string' || !result.error.startsWith(prefix)) return no('native result did not deny an in-root tracked-source overwrite');
   return { verified: true, rule: 'in-root-tracked-source', attemptStep: attempt.step_index,
-    deniedStep: result.step_index, workspace, target, error: result.error };
+    deniedStep: result.step_index, workspace, target, error: result.error,
+    workspaceEvidence: cwd === undefined ? 'private-native-main-binding' : 'native-command-cwd' };
 }
 
 function nativeAgentIdentities(output, workspace) {
@@ -661,6 +670,7 @@ function main() {
       const descriptors = expected.map(item => ({ TypeName: 'zensu-review-aspect', Role: item.role,
         Prompt: item.prompt, Model: 'inherit', Workspace: 'inherit' }));
       const prompt = 'This is an isolated native agent integration probe. Do not run a Zensu implementation workflow. '
+        + 'The direct invoke_subagent call is the authorized read-only dispatch request for this fixture; the existing pre-tool hook records its dispatch receipt. Do not inspect or invoke session helpers. '
         + 'Call invoke_subagent exactly once with this literal Subagents array, preserving every prompt and role: '
         + JSON.stringify(descriptors) + '. Wait for both child conversations to finish. Do not read their evidence files yourself, '
         + 'change files, run shell commands, or substitute your own report. Then reply NATIVE_PROBE_DONE with the two actual child IDs.';
@@ -873,7 +883,13 @@ function main() {
               const provenance = require(path.join(installedPluginRoot(), 'hooks/antigravity/native-agent-provenance.js'));
               const log = provenance.readHostFile(logFile);
               if (!log.includes(ws) || !log.includes(ids[0])) throw Error('source-write CLI log does not match its own workspace and conversation');
-              branchProof = { ...sourceWriteProof({ rows: provenance.transcriptRows(transcript), workspace: ws, target, command }),
+              const adapterPaths = require(path.join(installedPluginRoot(), 'hooks/antigravity/session-paths.js'));
+              const nativeBinding = adapterPaths.readPrivateJson(path.join(adapterPaths.dataRoot(),
+                'native-agents/v1/mains', `${digest(ids[0])}.json`));
+              const location = provenance.location({ session_id: ids[0], transcript_path: transcript });
+              if (nativeBinding.brain !== location.brain) throw Error('private workspace binding belongs to a different native source');
+              branchProof = { ...sourceWriteProof({ rows: provenance.transcriptRows(transcript), workspace: ws, target, command,
+                sessionId: ids[0], nativeBinding }),
                 sessionId: ids[0], transcript, logFile };
             } catch (error) { branchProof = { verified: false, reason: error.message }; }
           }

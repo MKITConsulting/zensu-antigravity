@@ -72,8 +72,8 @@ test('private pending startup context is consumed once and a foreign record cann
   assert.equal(fs.existsSync(file), true);
 });
 
-for (const kind of ['deny', 'block', 'force_ask', 'ask']) {
-  test(`${kind} preserves the native invocation dialect and decision precedence`, t => {
+test('native invocation decisions preserve the dialect and precedence', t => {
+  for (const kind of ['deny', 'block', 'force_ask', 'ask']) {
     const f = fixture(t, ['first.sh'], ['second.sh', 'third.sh']);
     const decision = kind === 'block' ? { decision: 'block', reason: 'first reason' }
       : { hookSpecificOutput: { permissionDecision: kind, permissionDecisionReason: 'first reason' } };
@@ -83,8 +83,8 @@ for (const kind of ['deny', 'block', 'force_ask', 'ask']) {
     assert.equal(result.injectSteps[0].ephemeralMessage, kind === 'ask' ? 'later ask' : 'first reason');
     assert.equal(result.decision, undefined);
     assert.equal(f.calls.length, ['deny', 'block'].includes(kind) ? 1 : 3);
-  });
-}
+  }
+});
 
 test('a later hard refusal wins over force_ask; missing scripts are traced without claiming execution', t => {
   const f = fixture(t, ['first.sh'], ['missing.sh', 'deny.sh', 'unreached.sh']);

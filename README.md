@@ -171,6 +171,9 @@ ships this product policy and never edits the user's workspace `AGENTS.md`; repo
 development conventions are not installed as product instructions. Rule loading steers
 the model; runtime gates still enforce session, capability and completion checks.
 
+Native file-tool aliases from Antigravity CLI 1.4.7 (`read_file`, `write_file`,
+`edit_file`) map to the same read/write/edit policy gates as the earlier host names.
+
 Startup and pre-invocation advisory composition share one Node process, reducing
 process-launch overhead while retaining the 90-second host deadline and every
 registered engine hook. Native tool authorization and Stop enforcement are unchanged.
