@@ -45,3 +45,12 @@ for its own conversation. Antigravity then returned RESOURCE_EXHAUSTED (429)
 because the account quota was exhausted. No model result or work submission was
 produced, so full native capture acceptance remains unverified. The installed
 plugin and existing conversations were not modified.
+
+A fresh isolated Antigravity CLI 1.4.7 probe on 2026-10-25 at 14:35 UTC
+again observed startup and Stop delivery for its own native conversation. The
+provider returned RESOURCE_EXHAUSTED (429), reporting 6h7m until reset at the
+observation time. No model result or work submission was produced. The tested
+runtime was `c9f5120d672a31d10e16057db1238e544f99a314`, before synchronizing the
+subsequent feature-context documentation/read mapping from main. Full native
+capture acceptance is still unverified; unchanged configuration hashes do not
+substitute for that missing result.
