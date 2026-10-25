@@ -5,6 +5,19 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-24
+
+### Added
+
+- **context**: Load and hydrate linked feature evidence (#11)
+- Package native Antigravity distribution (#6)
+
+### Changed
+
+- Archive Marketplace submission evidence (#8)
+- Archive Google Marketplace submission evidence
+- Record Antigravity Marketplace interest submission (#7)
+
 ### Added
 
 - Native distribution packages with relative hooks, tracked-source validation and SHA-256 checksums, built without invoking Antigravity.
