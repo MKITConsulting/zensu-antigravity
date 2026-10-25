@@ -38,12 +38,23 @@ checkpoint before handoff to return the review link in the agent's response.
 
 ## Validation boundary
 
+Native capture passed on Antigravity CLI 1.4.7 with Gemini 3.8 Flash medium and
+Zensu CLI 0.11.0 on 2026-10-25. The real host declared the agreed goal, edited and
+committed a disposable fixture, submitted its clean HEAD, and repeated the
+checkpoint. Both repetition and native Stop returned `already_submitted`.
+Independent CLI read-back verified authenticated attribution, exactly one start
+and one submission, and no human decision. See the [native validation report](validation/2026-10-25-native-ai-work-capture.md)
+for source binding, observed startup latency and the limits of this result.
+
+Earlier quota-blocked probes below remain historical evidence, not successful
+native validation.
+
 Deterministic fixtures cover native binding, one-use helper authorization,
 child refusal, durable retries and nonblocking capture errors. An isolated
 staged-plugin probe on 2026-10-24 confirmed native startup and Stop-chain delivery
 for its own conversation. Antigravity then returned RESOURCE_EXHAUSTED (429)
 because the account quota was exhausted. No model result or work submission was
-produced, so full native capture acceptance remains unverified. The installed
+produced, so that probe did not verify full native capture. The installed
 plugin and existing conversations were not modified.
 
 A fresh isolated Antigravity CLI 1.4.7 probe on 2026-10-25 at 14:35 UTC
@@ -52,5 +63,5 @@ provider returned RESOURCE_EXHAUSTED (429), reporting 6h7m until reset at the
 observation time. No model result or work submission was produced. The tested
 runtime was `c9f5120d672a31d10e16057db1238e544f99a314`, before synchronizing the
 subsequent feature-context documentation/read mapping from main. Full native
-capture acceptance is still unverified; unchanged configuration hashes do not
+capture remained unverified by that probe; unchanged configuration hashes do not
 substitute for that missing result.
