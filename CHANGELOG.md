@@ -5,6 +5,16 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-25
+
+### Fixed
+
+- Normalize Antigravity CLI 1.4.7 `read_file`, `write_file` and `edit_file` names and Path/Target/Replacement fields so native file operations reach the existing read/write protection gates.
+- Reduce cumulative startup overhead by composing pre-invocation advisory output in one Node process instead of spawning separate JSON, rendering and de-bounce helpers for every hook.
+- Preserve engine order, startup context, private session binding, duplicate suppression, refusal precedence and the existing 90-second host deadline.
+- Let native validation load a frozen candidate in isolated projects and select a process-local model without replacing the global plugin.
+- Add a packaged startup subprocess budget and regression coverage for advisory composition. Tool authorization and Stop enforcement retain their existing path.
+
 ## [0.3.0] - 2026-10-25
 
 ### Added

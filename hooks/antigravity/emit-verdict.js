@@ -27,9 +27,7 @@
 // not in the host: emit {} without claiming an executable tool verdict rather than
 // guessing a shape that might deny a tool call or wedge the loop.
 
-const event = process.env.ZV_EVENT || "";
-const role = process.env.ZV_ROLE || "";
-const text = process.env.ZV_TEXT || "";
+function verdict(event, role, text) {
 
 function injectSteps() {
   return text ? { injectSteps: [{ ephemeralMessage: text }] } : {};
@@ -59,8 +57,7 @@ function stop() {
 // An uneventful PreToolUse still needs an explicit native permission decision.
 // Other events retain the empty verdict when there is nothing to emit.
 if (!role && event !== "PreToolUse") {
-  process.stdout.write("{}");
-  process.exit(0);
+  return {};
 }
 
 let o;
@@ -84,4 +81,12 @@ switch (event) {
     break;
 }
 
-process.stdout.write(JSON.stringify(o));
+return o;
+}
+
+if (require.main === module) {
+  process.stdout.write(JSON.stringify(verdict(
+    process.env.ZV_EVENT || "", process.env.ZV_ROLE || "", process.env.ZV_TEXT || "",
+  )));
+}
+module.exports = { verdict };

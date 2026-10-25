@@ -12,7 +12,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const hooks = path.join(dir, 'hooks'), adapter = path.join(hooks, 'antigravity');
   fs.mkdirSync(adapter, { recursive: true });
-  for (const file of ['antigravity-shim.sh', 'emit-verdict.js', 'session-paths.js']) fs.copyFileSync(path.join(root, 'hooks/antigravity', file), path.join(adapter, file));
+  for (const file of ['antigravity-shim.sh', 'emit-verdict.js', 'session-paths.js', 'invocation-chain.js', 'render-context.js']) fs.copyFileSync(path.join(root, 'hooks/antigravity', file), path.join(adapter, file));
   fs.copyFileSync(path.join(root, 'hooks/hooks.json'), path.join(hooks, 'hooks.json'));
   const marker = path.join(dir, 'calls.jsonl'), decisions = path.join(dir, 'decisions');
   const record = `const fs=require('fs');const payload=JSON.parse(fs.readFileSync(0,'utf8'));const record=value=>fs.appendFileSync(${JSON.stringify(marker)},JSON.stringify(value)+'\\n');`;

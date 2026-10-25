@@ -34,6 +34,7 @@
     "test-live-command-catalog.sh",
     "test-live-gate-verdicts.sh",
     "test-live-native-agents.sh",
+    "test-invocation-chain.sh",
     "test-live-provider-helpers.sh",
     "test-live-require-fired-binding.sh",
     "test-manifest-host-keys.sh",

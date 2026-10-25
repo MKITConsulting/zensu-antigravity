@@ -123,7 +123,7 @@
   vars:
     scenario_id: live-stop-block-and-resume
     probe: stopcycle
-    prompt: "Reply with exactly: DONE"
+    prompt: "This is an isolated Stop-hook transport probe. Do not call tools or complete any workflow. End this turn with exactly DONE; let the Stop hook enforce any pending chain."
     timeout_s: 120
     expect:
       # The two verdicts are asserted as ONE literal, in the order the probe emits

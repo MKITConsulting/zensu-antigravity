@@ -303,6 +303,29 @@ test('normalizer uses native authority and canonical edit fields', () => {
   assert.equal(output.agent_id, undefined);
 });
 
+test('CLI 1.4.7 file tools preserve canonical authorization targets and edit content', () => {
+  for (const [name, args, expected, input] of [
+    ['write_file', { Path: '/workspace/new.txt', Content: 'sensitive content', Overwrite: true,
+      TargetFile: '/decoy', CodeContent: 'decoy' }, 'Write',
+      { file_path: '/workspace/new.txt', content: 'sensitive content' }],
+    ['read_file', { Path: '/workspace/private.txt', TargetFile: '/decoy', CodeContent: 'decoy' }, 'Read', { file_path: '/workspace/private.txt' }],
+    ['edit_file', { Path: '/workspace/source.js', Target: 'before', Replacement: 'after',
+      TargetFile: '/decoy', TargetContent: 'decoy', ReplacementContent: 'decoy', ReplacementChunks: [{ ReplacementContent: 'decoy' }] }, 'Edit',
+      { file_path: '/workspace/source.js', old_string: 'before', new_string: 'after', content: 'after' }],
+    ['edit_file', { Path: '/workspace/source.js', Target: 'remove this', Replacement: '' }, 'Edit',
+      { file_path: '/workspace/source.js', old_string: 'remove this', new_string: '' }],
+  ]) {
+    const actual = normalizer.normalize({ conversationId: SID, workspacePaths: ['/workspace'],
+      tool_input: { file_path: '/decoy', content: 'decoy' },
+      toolCall: { name, args } }, 'PreToolUse', { correlate: false });
+    assert.equal(actual.tool_name, expected);
+    assert.deepEqual(actual.tool_input, input);
+    assert.equal(actual.native_tool_name, name);
+    assert.deepEqual(actual.native_tool_input, args);
+    assert.equal(actual.session_id, SID);
+  }
+});
+
 test('PreInvocation maps to the neutral UserPromptSubmit principal contract', () => {
   const output = normalizer.normalize({ conversationId: SID, workspacePaths: ['/workspace'], prompt: 'Implement the feature' }, 'PreInvocation');
   assert.equal(output.hook_event_name, 'UserPromptSubmit');
