@@ -299,6 +299,13 @@ if ! select_scripts "$ENTRY_NAME" "$TOOL"; then
   echo; exit 0
 fi
 
+# Capture is an advisory backstop after native binding, independent of the
+# review chain. Children already exited through their own lifecycle above.
+# The adapter's total time budget is bounded and it never blocks Stop.
+if [ "$HOOK_EVENT" = Stop ]; then
+  printf '%s' "$PAYLOAD" | node "$SHIM_DIR/ai-work.js" checkpoint-hook >&2 || true
+fi
+
 NORMAL_SCRIPTS=("${SCRIPTS[@]}")
 STARTUP_COUNT=0
 if [ "$BOOT_CREATED" = true ]; then

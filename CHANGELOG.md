@@ -5,6 +5,22 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-25
+
+### Added
+
+- Automatically capture agreed implementation goals and new clean Git results through personal Zensu CLI authentication, including direct implementation mode.
+- Bind capture to the native main conversation and its workspace with one-use helper authorization; reject unbound or child reporting.
+- Persist retry-safe private receipts and provide idempotent explicit checkpoints plus a native Stop backstop.
+- Return result-specific review links while keeping acceptance and revocation as explicit human web decisions. No code, prompts, transcripts or token usage are uploaded.
+
+### Validation
+
+- Verified the complete native CLI capture path with Antigravity CLI 1.4.7, Gemini 3.8 Flash medium and Zensu CLI 0.11.0, including authenticated ownership, duplicate prevention and no inferred acceptance.
+- Recorded the observed startup-hook timeout and earlier excluded probes in the native validation report.
+
+Requires Zensu CLI 0.11.0 or newer and the authenticated capture API. Missing prerequisites remain visible incomplete capture.
+
 ## [0.2.1] - 2026-10-24
 
 ### Added

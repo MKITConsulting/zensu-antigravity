@@ -1,6 +1,6 @@
 # Zensu for Antigravity
 
-![version](https://img.shields.io/badge/version-0.2.1-blue)
+![version](https://img.shields.io/badge/version-0.3.0-blue)
 ![host](https://img.shields.io/badge/host-Google%20Antigravity-blue)
 ![license](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue)
 
@@ -211,6 +211,12 @@ question can return. A direct answer decides that plan or request only; use
 configured `hooks.defaultDeliveryRoute` can decide the route without asking. The user's
 own explicit preference still wins for the current request; Autopilot and Pilot remain
 per-plan choices. See [delivery-route configuration](docs/configuration.md#hook-opt-out).
+
+## Automatic work capture
+
+Agreed implementation goals and new clean commits can be reported through personal
+CLI OAuth in direct or workflow mode. Acceptance and revocation remain human web
+decisions. See [capture behavior and host limits](docs/ai-work-capture.md).
 
 ## Feature context retrieval
 
