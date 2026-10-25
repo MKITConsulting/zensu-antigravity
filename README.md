@@ -1,6 +1,6 @@
 # Zensu for Antigravity
 
-![version](https://img.shields.io/badge/version-0.3.0-blue)
+![version](https://img.shields.io/badge/version-0.3.1-blue)
 ![host](https://img.shields.io/badge/host-Google%20Antigravity-blue)
 ![license](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue)
 
@@ -170,6 +170,16 @@ agy 1.1.10 inert-rule observation does not describe this verified channel. The i
 ships this product policy and never edits the user's workspace `AGENTS.md`; repository
 development conventions are not installed as product instructions. Rule loading steers
 the model; runtime gates still enforce session, capability and completion checks.
+
+Startup and pre-invocation advisory composition share one Node process, reducing
+process-launch overhead while retaining the 90-second host deadline and every
+registered engine hook. Native tool authorization and Stop enforcement are unchanged.
+For native candidate validation, stage the plugin with `install.sh --portable-stage-only`
+and set `ZENSU_LIVE_PLUGIN_STAGE` to the resulting `zensu` directory when running
+`ZENSU_LIVE_AGY=1 bash evals/promptfoo/live/run-live.sh`. Each probe copies the
+unchanged stage into its own native project. `ZENSU_LIVE_MODEL` optionally selects
+that probe's model without changing global settings. Without candidate mode the
+suite continues to validate the installed plugin.
 
 The native host lacks the source platform's SessionStart/SubagentStart/SessionEnd and
 plan-approval events. First-registration bootstrap and PreInvocation provide the supported

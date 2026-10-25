@@ -36,6 +36,7 @@ const DEFAULT_TIMEOUT_S = 120;
 // `finally { rmSync(ws) }` around the probe body is dead code and leaks one temp
 // workspace per scenario.
 let WORKSPACE = '';
+let CANDIDATE_ROOT = '';
 function emit(obj) {
   if (WORKSPACE) {
     try { fs.rmSync(WORKSPACE, { recursive: true, force: true }); } catch (_) {}
@@ -169,6 +170,29 @@ function makeWorkspace(parent = os.tmpdir()) {
   // alias would turn an intended in-root write into an outside-worktree probe.
   const ws = fs.realpathSync.native(fs.mkdtempSync(path.join(parent, 'zensu-live-')));
   fs.writeFileSync(path.join(ws, 'note.txt'), 'probe workspace\n');
+  CANDIDATE_ROOT = '';
+  if (process.env.ZENSU_LIVE_PLUGIN_STAGE) {
+    try {
+      const stage = fs.realpathSync(process.env.ZENSU_LIVE_PLUGIN_STAGE);
+      if (!isAgyPluginRoot(stage) || !fs.existsSync(path.join(stage, 'plugin.json'))
+          || !fs.existsSync(path.join(stage, 'hooks.json'))) throw Error('incomplete portable plugin stage');
+      const inspect = directory => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+          if (entry.isSymbolicLink()) throw Error('portable plugin stage contains a symbolic link');
+          if (entry.isDirectory()) inspect(path.join(directory, entry.name));
+          else if (!entry.isFile()) throw Error('portable plugin stage contains a non-regular file');
+        }
+      };
+      inspect(stage);
+      const target = path.join(ws, '.agents/plugins/zensu');
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.cpSync(stage, target, { recursive: true, errorOnExist: true, force: false });
+      CANDIDATE_ROOT = target;
+    } catch (error) {
+      fs.rmSync(ws, { recursive: true, force: true });
+      throw error;
+    }
+  }
   return ws;
 }
 
@@ -195,6 +219,8 @@ function isAgyPluginRoot(dir) {
 // verdict about a tree the host never loaded. The caller turns null into
 // LIVE-UNAVAILABLE.
 function installedPluginRoot() {
+  // Candidate mode must never silently exercise the user's global installation.
+  if (process.env.ZENSU_LIVE_PLUGIN_STAGE) return CANDIDATE_ROOT || null;
   const hostDir = path.join(os.homedir(), '.gemini', 'config', 'plugins', 'zensu');
   if (isAgyPluginRoot(hostDir)) return hostDir;
   try {
@@ -389,11 +415,17 @@ function toolProbeArgs(ws) {
   return ['--dangerously-skip-permissions'];
 }
 
+function agyArgs(prompt, ws, seconds, extraArgs = []) {
+  const project = extraArgs.includes('--conversation') ? [] : ['--new-project'];
+  const model = process.env.ZENSU_LIVE_MODEL ? ['--model', process.env.ZENSU_LIVE_MODEL] : [];
+  return ['-p', prompt, '--add-dir', ws, '--print-timeout', `${seconds}s`, ...project, ...model, ...extraArgs];
+}
+
 function runAgy(prompt, ws, timeoutS, extraEnv, extraArgs) {
   const seconds = Number(timeoutS || DEFAULT_TIMEOUT_S);
   const result = spawnSync(
     'agy',
-    ['-p', prompt, '--add-dir', ws, '--print-timeout', `${seconds}s`, ...(extraArgs || [])],
+    agyArgs(prompt, ws, seconds, extraArgs),
     {
       cwd: ws,
       encoding: 'utf8',
@@ -897,7 +929,7 @@ function main() {
       for (const file of [traceA, traceB, decisionsA, decisionsB, logA, logB]) fs.rmSync(file, { force: true });
       // A clean real repository makes --tdd-complete take its legitimate
       // zero-change path, without fabricating review or execution evidence.
-      fs.writeFileSync(path.join(ws, '.gitignore'), '.zensu/\n.gemini/\ntrace-*.log*\nshim-trace.log*\n');
+      fs.writeFileSync(path.join(ws, '.gitignore'), '.zensu/\n.gemini/\n.agents/\ntrace-*.log*\nshim-trace.log*\n');
       for (const args of [['init', '-q'], ['add', '--', 'note.txt', '.gitignore'],
         ['-c', 'user.name=Zensu Live Probe', '-c', 'user.email=probe@invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'test: initialize isolated Stop probe']]) {
         const result = spawnSync('git', args, { cwd: ws, encoding: 'utf8' });
@@ -1079,6 +1111,7 @@ function main() {
 // remains live-only; keep moving decision logic out here rather than growing it
 // there.
 module.exports = {
+  agyArgs,
   parseTraceLine,
   readTrace,
   countHook,

@@ -2,6 +2,18 @@
   "schemaVersion": 1,
   "files": [
     {
+      "path": "tests/structure/startup-process-budget.test.js",
+      "registered": 1,
+      "runs": [{ "driver": "tests/structure/test-invocation-chain.sh" }],
+      "summary": "Packaged startup preserves the complete advisory output while bounding subprocess starts and retaining the native 90-second deadline."
+    },
+    {
+      "path": "tests/structure/invocation-chain.test.js",
+      "registered": 10,
+      "runs": [{ "driver": "tests/structure/test-invocation-chain.sh" }],
+      "summary": "Invocation composition preserves startup order, native rendering, private de-bounce, pending context, refusal precedence and truthful diagnostics."
+    },
+    {
       "path": "tests/host/native-agent-provenance.test.js",
       "registered": 22,
       "runs": [
