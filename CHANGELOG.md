@@ -5,6 +5,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-26
+
+### Added
+
+- **context**: Load tracked feature context automatically (#16)
+
 ## [0.4.0] - 2026-10-26
 
 ### Added
