@@ -5,6 +5,16 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-26
+
+### Added
+
+- Record implementation context-package retrievals with the declared Antigravity host and retain the server-issued load receipt.
+- Correlate subsequent knowledge-source retrievals with that package so the Context Board can show the authenticated account, server timestamps and returned source kinds.
+- Report receipt failures explicitly and distinguish file references from local file reads or model understanding.
+
+Requires Zensu CLI 0.13.0 or newer and the backend context-load endpoints. Deterministic CI validates the package; native provider sessions were not rerun for this instruction-only integration.
+
 ## [0.3.1] - 2026-10-25
 
 ### Fixed
