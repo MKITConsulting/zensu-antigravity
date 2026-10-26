@@ -43,7 +43,7 @@
     timeout_s: 90
     # Space-separated, NOT a YAML list — promptfoo turns an array-valued var into
     # one test run per element.
-    require_fired: "PreInvocation:session-start-evidence-discipline.sh PreInvocation:session-start-primer.sh PreInvocation:session-start-prompt-ledger.sh PreInvocation:user-prompt-intent-router.sh PreInvocation:user-prompt-tdd-reminder.sh Stop:stop-chain-enforcer.sh"
+    require_fired: "PreInvocation:session-start-evidence-discipline.sh PreInvocation:session-start-primer.sh PreInvocation:session-start-prompt-ledger.sh PreInvocation:user-prompt-context-auto-load.sh PreInvocation:user-prompt-intent-router.sh PreInvocation:user-prompt-tdd-reminder.sh Stop:stop-chain-enforcer.sh"
     expect:
       stdout_contains_any: ["HOOKS-FIRED-ALL", "LIVE-SKIPPED", "LIVE-UNAVAILABLE"]
       stdout_not_contains: ["HOOKS-NOT-FIRED", "HOOKS-FIRED-MISSING"]

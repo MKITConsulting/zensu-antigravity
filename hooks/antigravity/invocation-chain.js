@@ -58,7 +58,7 @@ function appendDiagnostic(file, line) {
   } catch { /* Diagnostics never change the host verdict. */ }
 }
 
-function firstThisTurn(data, payload, script, text) {
+function firstThisTurn(data, payload, script, text, failOpen = true) {
   try {
     const sid = paths.safeSessionId(payload.session_id);
     const directory = paths.privateDirectory(data, 'advisory-turns');
@@ -74,7 +74,7 @@ function firstThisTurn(data, payload, script, text) {
     record.signatures.push(signature);
     record.signatures = record.signatures.slice(-128);
     paths.writePrivateJson(file, record);
-  } catch { /* Context remains visible if the optional de-bounce store fails. */ }
+  } catch { return failOpen; /* Reads must not repeat when their de-bounce store is unavailable. */ }
   return true;
 }
 
@@ -88,6 +88,22 @@ function pendingContext(data, payload) {
     fs.unlinkSync(file);
     return value.text;
   } catch { return ''; }
+}
+
+// Native USER_EXPLICIT transcript rows wrap user text separately from host
+// metadata. Unwrap only that verified host envelope, never tags from a generic
+// prompt. Feature keys in metadata must not influence automatic selection.
+function contextPayload(payload) {
+  if (payload.native_payload !== true || typeof payload.prompt !== 'string') return payload;
+  const match = /^<USER_REQUEST>\r?\n([\s\S]*?)\r?\n<\/USER_REQUEST>([\s\S]*)$/.exec(payload.prompt);
+  if (!match || /<\/?USER_REQUEST>/.test(match[1])) return payload;
+  let rest = match[2].trim();
+  while (rest) {
+    const metadata = /^<(ADDITIONAL_METADATA|USER_SETTINGS_CHANGE)>\r?\n[\s\S]*?\r?\n<\/\1>/.exec(rest);
+    if (!metadata) return payload;
+    rest = rest.slice(metadata[0].length).trim();
+  }
+  return { ...payload, prompt: match[1] };
 }
 
 function run(payload, options = {}) {
@@ -111,6 +127,11 @@ function run(payload, options = {}) {
   const execute = options.execute || spawnSync;
   for (const [index, name] of [...startup, ...normal].entries()) {
     const isStartup = index < startup.length;
+    // PreInvocation fires before every model step. Claim the automatic read
+    // before executing it, so repeated steps do not create new retrievals.
+    // Reuse the native adapter's per-session/per-prompt advisory store.
+    if (name === 'user-prompt-context-auto-load.sh'
+      && !firstThisTurn(data, payload, 'context-auto-load-attempt', 'attempted', false)) continue;
     const file = path.join(root, 'hooks', name);
     let exists = false;
     try { exists = fs.statSync(file).isFile(); } catch { /* A missing or unreadable script is not executed. */ }
@@ -119,9 +140,11 @@ function run(payload, options = {}) {
       continue;
     }
     appendDiagnostic(environment.ZENSU_SHIM_TRACE, `PreInvocation ${name} ran`);
-    const input = isStartup ? { ...payload, hook_event_name: 'SessionStart', source: 'startup' } : payload;
+    const input = isStartup ? { ...payload, hook_event_name: 'SessionStart', source: 'startup' }
+      : name === 'user-prompt-context-auto-load.sh' ? contextPayload(payload) : payload;
     const result = execute('bash', [file], {
-      input: JSON.stringify(input), encoding: 'utf8', env: environment,
+      input: JSON.stringify(input), encoding: 'utf8', env: name === 'user-prompt-context-auto-load.sh'
+        ? { ...environment, ZENSU_CONTEXT_AGENT: 'antigravity' } : environment,
       cwd: isStartup && environment.ZENSU_PROJECT_DIR ? environment.ZENSU_PROJECT_DIR : undefined,
       maxBuffer: 16 * 1024 * 1024,
     });
@@ -171,4 +194,4 @@ function main() {
   }
 }
 if (require.main === module) main();
-module.exports = { handlers, classify, firstThisTurn, pendingContext, run };
+module.exports = { handlers, classify, firstThisTurn, pendingContext, contextPayload, run };
