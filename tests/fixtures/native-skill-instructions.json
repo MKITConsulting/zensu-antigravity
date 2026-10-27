@@ -9,7 +9,7 @@
         "instructions-02.md",
         "instructions-03.md"
       ],
-      "bodySha256": "8d1bbd9ddad5c7baef0224f0f0f95183044c26da668312d22aa8dc37a9769104"
+      "bodySha256": "a5dd2a328f54b81ad15427484ed0ca0d592fd2ec2b1151fb5d0b02cb8741525c"
     },
     {
       "skill": "autopilot",
@@ -17,7 +17,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "2d2e8ba394c6dd50350214fa759064804f5156f0f36d9ccd1579d5cb9ac0240c"
+      "bodySha256": "8cb668d558357408e7b3681cc09eeb9dd1cb5ff538bf4ee4b667aeb769520d39"
     },
     {
       "skill": "gauntlet-loop",
@@ -25,7 +25,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "1c863fa9f32f15a6136e5d0f47da8639f9a69d8765d851de54b10b92f18347cb"
+      "bodySha256": "504666efce26b93ec9a4b933a47acf779d1bfe212174eec3ed513290ff6d5dec"
     },
     {
       "skill": "ghost-scan",
@@ -33,7 +33,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "781f3b1e40575a66637497fb6f424df567f23c557ff283fdf16e76c976b09c7e"
+      "bodySha256": "8ef3242bbb44e3c3ae2d4d0d3e03f3bb765d9e95810ea7644e923daf88b70489"
     },
     {
       "skill": "plan-review",
@@ -41,7 +41,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "49a95b8b995d8947d7b1149371816e5a649c7499e2e6af3b6f4672596404230c"
+      "bodySha256": "fbbdb92c15713fe4e61b9853b55bc061e8dce491eaf70fd491b4c609c8cb4bbe"
     },
     {
       "skill": "self-review",
@@ -49,7 +49,7 @@
         "SKILL.md",
         "instructions-02.md"
       ],
-      "bodySha256": "7f2ab257f2918c8393b1041b59ee41d03d2caa1f851d5d4e87f6a7604429af07"
+      "bodySha256": "e57865eaf042b3153062fed1bcb902ae93104e9844c3dfc814f00ad6d7dcfb09"
     },
     {
       "skill": "verify-feature",
@@ -58,7 +58,7 @@
         "instructions-02.md",
         "instructions-03.md"
       ],
-      "bodySha256": "76e6513471ed83de7b006c9b5ed3afb968d7b73e18a32a2f664b66cae6d02c51"
+      "bodySha256": "af46044e25666121f93b67668e7c0be9699417f592ee8019595c7cc0d8693cc6"
     }
   ]
 }
