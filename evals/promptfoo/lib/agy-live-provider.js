@@ -527,9 +527,16 @@ function nativeAgentIdentities(output, workspace) {
       && step.tool_name === 'invoke_subagent' && step.subagent_info
       ? step : null;
   }).filter(Boolean);
-  if (launches.length !== 1) throw new Error('The own native parent did not issue exactly one completed agent batch');
-  const spawned = launches[0].subagent_info.subagents || [];
-  if (spawned.length !== 2 || new Set(spawned.map(child => child.conversation_id)).size !== 2) {
+  if (launches.length < 1 || launches.length > 2
+      || launches.some(step => !Number.isSafeInteger(step.step_index) || step.step_index < 0)
+      || new Set(launches.map(step => step.step_index)).size !== launches.length) {
+    throw new Error('The own native parent did not issue one batch or two distinct completed agent calls');
+  }
+  const spawned = launches.flatMap(step => step.subagent_info.subagents || []);
+  if (launches.some(step => !Array.isArray(step.subagent_info.subagents)
+        || step.subagent_info.subagents.length !== (launches.length === 1 ? 2 : 1))
+      || spawned.length !== 2 || spawned.some(child => !/^[a-f0-9-]{36}$/i.test(child.conversation_id || ''))
+      || new Set(spawned.map(child => child.conversation_id)).size !== 2) {
     throw new Error('The own native parent did not report exactly two distinct child conversations');
   }
   return { parentId, spawned };
@@ -671,7 +678,7 @@ function main() {
         Prompt: item.prompt, Model: 'inherit', Workspace: 'inherit' }));
       const prompt = 'This is an isolated native agent integration probe. Do not run a Zensu implementation workflow. '
         + 'The direct invoke_subagent call is the authorized read-only dispatch request for this fixture; the existing pre-tool hook records its dispatch receipt. Do not inspect or invoke session helpers. '
-        + 'Call invoke_subagent exactly once with this literal Subagents array, preserving every prompt and role: '
+        + 'Call invoke_subagent once per descriptor below with its fields as top-level arguments, preserving every prompt and role (use a Subagents array only if the actual host tool schema requires it): '
         + JSON.stringify(descriptors) + '. Wait for both child conversations to finish. Do not read their evidence files yourself, '
         + 'change files, run shell commands, or substitute your own report. Then reply NATIVE_PROBE_DONE with the two actual child IDs.';
       // Direct read-only dispatch needs no broad permission bypass. A native

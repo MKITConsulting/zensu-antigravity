@@ -1,6 +1,6 @@
 # Zensu for Antigravity
 
-![version](https://img.shields.io/badge/version-0.4.1-blue)
+![version](https://img.shields.io/badge/version-0.4.2-blue)
 ![host](https://img.shields.io/badge/host-Google%20Antigravity-blue)
 ![license](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue)
 
@@ -14,6 +14,10 @@ Implementation defaults to **vanilla**. Strict RED→GREEN is opt-in via
 `hooks.tddImplementation=true`; evidence audits, the review chain and completion gates remain
 active in both modes when a workflow is armed. A user's explicit direct-implementation choice
 is retained. No workflow is silently armed after that choice.
+
+Native delegation supports CLI 1.4.7 single-agent calls and older batch calls.
+The [native validation](docs/validation/2026-10-27-native-delegation.md) records two
+real child completions and an enforced protected-file denial.
 
 ## Install
 

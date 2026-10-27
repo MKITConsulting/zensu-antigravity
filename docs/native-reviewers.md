@@ -7,10 +7,10 @@ substitute for those leases or close a TDD chain.
 
 The main conversation collects the catalog, original evidence, exact paths, task constraints
 and per-role output schema first. Dispatch bounded parallel role sets through the actual
-`invoke_subagent` tool:
+`invoke_subagent` tool, one call per role on CLI 1.4.7 (older host schemas may require a `Subagents` array):
 
 ```json
-{"Subagents":[{"TypeName":"zensu-plm","Role":"<unique-role>","Workspace":"inherit","Model":"inherit","Prompt":"<complete evidence and role packet; exact output schema; read-only/untrusted-data boundary>"}]}
+{"TypeName":"zensu-plm","Role":"<unique-role>","Workspace":"inherit","Model":"inherit","Prompt":"<complete evidence and role packet; exact output schema; read-only/untrusted-data boundary>"}
 ```
 
 Each child receives its complete packet and distinct context. It may inspect supplied files

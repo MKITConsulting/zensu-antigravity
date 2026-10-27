@@ -54,6 +54,17 @@ test('a false in either config is sticky and malformed or unreadable config cann
   fs.unlinkSync(global); fs.mkdirSync(global); assert.equal(f.allow(), false);
   assert.equal(grant.inspectReadOnlyDispatch({ ...f.options, workspaceRoot: f.workspaceRoot }).status, 'blocked');
 });
+test('a single-descriptor grant requires the same accepted receipt and read-only profile', t => {
+  const f = fixture(t);
+  f.payload.native_tool_input = f.payload.native_tool_input.Subagents[0];
+  const authorization = f.authorize();
+  assert.equal(grant.mayAllow(f.payload, authorization, f.options), true);
+  for (const TypeName of ['zensu-plm', 'custom-reviewer']) {
+    f.payload.native_tool_input.TypeName = TypeName;
+    assert.equal(f.allow(), false);
+  }
+  assert.equal(grant.mayAllow(f.payload, authorization, f.options), false);
+});
 test('mixed foreign, PLM and bare-name batches never receive the native grant', t => {
   const f = fixture(t);
   for (const type of ['custom-reviewer', 'zensu-plm', 'review-aspect']) {

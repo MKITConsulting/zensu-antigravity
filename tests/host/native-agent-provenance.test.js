@@ -69,6 +69,72 @@ test('a native child without an accepted receipt cannot fall back to main', (t) 
   const f = fixture(t); const result = api.prepare(f.childPayload, f.options);
   assert.equal(result.status, 'deny'); assert.equal(result.skipMainLifecycle, true);
 });
+test('single-descriptor launches retain exact parent, role and completion binding', (t) => {
+  const f = fixture(t);
+  f.parentPayload.native_tool_input = { ...f.descriptor };
+  f.parentRows[1].tool_calls[0].args = { ...f.descriptor };
+  f.parentRows[2].content = f.parentRows[2].content.replace('following subagents:', 'following subagent:');
+  f.writeRows(f.parent, f.parentRows);
+  const receipt = f.authorize().receipt;
+  assert.equal(receipt.entries.length, 1);
+  assert.equal(receipt.entries[0].prompt, f.descriptor.Prompt);
+  const child = api.prepare(f.childPayload, f.options);
+  assert.equal(child.status, 'child');
+  assert.equal(child.provenance.parentSessionId, f.parent);
+  assert.equal(child.provenance.childSessionId, f.child);
+  assert.equal(api.latestChildResponse(f.childPayload, f.options).text, '{"findings":[]}');
+  f.parentRows[1].tool_calls[0].args.Role = 'Unaccepted role';
+  f.writeRows(f.parent, f.parentRows);
+  assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+});
+test('single dispatch rejects mixed, extra, missing and noninherit selectors', (t) => {
+  const f = fixture(t);
+  for (const args of [null, [], {}, { ...f.descriptor, Subagents: [f.descriptor] },
+    { Subagents: [f.descriptor], unexpected: true }, { ...f.descriptor, unexpected: true },
+    { ...f.descriptor, Prompt: '' }, { ...f.descriptor, Model: 'other' },
+    { ...f.descriptor, Workspace: 'other' }]) {
+    assert.throws(() => api.inspectLaunch({ ...f.parentPayload, native_tool_input: args }));
+  }
+  assert.throws(() => api.inspectLaunch({ ...f.parentPayload, native_tool_input: f.descriptor, agent_id: f.child }), /cannot dispatch/);
+  const child = JSON.stringify({ conversationId: f.child });
+  assert.throws(() => api.spawnedChildren(`Created the following subagent:\n${child}\n${child}`), /count/);
+  assert.throws(() => api.spawnedChildren(`Created the following subagent:\n${child}\nCreated the following subagents:\n${child}`), /ambiguous/);
+});
+test('multi-call sidecar drift binds only the exact child result and accepted role', (t) => {
+  const f = fixture(t);
+  f.parentPayload.native_tool_input = { ...f.descriptor };
+  f.parentRows[1].tool_calls = [
+    { name: 'invoke_subagent', args: { ...f.descriptor } },
+    { name: 'invoke_subagent', args: { ...f.descriptor, Role: 'Other reviewer', Prompt: 'Different evidence' } },
+  ];
+  f.parentRows[2].content = f.parentRows[2].content.replace('following subagents:', 'following subagent:');
+  f.writeRows(f.parent, f.parentRows);
+  f.sidecar.spawnStepIndex = 4;
+  fs.writeFileSync(f.sidecarFile, JSON.stringify(f.sidecar));
+  f.authorize();
+  const child = api.prepare(f.childPayload, f.options);
+  assert.equal(child.status, 'child');
+  assert.equal(child.provenance.spawnStepIndex, 3);
+  assert.equal(child.provenance.childSessionId, f.child);
+  assert.equal(child.provenance.role, f.descriptor.Role);
+  for (const invalidStep of [2, 5, 999]) {
+    fs.writeFileSync(f.sidecarFile, JSON.stringify({ ...f.sidecar, spawnStepIndex: invalidStep }));
+    assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+  }
+  fs.writeFileSync(f.sidecarFile, JSON.stringify(f.sidecar));
+  const original = structuredClone(f.parentRows);
+  for (const mutate of [
+    rows => rows[1].tool_calls.reverse(),
+    rows => { rows[1].tool_calls[1].name = 'run_command'; },
+    rows => { rows[1].tool_calls[1].args.Role = f.descriptor.Role; },
+    rows => { rows[1].tool_calls[0].args.Prompt = 'Other prompt'; },
+    rows => { rows[1].tool_calls[0].args = { Subagents: [f.descriptor] }; },
+    rows => rows.push({ ...rows[2], step_index: 4 }),
+  ]) {
+    const rows = structuredClone(original); mutate(rows); f.writeRows(f.parent, rows);
+    assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+  }
+});
 test('empty first invocation is pending and does not manufacture a main principal', (t) => {
   const f = fixture(t); f.writeRows(f.child, f.childRows.slice(0, 1));
   assert.equal(api.prepare(f.childPayload, f.options).status, 'pending');

@@ -77,7 +77,12 @@ function decodeArgument(value) {
   try { return JSON.parse(value); } catch { return value; }
 }
 function descriptors(args) {
-  const items = decodeArgument(args && args.Subagents);
+  if (!args || typeof args !== 'object' || Array.isArray(args)) fail('native dispatch arguments are missing');
+  // CLI 1.4.7 accepts one descriptor per call; 1.4.2 used a Subagents batch.
+  // Never merge the two forms: an ignored selector could escape authorization.
+  const batch = Object.hasOwn(args, 'Subagents');
+  if (batch && Object.keys(args).some(key => key !== 'Subagents')) fail('mixed native dispatch formats');
+  const items = batch ? decodeArgument(args.Subagents) : [args];
   if (!Array.isArray(items) || !items.length || items.length > 16) fail('Subagents must contain between one and sixteen roles');
   const roles = new Set();
   return items.map((entry, index) => {
@@ -153,8 +158,10 @@ function initialParentMessage(rows) {
   return null;
 }
 function spawnedChildren(content) {
-  const marker = 'Created the following subagents:\n';
-  if (typeof content !== 'string' || !content.includes(marker)) fail('native dispatch result is missing');
+  const markers = ['Created the following subagent:\n', 'Created the following subagents:\n'];
+  const found = typeof content === 'string' ? markers.filter(marker => content.includes(marker)) : [];
+  if (found.length !== 1) fail('native dispatch result is missing or ambiguous');
+  const marker = found[0];
   let rest = content.slice(content.indexOf(marker) + marker.length).trimStart();
   const values = [];
   while (rest.startsWith('{')) {
@@ -170,7 +177,7 @@ function spawnedChildren(content) {
     values.push(JSON.parse(rest.slice(0, end)));
     rest = rest.slice(end).trimStart();
   }
-  if (!values.length || values.length > 16) fail('native dispatch result has an invalid child count');
+  if (!values.length || values.length > 16 || (marker === markers[0] && values.length !== 1)) fail('native dispatch result has an invalid child count');
   return values;
 }
 function verifyParentLaunch(receipt, childId, childTranscript, options = {}) {
@@ -204,6 +211,39 @@ function validateReceipt(receipt, source, workspace, options) {
       || binding.context.runtime_digest !== receipt.runtimeDigest || binding.sessionKey !== receipt.sessionKey) fail('launch context is no longer valid');
   return binding;
 }
+function childLaunchStep(source, parent, sidecar) {
+  const file = path.join(source.brain, parent.parentSessionId, '.system_generated', 'logs', path.basename(source.transcript));
+  const rows = transcriptRows(file);
+  const matches = rows.filter(row => {
+    if (row.type !== 'GENERIC' || row.source !== 'MODEL' || row.status !== 'DONE') return false;
+    try { return spawnedChildren(row.content).some(child => child.conversationId === source.sessionId); }
+    catch { return false; }
+  });
+  if (matches.length !== 1) fail('the child has no unique completed parent result');
+  const result = matches[0];
+  if (sidecar.spawnStepIndex !== result.step_index) {
+    // CLI 1.4.7 assigns every sidecar in a multi-call planner response the final
+    // tool-step index. Accept only that observed shape, with the child's exact
+    // UUID in its own completed result and its descriptor at the matching offset.
+    const planner = [...rows].reverse().find(row => row.step_index < result.step_index
+      && row.type === 'PLANNER_RESPONSE' && row.source === 'MODEL' && row.status === 'DONE');
+    const calls = planner?.tool_calls;
+    if (!Array.isArray(calls) || calls.length < 2 || calls.length > 16
+        || sidecar.spawnStepIndex !== planner.step_index + calls.length
+        || calls.some(call => call.name !== 'invoke_subagent' || !call.args || Object.hasOwn(call.args, 'Subagents'))) {
+      fail('native sidecar dispatch step differs from the completed result');
+    }
+    const entries = calls.map(call => descriptors(call.args)[0]);
+    const index = result.step_index - planner.step_index - 1;
+    const entry = entries[index];
+    if (!entry || entry.typeName !== sidecar.subagentDescriptor.typeName
+        || entry.role !== sidecar.subagentDescriptor.role || entry.prompt !== parent.prompt
+        || new Set(entries.map(item => item.role)).size !== entries.length
+        || rows.some(row => row.step_index > planner.step_index && row.step_index <= sidecar.spawnStepIndex
+          && row.type === 'PLANNER_RESPONSE')) fail('native multi-call sidecar does not match its exact role and result');
+  }
+  return result.step_index;
+}
 function verifyChild(payload, options = {}) {
   const source = location(payload), workspace = safeRoot(payload.workspace_root);
   const rows = transcriptRows(source.transcript), parent = initialParentMessage(rows);
@@ -214,11 +254,12 @@ function verifyChild(payload, options = {}) {
   if (sidecar.conversationId !== source.sessionId || !Number.isSafeInteger(sidecar.spawnStepIndex)
       || sidecar.spawnStepIndex < 0 || !sidecar.subagentDescriptor || !validType(sidecar.subagentDescriptor.typeName)
       || !same(sidecar.workspaceUris, [pathToFileURL(workspace).href])) fail('native child descriptor does not match');
-  const dirs = recordDirs(options), file = launchFile(dirs, parent.parentSessionId, sidecar.spawnStepIndex);
-  return core.withFileLock(dirs.locks, `launch-${hash(`${parent.parentSessionId}:${sidecar.spawnStepIndex}`)}`, () => {
+  const spawnStepIndex = childLaunchStep(source, parent, sidecar);
+  const dirs = recordDirs(options), file = launchFile(dirs, parent.parentSessionId, spawnStepIndex);
+  return core.withFileLock(dirs.locks, `launch-${hash(`${parent.parentSessionId}:${spawnStepIndex}`)}`, () => {
     const receipt = paths.readPrivateJson(file);
     validateReceipt(receipt, source, workspace, options);
-    if (receipt.parentSessionId !== parent.parentSessionId || receipt.spawnStepIndex !== sidecar.spawnStepIndex) fail('launch receipt selectors do not match');
+    if (receipt.parentSessionId !== parent.parentSessionId || receipt.spawnStepIndex !== spawnStepIndex) fail('launch receipt selectors do not match');
     const entries = receipt.entries.filter((entry) => entry.typeName === sidecar.subagentDescriptor.typeName
       && entry.role === sidecar.subagentDescriptor.role && entry.prompt === parent.prompt && entry.promptSha256 === hash(parent.prompt));
     if (entries.length !== 1) fail('native child prompt or role differs from the accepted dispatch');
@@ -231,7 +272,7 @@ function verifyChild(payload, options = {}) {
     }
     const provenance = { schema: CHILD_SCHEMA, parentSessionId: parent.parentSessionId,
       childSessionId: source.sessionId, typeName: entry.typeName, readOnlyProfile: TYPES.has(entry.typeName), role: entry.role,
-      prompt: entry.prompt, promptSha256: entry.promptSha256, spawnStepIndex: sidecar.spawnStepIndex,
+      prompt: entry.prompt, promptSha256: entry.promptSha256, spawnStepIndex,
       workspaceRoot: workspace, childTranscript: source.transcript, parentTranscript: receipt.parentTranscript,
       runtimeDigest: receipt.runtimeDigest, sourceTree: receipt.sourceTree, launchReceiptId: receipt.launchReceiptId, launchCreatedAtMs: receipt.createdAtMs };
     const childFile = path.join(dirs.children, `${hash(source.sessionId)}.json`);

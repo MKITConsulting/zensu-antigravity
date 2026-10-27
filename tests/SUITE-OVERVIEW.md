@@ -26,14 +26,14 @@ Generated from `tests/profiles/unit-files.v1.json` by `node tests/structure/lib-
 
 | Unit file | Registered | Skips | Driven by | Summary |
 |---|---|---|---|---|
-| `host/native-agent-provenance.test.js` | 22 | – | `test-native-session-bridge.sh` | Native agent provenance: real assertions with strict count, completion and no-unexpected-skip verification. |
+| `host/native-agent-provenance.test.js` | 25 | – | `test-native-session-bridge.sh` | Native agent provenance: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/native-reviewer-outcome.test.js` | 18 | – | `test-native-session-bridge.sh` | Native reviewer outcomes: authenticated parent and launch correlation, actual child success, negative-only policy refusal, bounded retries, safe reads and forged-outcome rejection. |
 | `host/test-native-agent-lifecycle.js` | 6 | – | `test-native-session-bridge.sh` | Native agent lifecycle: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-native-agent-shim.js` | 5 | – | `test-native-session-bridge.sh` | Native agent shim: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-native-doctor.js` | 8 | – | `test-native-session-bridge.sh` | Native Doctor registration and capability audits, actual permission-policy reporting and refusal of missing or unsafe host evidence. |
 | `host/test-native-review.js` | 10 | – | `test-native-session-bridge.sh` | Native review: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-native-rules-worker-probes.js` | 2 | – | `test-native-session-bridge.sh` | Native rule and worker probes reject tools, missing completion, mismatched responses and uncorrelated shared logs. |
-| `host/test-native-spawn-allow.js` | 5 | – | `test-native-session-bridge.sh` | Native spawn allow: real assertions with strict count, completion and no-unexpected-skip verification. |
+| `host/test-native-spawn-allow.js` | 6 | – | `test-native-session-bridge.sh` | Native spawn allow: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-review-worker.js` | 8 | – | `test-native-session-bridge.sh` | Native review worker: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-session-adapter.js` | 23 | – | `test-native-session-bridge.sh` | Native session adapter: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-stop-session-state.js` | 4 | – | `test-stop-enforcer.sh` | Native stop session state: real assertions with strict count, completion and no-unexpected-skip verification. |
