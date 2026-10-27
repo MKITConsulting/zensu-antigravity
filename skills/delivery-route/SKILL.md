@@ -31,8 +31,9 @@ For reanchor, set the shell tool's native working-directory property to the targ
 All state-changing helper calls use `{session-helper} --helper <name> -- <arguments>`.
 Read `{plugin_root}/docs/upstream-parity.md` when this skill names a host facility.
 Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles,
-with literal `Subagents` entries containing `TypeName`, `Role`, `Workspace: "inherit"`,
-`Model: "inherit"` and a complete `Prompt`. Follow the calling review procedure's private
+with one call per role containing `TypeName`, `Role`, `Workspace: "inherit"`,
+`Model: "inherit"` and a complete `Prompt`. CLI 1.4.7 accepts this flat descriptor;
+only older hosts whose tool schema requires it use a `Subagents` array. Follow the calling review procedure's private
 lease and actual child-UUID completion checks; a role name or model-written result is not
 proof of execution. Keep implementation in the main conversation. No source-host Agent,
 SendMessage, Workflow, desktop transfer or implicit plan-approval callback is assumed.

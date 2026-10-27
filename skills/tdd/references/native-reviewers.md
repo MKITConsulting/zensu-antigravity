@@ -31,17 +31,15 @@ findings, explicitly declining to claim an inspection. With activation disabled,
 role actually reviews, on first and later rounds alike. Never replace a required child with
 main-thread prose or silently omit a selected custom/aspect pass.
 
-Call the actual native tool with this exact argument shape, expanding every placeholder:
+On CLI 1.4.7 call the actual native tool once per role with this argument shape, expanding every placeholder:
 
 ```json
 {
-  "Subagents": [{
     "TypeName": "zensu-review-aspect",
     "Role": "<exact role from the lease>",
     "Workspace": "inherit",
     "Model": "inherit",
     "Prompt": "<complete REVIEW PACKET v1, assigned perspective, exact ticket/tree/role, inherited evidence and severity blocks, read-only boundary, output schema below>"
-  }]
 }
 ```
 
@@ -56,7 +54,7 @@ REVIEW-ROLE: <role>
 
 Then append the complete packet and output contract. Never prepend a greeting or omit a
 prefix line; the adapter binds these exact identities to the actual native launch.
-Include all required roles in one `Subagents` array. Every child starts with its own complete
+Dispatch every required role. Only older host schemas require one `Subagents` array. Every child starts with its own complete
 packet and isolated conversation; no prior role conclusions enter a panel prompt. Custom
 personas remain concern text inside this fixed type. Model overrides are not implicit.
 Each child must return one raw JSON object as its entire ordinary final response:
@@ -77,7 +75,6 @@ Each child must return one raw JSON object as its entire ordinary final response
     "failure_scenario": "Concrete supported trigger",
     "fix": "Concrete correction",
     "confidence": 90
-  }]
 }
 ```
 
@@ -106,8 +103,8 @@ children under a fresh ticket after correcting the cause.
 
 Run the configured first judge as a fresh `zensu-review-judge` child over the full packet
 and merged panel report. Use the same native shape, `Role: "judge"`, inherited model and
-workspace. When enabled on the first review, dispatch the second judge in that same
-`Subagents` batch as another fresh child with `Role: "judge-b"` and the same original input
+workspace. When enabled on the first review, dispatch the second judge with another
+call as a fresh child with `Role: "judge-b"` and the same original input
 plus final line `judge_run: second`, excluding the first judge's deltas. Its distinct context is
 real; the canonical add-only and rule-breach rules still apply. Require final raw JSON
 `{"schema":"zensu-review-judge-result-v1","role":"<judge|judge-b>","report":"<complete canonical judge output>"}`.

@@ -10,7 +10,7 @@ is a gap and cannot become a pass.
 Invoke one child for Critic 1 with the real native argument shape:
 
 ```json
-{"Subagents":[{"TypeName":"zensu-gauntlet-critic","Role":"gauntlet-critic-1-wave-1","Workspace":"inherit","Model":"inherit","Prompt":"<approved charter, bounded artifact/evidence, exact read scope, quality bar, inspection protocol and critique schema; no builder self-assessment>"}]}
+{"TypeName":"zensu-gauntlet-critic","Role":"gauntlet-critic-1-wave-1","Workspace":"inherit","Model":"inherit","Prompt":"<approved charter, bounded artifact/evidence, exact read scope, quality bar, inspection protocol and critique schema; no builder self-assessment>"}
 ```
 
 Expand the complete packet and use the actual wave number. The child returns one raw JSON

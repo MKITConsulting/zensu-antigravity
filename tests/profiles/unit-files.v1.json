@@ -15,7 +15,7 @@
     },
     {
       "path": "tests/host/native-agent-provenance.test.js",
-      "registered": 22,
+      "registered": 25,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
@@ -85,7 +85,7 @@
     },
     {
       "path": "tests/host/test-native-spawn-allow.js",
-      "registered": 5,
+      "registered": 6,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"

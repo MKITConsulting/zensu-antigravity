@@ -26,10 +26,10 @@ Capture the single `lease_id=...` line. The helper validates the native host ses
 
 ### Phase C — Confined Parallel Spawn
 
-Call the native `invoke_subagent` tool once with one `Subagents` array containing every
+Call the native `invoke_subagent` tool once per role, passing a flat descriptor for every
 accepted persona exactly once. Each item is `{ "TypeName": "zensu-plan-review-worker",
 "Role": "<persona-id>", "Workspace": "inherit", "Model": "inherit", "Prompt": "<complete packet>" }`.
-Expand every placeholder. The tool has no `schema` parameter: include the exact raw-JSON
+Only older host schemas require a `Subagents` array. Expand every placeholder. The tool has no `schema` parameter: include the exact raw-JSON
 schema in each prompt. Record the actual returned `conversation_id` per role from
 `subagent_info.subagents[]`; never guess an ID from a title, message or newest transcript.
 The adapter verifies the parent spawn step, exact type/role/prompt and workspace before

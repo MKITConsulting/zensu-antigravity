@@ -93,3 +93,7 @@ It supplies no evidence of successful delegation and is not counted as passed.
 The broad native suite therefore is not claimed fully green. This release's
 startup, capture and gate evidence above is separate from that open model-driven
 orchestration check and from the deterministic CI gate.
+
+Follow-up: the [2026-10-27 native delegation validation](2026-10-27-native-delegation.md)
+reproduced the host-contract mismatch and verified the 0.4.2 correction with two
+actual child completions and a protected-file denial.

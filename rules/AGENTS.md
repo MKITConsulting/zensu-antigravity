@@ -87,9 +87,10 @@ explicit authority requirements; never use those operations to erase a failing c
 
 ## Real native reviewers and immutable evidence
 
-Use the actual `invoke_subagent` tool for a required native review. A batch contains literal
-`Subagents` entries with exact registered `TypeName`, `Role`, `Workspace: "inherit"`,
-`Model: "inherit"` and the full `Prompt`. Dispatch from the main conversation; nested
+Use the actual `invoke_subagent` tool for a required native review. On CLI 1.4.7, call it
+once per role with exact registered `TypeName`, `Role`, `Workspace: "inherit"`,
+`Model: "inherit"` and the full `Prompt` as top-level arguments. Only older hosts whose
+tool schema requires it use a `Subagents` array of these descriptors. Never mix formats. Dispatch from the main conversation; nested
 dispatch and alternate workspace/model selectors are not supported by the binding adapter.
 Known reviewer/worker profiles are read-only. Keep implementation, tests, workflow state,
 publication and scope decisions in the main conversation. A PLM child is not a mutation

@@ -83,8 +83,8 @@ manual hotfix follow the invariant by hand.
   pulse capture initialize lazily through `session-bootstrap.js` and the startup chain.
 - **Native reviewers use actual host provenance.** On agy 1.4.2, correctly typed YAML
   `tools` arrays register named profiles and `invoke_subagent` creates distinct child UUIDs.
-  The exact request is `Subagents: [{TypeName, Role, Workspace: "inherit", Model: "inherit",
-  Prompt}]`. Bind each child from the actual parent spawn step, metadata and initial parent
+  CLI 1.4.7 requires one flat `{TypeName, Role, Workspace: "inherit", Model: "inherit",
+  Prompt}` per call; older 1.4.2 requires `Subagents: [descriptor, ...]`. Reject mixed forms. Bind each child from the actual parent spawn step, metadata and initial parent
   linkage before its first tool call; never trust a model-authored agent id. Only normal,
   fully idle child Stop supplies completed-result evidence. Native read-only reviewers cannot
   mutate files/tasks, run commands or spawn children. Plan/PR workers additionally obey a

@@ -5,6 +5,14 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-27
+
+### Fixed
+
+- Support the Antigravity CLI 1.4.7 single-descriptor agent call and singular launch result while preserving older batch dispatch.
+- Bind multi-call children to their actual completed parent result and exact accepted role when the host sidecar reports the final sibling step.
+- Update native dispatch guidance and the two-child live verification without weakening read-only gates or normal-Stop completion requirements.
+
 ## [0.4.1] - 2026-10-26
 
 ### Added
