@@ -5,6 +5,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-28
+
+### Fixed
+
+- **context**: Prioritize relevant evidence and preserve related sources (#19)
+
 ## [0.4.2] - 2026-10-27
 
 ### Fixed
