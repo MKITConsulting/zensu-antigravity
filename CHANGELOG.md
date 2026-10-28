@@ -10,6 +10,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 
 - **capture**: Preserve plugin origin and explicit run purpose
+- **context**: Automatically discover relevant features from task descriptions
 
 ## [0.4.3] - 2026-10-28
 
