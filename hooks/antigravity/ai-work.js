@@ -10,10 +10,10 @@ function options(payload, args = [], env = process.env, resolver) {
   const id = paths.safeSessionId(payload.session_id);
   const bind = resolver || require('../lib/runtime-hook-session-v1.js').resolveHookSession;
   const binding = bind(payload, env);
-  const values = { workspace: binding.projectRoot,
+  const values = { source: 'antigravity', sourceVersion: require('../../plugin.json').version, workspace: binding.projectRoot,
     session: 'awcv1_' + crypto.createHash('sha256').update('zensu.ai-work.v1\0antigravity\0' + id).digest('hex') };
   for (let i = 0; i < args.length; i += 2) {
-    if (!['--task', '--title', '--criteria'].includes(args[i]) || typeof args[i + 1] !== 'string' || Object.hasOwn(values, args[i].slice(2))) throw new Error('Invalid capture arguments');
+    if (!['--task', '--title', '--criteria', '--run-kind'].includes(args[i]) || typeof args[i + 1] !== 'string' || Object.hasOwn(values, args[i].slice(2))) throw new Error('Invalid capture arguments');
     values[args[i].slice(2)] = args[i + 1];
   }
   return values;
@@ -24,7 +24,7 @@ function run(payload, action, args = [], env = process.env) {
 }
 function primer(payload, root) {
   const prefix = paths.helperPrefix(payload.session_id, root);
-  return ` AI work capture applies to direct implementation too. For an authorized implementation goal, read ${root}/docs/ai-work-capture.md, then automatically declare it once with ${prefix} --helper ai-work -- begin --task <stable-goal-key> --title <agreed-objective> --criteria <criteria-version-or-digest>. Quote each value; reuse them on retries. Use the same helper with checkpoint after the final clean commit and include the exact reviewUrl. Startup alone creates no work. Personal CLI OAuth binds the reporting account; no inferred authorship, transcripts or token usage. Stop only retries a declared goal. Only a human can accept or revoke a result in the web application.`;
+  return ` AI work capture applies to direct implementation too. For an authorized implementation goal, read ${root}/docs/ai-work-capture.md, then automatically declare it once with ${prefix} --helper ai-work -- begin --task <stable-goal-key> --title <agreed-objective> --criteria <criteria-version-or-digest>. Quote each value; reuse them on retries. Explicit validation/demo/probe tasks must use --run-kind test; normal product work including tests uses --run-kind work. Use the same helper with checkpoint after the final clean commit and include the exact reviewUrl. Startup alone creates no work. Personal CLI OAuth binds the reporting account; no inferred authorship, transcripts or token usage. Stop only retries a declared goal. Only a human can accept or revoke a result in the web application.`;
 }
 function main(argv) {
   if (argv[0] === 'checkpoint-hook') {
