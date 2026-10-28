@@ -5,6 +5,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-28
+
+### Added
+
+- **capture**: Preserve plugin origin and explicit run purpose
+
 ## [0.4.3] - 2026-10-28
 
 ### Fixed
