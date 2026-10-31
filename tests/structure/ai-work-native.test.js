@@ -15,6 +15,9 @@ test('native account reporting derives its scope from the immutable binding', ()
   const resolver = () => ({ projectRoot: '/bound/worktree' });
   const value = capture.options({ session_id: id, cwd: '/untrusted/payload-path' }, ['--task', 'goal', '--title', 'Agreed goal', '--criteria', 'v1'], {}, resolver);
   assert.equal(value.workspace, '/bound/worktree'); assert.match(value.session, /^awcv1_[a-f0-9]{64}$/);
+  assert.equal(value['cross-product-reason'], undefined);
+  assert.equal(capture.options({ session_id: id }, ['--cross-product-reason', 'Explicit shared goal'], {}, resolver)['cross-product-reason'], 'Explicit shared goal');
+  assert.match(capture.primer({ session_id: id }, root), /explicit human confirmation/);
   assert.throws(() => capture.options({ session_id: id }, ['--workspace', '/other'], {}, resolver), /Invalid/);
   assert.notEqual(value.session, capture.options({ session_id: 'c4a00f40-89bd-4bb8-b555-3603f5abb49f' }, [], {}, resolver).session);
 });
