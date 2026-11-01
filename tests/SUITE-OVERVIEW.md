@@ -35,7 +35,7 @@ Generated from `tests/profiles/unit-files.v1.json` by `node tests/structure/lib-
 | `host/test-native-rules-worker-probes.js` | 2 | – | `test-native-session-bridge.sh` | Native rule and worker probes reject tools, missing completion, mismatched responses and uncorrelated shared logs. |
 | `host/test-native-spawn-allow.js` | 6 | – | `test-native-session-bridge.sh` | Native spawn allow: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-review-worker.js` | 8 | – | `test-native-session-bridge.sh` | Native review worker: real assertions with strict count, completion and no-unexpected-skip verification. |
-| `host/test-session-adapter.js` | 23 | – | `test-native-session-bridge.sh` | Native session adapter: real assertions with strict count, completion and no-unexpected-skip verification. |
+| `host/test-session-adapter.js` | 25 | – | `test-native-session-bridge.sh` | Native session adapter: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-stop-session-state.js` | 4 | – | `test-stop-enforcer.sh` | Native stop session state: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `structure/acceptance-verify-v1.test.js` | 26 | – | `test-acceptance-gate.sh` | Acceptance records: the record schema and store, the verify-feature driver ids, criteria from the shared lister, the chain anchor, criterion and gate verdicts, and retention. |
 | `structure/ai-work-capture.test.js` | 12 | – | `test-ai-work-capture.sh` | Work capture: durable exact retries, account binding and human-only decisions. |

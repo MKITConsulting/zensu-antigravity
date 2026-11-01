@@ -105,7 +105,7 @@
     },
     {
       "path": "tests/host/test-session-adapter.js",
-      "registered": 23,
+      "registered": 25,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"

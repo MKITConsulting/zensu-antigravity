@@ -29,6 +29,61 @@ function payload(commandLine, sessionId = SID) {
   return { session_id: sessionId, tool_name: 'Bash', tool_input: { command: commandLine } };
 }
 
+test('helper entrypoint executes an authorized child with bound input and preserves its exit code', (t) => {
+  const options = fixture(t), plugin = path.join(options.root, 'plugin');
+  const directory = path.join(plugin, 'hooks/lib');
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, 'zensu-log.sh'),
+    'printf "%s\\n" "$ZENSU_HOST_SESSION_ID" "$ZENSU_CLIENT_NAME" "$2" > "$1"\n'
+    + 'if [ "$3" = input ]; then cat >> "$1"; fi\nexit "$4"\n');
+  t.mock.method(paths, 'pluginRoot', () => plugin);
+  t.mock.method(paths, 'dataRoot', () => options.pluginData);
+  const exitCode = process.exitCode;
+  t.after(() => { process.exitCode = exitCode; });
+  for (const withInput of [false, true]) {
+    const output = path.join(options.root, `output-${withInput}.txt`);
+    const input = path.join(options.root, 'input.txt');
+    fs.writeFileSync(input, 'bound input\n');
+    const argv = ['--session', SID, '--helper', 'log',
+      ...(withInput ? ['--stdin-file', input] : []), '--', output,
+      'literal value; $(must-not-run)', withInput ? 'input' : 'none', withInput ? '7' : '0'];
+    const request = helpers.parseArguments(argv);
+    helpers.authorize(request, { pluginData: options.pluginData });
+    helpers.main(argv);
+    assert.equal(process.exitCode, withInput ? 7 : 0);
+    process.exitCode = exitCode;
+    assert.equal(fs.readFileSync(output, 'utf8'),
+      `${SID}\nzensu-antigravity\nliteral value; $(must-not-run)\n${withInput ? 'bound input\n' : ''}`);
+    assert.throws(() => helpers.main(argv), /No current PreToolUse authorization/);
+  }
+});
+
+test('helper entrypoint refuses unsafe targets and surfaces child launch failures', (t) => {
+  const options = fixture(t), plugin = path.join(options.root, 'plugin');
+  const directory = path.join(plugin, 'hooks/lib');
+  fs.mkdirSync(directory, { recursive: true });
+  const target = path.join(directory, 'zensu-log.sh');
+  const argv = ['--session', SID, '--helper', 'log', '--'];
+  const request = helpers.parseArguments(argv);
+  t.mock.method(paths, 'pluginRoot', () => plugin);
+  t.mock.method(paths, 'dataRoot', () => options.pluginData);
+  fs.mkdirSync(target);
+  helpers.authorize(request, { pluginData: options.pluginData });
+  assert.throws(() => helpers.main(argv), /Helper target is unsafe/);
+  fs.rmdirSync(target);
+  fs.writeFileSync(target, 'exit 0\n');
+  helpers.authorize(request, { pluginData: options.pluginData });
+  const inheritedPath = process.env.PATH;
+  try {
+    process.env.PATH = path.join(options.root, 'missing-bin');
+    assert.throws(() => helpers.main(argv), { code: 'ENOENT' });
+  } finally {
+    if (inheritedPath === undefined) delete process.env.PATH;
+    else process.env.PATH = inheritedPath;
+  }
+  assert.throws(() => helpers.consumeAuthorization(request, { pluginData: options.pluginData }), /No current PreToolUse authorization/);
+});
+
 test('literal helper invocation retains argv and must match host conversation', () => {
   const request = adapter.inspectCommand(payload(command(SID, 'log', ['--evidence-run', '--command', 'npm test && npm run build'])));
   assert.equal(request.kind, 'helper');
