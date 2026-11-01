@@ -161,7 +161,7 @@ test('legacy receipts are replayed without invented source or purpose', (t) => {
   assert.throws(() => capture.begin({ ...options, 'run-kind': 'test' }), /run purpose/);
 });
 
- test('unbound work is skipped without declaration or receipt; cross-product requires explicit intent', (t) => {
+test('unbound work is skipped without declaration or receipt; cross-product requires explicit intent', (t) => {
   const { options, state, file } = fixture(t); state.unbound = true;
   assert.equal(capture.begin(options).status, 'skipped_unassigned');
   assert.equal(state.unit, null); assert.equal(fs.existsSync(file), false);
@@ -172,12 +172,12 @@ test('legacy receipts are replayed without invented source or purpose', (t) => {
   assert.equal(state.unit.productId, null); assert.equal(state.unit.crossProductReason, cross['cross-product-reason']);
   assert.throws(() => capture.begin(options), /product scope/);
   state.head = 'e'.repeat(40); assert.equal(capture.checkpoint(options).status, 'submitted_for_review');
- });
- test('changed product and legacy unscoped receipts never submit automatically', (t) => {
+});
+test('changed product and legacy unscoped receipts never submit automatically', (t) => {
   const { options, state, file } = fixture(t); capture.begin(options); state.head = 'e'.repeat(40);
   state.product = org; assert.throws(() => capture.checkpoint(options), /scope/);
   state.product = other; state.unit.productId = org; assert.throws(() => capture.checkpoint(options), /scope/);
   state.unit.productId = other;
   const receipt = JSON.parse(fs.readFileSync(file)); delete receipt.scope; fs.writeFileSync(file, JSON.stringify(receipt));
   assert.throws(() => capture.checkpoint(options), /Legacy capture/); assert.equal(state.submits.length, 0);
- });
+});

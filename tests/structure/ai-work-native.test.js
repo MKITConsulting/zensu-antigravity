@@ -46,3 +46,21 @@ test('native Stop errors are nonblocking and never expose payload or server deta
   const child = cp.spawnSync(process.execPath, [path.join(root, 'hooks/antigravity/ai-work.js'), 'checkpoint-hook'], { input: JSON.stringify({ session_id: id, agent_id: 'child' }), encoding: 'utf8' });
   assert.equal(child.status, 0); assert.equal(child.stdout + child.stderr, '');
 });
+test('helper receipts preserve their lifetime when the issuance clock advances', t => {
+  const data = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'agy-capture-clock-')));
+  t.after(() => fs.rmSync(data, { recursive: true, force: true }));
+  let now = 1000;
+  t.mock.method(Date, 'now', () => now++);
+  const request = { sessionId: id, helper: 'ai-work', args: ['checkpoint'] };
+  const file = helpers.authorize(request, { pluginData: data });
+  const receipt = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(receipt.created_at_ms, 1000);
+  assert.equal(receipt.expires_at_ms, 601000);
+  helpers.consumeAuthorization(request, { pluginData: data, now: 1002 });
+  assert.throws(() => helpers.consumeAuthorization(request, { pluginData: data, now: 1002 }), /No current PreToolUse authorization/);
+  const explicit = helpers.authorize(request, { pluginData: data, now: 0 });
+  const explicitReceipt = JSON.parse(fs.readFileSync(explicit, 'utf8'));
+  assert.equal(explicitReceipt.created_at_ms, 0);
+  assert.equal(explicitReceipt.expires_at_ms, 600000);
+  assert.throws(() => helpers.consumeAuthorization(request, { pluginData: data, now: 600001 }), /No current PreToolUse authorization/);
+});

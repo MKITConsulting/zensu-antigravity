@@ -127,10 +127,11 @@ function authorize(request, options = {}) {
   const directory = paths.privateDirectory(data, 'helper-calls');
   const key = requestKey(request);
   const nonce = crypto.randomBytes(16).toString('hex');
+  const now = options.now === undefined ? Date.now() : options.now;
   const record = { schema: 'zensu.antigravity.helper-call.v1', key,
     session_id: request.sessionId, helper: request.helper,
-    created_at_ms: options.now === undefined ? Date.now() : options.now,
-    expires_at_ms: (options.now === undefined ? Date.now() : options.now) + AUTHORIZATION_TTL_MS };
+    created_at_ms: now,
+    expires_at_ms: now + AUTHORIZATION_TTL_MS };
   const file = path.join(directory, `${key}-${nonce}.json`);
   fs.writeFileSync(file, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
   return file;
