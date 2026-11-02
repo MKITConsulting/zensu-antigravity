@@ -153,20 +153,41 @@ fi
 if arm "fsg-stale" "$PROJ"; then
   run_full --cmd 'true'
   printf 'edited\n' > "$PROJ/tracked.txt"
+  # Certify this actual edit for the current generation before testing suite
+  # staleness, so the terminal audit prerequisite cannot mask the suite gate.
+  STALE_STEM="2026-01-01-0101_full-suite-stale"
+  mkdir -p "$PROJ/.zensu/plans" "$PROJ/.zensu/logs"
+  printf '# Fixture implementation\n\n## Requirements\n| ID | Requirement | Source |\n| --- | --- | --- |\n| FR-001 | Persist the edited value | fixture |\n' > "$PROJ/.zensu/plans/$STALE_STEM.md"
+  printf 'S1 IMPL completed — files: tracked.txt\n' > "$PROJ/.zensu/logs/$STALE_STEM.log"
+  node - "$PROJ/tracked.txt" "$WORK/stale-audit-predicates.json" <<'NODE'
+const fs = require('node:fs'), crypto = require('node:crypto');
+const bytes = fs.readFileSync(process.argv[2]);
+fs.writeFileSync(process.argv[3], JSON.stringify({ schema: 'edit-landing-predicates-v1', claims: [{
+  step: 'S1', path: 'tracked.txt', sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+  present: [bytes.toString('utf8')],
+}] }));
+NODE
+  bash "$PLUGIN_DIR/hooks/lib/zensu-edit-landing.sh" \
+    --project "$PROJ" --log "$PROJ/.zensu/logs/$STALE_STEM.log" --session fsg-stale \
+    --baseline "$(git -C "$PROJ" rev-parse HEAD)" --predicates "$WORK/stale-audit-predicates.json" \
+    >"$WORK/audit-out" 2>"$WORK/audit-err"
+  AUDIT_RC=$?
   chain_done; RC=$?
-  if [ "$RC" -eq 1 ] && [ "$(done_flag)" = "false" ] \
+  if [ "$AUDIT_RC" -eq 0 ] && [ "$RC" -eq 1 ] && [ "$(done_flag)" = "false" ] \
     && grep -q '^FULL SUITE — stale | the newest green full-suite run measured an older tree (record er1_[0-9_a-f]*); files changed since: tracked.txt | ' "$WORK/err"; then
     check "F5 an edit after the green run refuses as stale and lists the path" PASS
   else
     check "F5 an edit after the green run refuses as stale (rc=$RC)" FAIL
+    cat "$WORK/audit-err"
     ERR
   fi
   run_full --cmd 'true' --if-stale
   chain_done; RC=$?
-  if [ "$RC" -eq 0 ] && [ "$(done_flag)" = "true" ] && grep -q '^FULL SUITE — pass | ' "$WORK/err"; then
+  if [ "$AUDIT_RC" -eq 0 ] && [ "$RC" -eq 0 ] && [ "$(done_flag)" = "true" ] && grep -q '^FULL SUITE — pass | ' "$WORK/err"; then
     check "F6 --if-stale re-runs the stale suite and the terminus then closes" PASS
   else
     check "F6 --if-stale re-runs the stale suite and the terminus then closes (rc=$RC)" FAIL
+    cat "$WORK/audit-err"
     ERR
   fi
   git -C "$PROJ" checkout -q -- tracked.txt

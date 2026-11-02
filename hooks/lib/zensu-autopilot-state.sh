@@ -427,7 +427,7 @@ _autopilot_node() {
     native="$(_autopilot_native_project_path "${args[$index]}")" || return 2
     args[$index]="$native"
   done
-  MSYS2_ARG_CONV_EXCL='*' node - "$mode" "${args[@]}" <<'NODE'
+  MSYS2_ARG_CONV_EXCL='*' node - "$_ZENSU_TDD_CONTROL_CORE" "$mode" "${args[@]}" <<'NODE'
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -435,9 +435,13 @@ const path = require("path");
 const MAX_BYTES = 1024 * 1024;
 const MAX_EVENTS = 512;
 const args = process.argv.slice(2);
+const corePath = args.shift();
 const mode = args.shift();
+let inBudgetTransaction = false;
 
 const fail = (code, message) => {
+  // Unwind the in-process lease before returning a typed worker refusal.
+  if (inBudgetTransaction) throw Object.assign(new Error(message), { exitCode: code });
   if (message) process.stderr.write(`[zensu-autopilot-state] ${message}\n`);
   process.exit(code);
 };
@@ -2204,20 +2208,32 @@ if (mode === "team-review-receipt-meta") {
 if (mode === "increment-budget") {
   const [stateDir, runFile, runOutput, runId, expectedStage, expectedProjectRoot,
     expectedOwnerSessionId = ""] = args;
-  const state = readState(runFile);
-  const pointer = activePointerFor(stateDir, state.ownerSessionId, runId);
-  if (!pointer || pointer.runId !== runId) fail(4, "budget does not target the active run");
-  if (state.runId !== runId || state.projectRoot !== expectedProjectRoot
-    || state.stage !== expectedStage || STOP_TERMINAL.has(state.stage)) {
-    fail(4, "stop budget stage is stale or terminal");
+  let count;
+  try {
+    inBudgetTransaction = true;
+    count = require(path.join(path.dirname(corePath), "autopilot-budget-v1.js")).updateBudget({
+      projectRoot: expectedProjectRoot, stateDirectory: stateDir, runFile, runOutput, runId,
+    }, () => {
+      const state = readState(runFile);
+      const pointer = activePointerFor(stateDir, state.ownerSessionId, runId);
+      if (!pointer || pointer.runId !== runId) fail(4, "budget does not target the active run");
+      if (state.runId !== runId || state.projectRoot !== expectedProjectRoot
+        || state.stage !== expectedStage || STOP_TERMINAL.has(state.stage)) {
+        fail(4, "stop budget stage is stale or terminal");
+      }
+      if (expectedOwnerSessionId && state.ownerSessionId !== expectedOwnerSessionId) {
+        fail(4, "stop-budget caller does not own the active run");
+      }
+      state.stopBudget.count += 1;
+      if (!stateValid(state)) fail(2, "budget increment produced invalid state");
+      writeOutput(runOutput, state);
+      return state.stopBudget.count;
+    });
+  } catch (error) {
+    inBudgetTransaction = false;
+    fail(error.exitCode || 2, error.message);
   }
-  if (expectedOwnerSessionId && state.ownerSessionId !== expectedOwnerSessionId) {
-    fail(4, "stop-budget caller does not own the active run");
-  }
-  state.stopBudget.count += 1;
-  if (!stateValid(state)) fail(2, "budget increment produced invalid state");
-  writeOutput(runOutput, state);
-  process.stdout.write(String(state.stopBudget.count));
+  process.stdout.write(`${count}\n`);
   process.exit(0);
 }
 
@@ -4332,22 +4348,6 @@ autopilot_adopt_pending_review() {
   return 1
 }
 
-_autopilot_increment_budget_critical() {
-  local root="$1" run_id="$2" expected_stage="$3" caller_session_id="${4:-}"
-  local state_dir="$root/.zensu/state"
-  local run_file="$state_dir/autopilot-run-${run_id}.json"
-  local run_tmp result rc
-  run_tmp="$(_autopilot_mktemp_beside "$run_file")" || return 5
-  result="$(_autopilot_node increment-budget "$state_dir" "$run_file" "$run_tmp" "$run_id" "$expected_stage" "$root" "$caller_session_id")"
-  rc=$?
-  if [ "$rc" -ne 0 ]; then
-    rm -f "$run_tmp"
-    return "$rc"
-  fi
-  _tdd_atomic_replace_regular "$run_tmp" "$run_file" || { rm -f "$run_tmp"; return 5; }
-  printf '%s\n' "$result"
-}
-
 autopilot_increment_stop_budget() {
   local run_id="${1:-}" expected_stage="${2:-}" root caller_session_id="${4:-}"
   _autopilot_identifier_ok "$run_id" || return 3
@@ -4356,8 +4356,19 @@ autopilot_increment_stop_budget() {
   fi
   root="$(_autopilot_project_root "${3:-${ZENSU_PROJECT_DIR:-.}}")" || return 2
   _autopilot_read_storage_ready "$root" "$run_id" || return $?
-  _autopilot_locked_run "$root" "$run_id" _autopilot_increment_budget_critical \
-    "$root" "$run_id" "$expected_stage" "$caller_session_id"
+  local state_dir="$root/.zensu/state" run_file run_tmp rc
+  run_file="$state_dir/autopilot-run-${run_id}.json"
+  run_tmp="$(_autopilot_mktemp_beside "$run_file")" || return 5
+  # The worker owns the same Core lease through validation, mutation, durable
+  # output, atomic replacement and release. No shell helper starts while held.
+  if _autopilot_node increment-budget "$state_dir" "$run_file" "$run_tmp" \
+      "$run_id" "$expected_stage" "$root" "$caller_session_id"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  rm -f -- "$run_tmp"
+  return "$rc"
 }
 
 _autopilot_increment_budget_capped_critical() {

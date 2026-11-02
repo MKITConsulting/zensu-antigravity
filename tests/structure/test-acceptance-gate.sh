@@ -74,7 +74,7 @@ VERIFY_SKILL="$(skill_text_file "$PLUGIN_DIR/skills/verify-feature")"
 PLAN_TEMPLATE="$PLUGIN_DIR/templates/tdd-plan.md"
 if grep -qF '6d. **Live Acceptance Verification**' "$TDD_SKILL" \
   && grep -qF -- '--acceptance-status --log {log_file}' "$TDD_SKILL" \
-  && grep -qF 'the current `ACCEPTANCE STATUS` lines' "$TDD_SKILL" \
+  && grep -qF '`ACCEPTANCE STATUS` lines' "$TDD_SKILL" \
   && grep -qF 'acceptance status, suite/CI evidence and every bypass' "$TDD_SKILL" \
   && grep -qF '**Acceptance re-verification**' "$SELF_REVIEW_SKILL" \
   && grep -qF 'Full suite, Acceptance, Build' "$SELF_REVIEW_SKILL" \
@@ -157,6 +157,26 @@ review_to_done() {
   SF="$(tdd_state_file "$sid")"
 }
 
+# Acceptance cases need a real fresh audit prerequisite so the terminal audit
+# gate does not mask the acceptance behavior under test. Missing/escaped receipt
+# scenarios deliberately keep using arm_plain/arm_begin below.
+audit_current() {
+  local sid="$1" project="$2" baseline proof="$WORK/acceptance-audit-predicates.json"
+  baseline="$(git -C "$project" rev-parse HEAD)" || return 1
+  node - "$project/tracked.txt" "$proof" <<'NODE'
+const fs = require('node:fs'), crypto = require('node:crypto');
+const bytes = fs.readFileSync(process.argv[2]);
+fs.writeFileSync(process.argv[3], JSON.stringify({ schema: 'edit-landing-predicates-v1', claims: [{
+  step: 'S1', path: 'tracked.txt', sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+  present: [bytes.toString('utf8')],
+}] }));
+NODE
+  [ "$?" -eq 0 ] || return 1
+  bash "$PLUGIN_DIR/hooks/lib/zensu-edit-landing.sh" \
+    --project "$project" --log "$project/.zensu/logs/$STEM.log" \
+    --session "$sid" --baseline "$baseline" --predicates "$proof" >"$WORK/audit-out" 2>"$WORK/audit-err"
+}
+
 arm() {
   local sid="$1" rp
   export ZENSU_PROJECT_DIR="$PROJ"
@@ -165,10 +185,7 @@ arm() {
   bash "$LOG" --tdd-begin >/dev/null 2>&1 || return 1
   write_plan "$PROJ"
   printf 'S1 IMPL completed — files: tracked.txt\n' > "$PROJ/.zensu/logs/$STEM.log"
-  rp="$(tdd_edit_landing_receipt "$sid")" || return 1
-  mkdir -p "$(dirname "$rp")"
-  printf '{"schema":"edit-landing-v2","session":"%s","log":".zensu/logs/%s.log","claims":1,"landed":1,"notLanded":0,"unverified":0,"pending":0,"exemptIgnored":0,"exemptVerified":0,"clean":true}\n' \
-    "$sid" "$STEM" > "$rp"
+  audit_current "$sid" "$PROJ" || return 1
   bash "$LOG" --tdd-complete --plan "./$PLAN_REL" >/dev/null 2>&1 || return 1
   review_to_done "$sid"
 }
@@ -219,10 +236,7 @@ bound_arm() {
     --autopilot-return-stage GATES --chain-id "$chain" >/dev/null 2>&1 || return 1
   write_plan "$project"
   printf 'S1 IMPL completed — files: tracked.txt\n' > "$project/.zensu/logs/$STEM.log"
-  rp="$(tdd_edit_landing_receipt "$sid")" || return 1
-  mkdir -p "$(dirname "$rp")"
-  printf '{"schema":"edit-landing-v2","session":"%s","log":".zensu/logs/%s.log","claims":1,"landed":1,"notLanded":0,"unverified":0,"pending":0,"exemptIgnored":0,"exemptVerified":0,"clean":true}\n' \
-    "$sid" "$STEM" > "$rp"
+  audit_current "$sid" "$project" || return 1
   bash "$LOG" --tdd-complete --session "$sid" --plan "./$PLAN_REL" --autopilot-run "$run" \
     --autopilot-attempt 1 --chain-id "$chain" >/dev/null 2>&1 || return 1
   SF="$(tdd_state_file "$sid")"
@@ -379,6 +393,7 @@ EVIDENCE
 the page showed the saved value
 EVIDENCE
   printf 'v3\n' > "$PROJ/tracked.txt"
+  audit_current "acc-stale" "$PROJ" || { check "A8 re-audit the changed acceptance tree" FAIL; }
   chain_done; RC=$?
   if [ "$RC" -eq 1 ] && [ "$(done_flag)" = "false" ] \
     && grep -qF 'AC-001 stale (files changed since it was verified: tracked.txt)' "$WORK/err" \
@@ -389,6 +404,7 @@ EVIDENCE
     ERR
   fi
   printf 'v2\n' > "$PROJ/tracked.txt"
+  audit_current "acc-stale" "$PROJ" || { check "A9 re-audit the reverted acceptance tree" FAIL; }
 
   write_plan "$PROJ" "the page shows the saved value after a reload"
   chain_done; RC=$?
@@ -663,10 +679,12 @@ fi
 
 if arm_plain "acc-no-receipt-dirty" "$PROJ"; then
   printf 'late edit\n' > "$PROJ/tracked.txt"
+  acc_status; RC_STATUS=$?
   chain_done; RC=$?
   if [ "$RC" -eq 1 ] && [ "$(done_flag)" = "false" ] \
-    && grep -q "^ACCEPTANCE — unresolved | the working tree has changes but no edit-landing receipt names this chain's plan; run the Phase 6 step 5b Edit Landing Audit | gate: required$" "$WORK/err"; then
-    check "A21 changed files without a receipt refuse as unresolved instead of passing" PASS
+    && [ "$RC_STATUS" -ne 0 ] && grep -qF 'no edit-landing receipt exists for this chain' "$WORK/sout" \
+    && grep -qF 'run the edit-landing audit for this generation with current predicate proofs' "$WORK/err"; then
+    check "A21 missing-receipt acceptance remains unresolved and the stronger terminal audit gate refuses first" PASS
   else
     check "A21 changed files without a receipt refuse as unresolved (rc=$RC)" FAIL
     ERR

@@ -49,7 +49,9 @@ test('bound inactive, review-pending and complete chains route from validated st
   assert.match(pending.verdict.reason, /review chain|reviewer chain/);
   const native = render(pending.verdict.reason, 'stop-chain-enforcer.sh', pending.payload);
   assert.match(native, /native delegated review phase/);
-  assert.match(native, /real invoke_subagent tool/);
+  assert.match(native, /each returned required role through its own real invoke_subagent call/);
+  assert.match(native, /flat TypeName, Role, Workspace: inherit, Model: inherit and complete Prompt arguments/);
+  assert.doesNotMatch(native, /\bSubagents\b/);
   assert.match(native, /--helper review -- --begin --ticket/);
   assert.doesNotMatch(native, /subagent_type=|Agent tool/);
   assert.equal(f.read(session).stopBlockCount, 1);

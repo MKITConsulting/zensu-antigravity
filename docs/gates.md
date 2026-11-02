@@ -202,7 +202,7 @@ for Bash); disable via `hooks.secretScan:false`.
 
 ## Reviewer execution and private data
 
-`reviewerSpawnAutoAllow` permits a native launch only for a batch consisting entirely of
+`reviewerSpawnAutoAllow` permits a flat native launch or a supported legacy batch only for
 exact manifest-owned REVIEWER/EVIDENCE_WORKER profiles whose inherited model and three
 read tools pass the native audit. All canonical gates must accept first and launch provenance
 must be recorded. Strict configuration withdraws the grant on any `false` or unusable

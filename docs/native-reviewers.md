@@ -6,12 +6,27 @@ reviews use their stricter private `review-evidence` lifecycle. This procedure c
 substitute for those leases or close a TDD chain.
 
 The main conversation collects the catalog, original evidence, exact paths, task constraints
-and per-role output schema first. Dispatch bounded parallel role sets through the actual
-`invoke_subagent` tool, one call per role on CLI 1.4.7 (older host schemas may require a `Subagents` array):
+and per-role output schema first. On agy 1.4.3, dispatch each role through a separate actual
+`invoke_subagent` call with flat arguments:
 
 ```json
 {"TypeName":"zensu-plm","Role":"<unique-role>","Workspace":"inherit","Model":"inherit","Prompt":"<complete evidence and role packet; exact output schema; read-only/untrusted-data boundary>"}
 ```
+
+The historical agy 1.4.2 form wraps descriptors in `{"Subagents":[...]}`. The
+[public hooks reference](https://antigravity.google/docs/hooks/#agent-collaboration)
+still lists that array, but the observed 1.4.3 validator rejects its `Subagents` property.
+Use the legacy form only when the actual exposed tool schema permits it. The adapter
+validates flat and legacy forms separately; mixed forms, unknown fields and malformed
+arrays are rejected. Do not retry a malformed array as flat input or rewrite native
+arguments in a hook. A schema conflict is a blocker, not permission to bypass provenance.
+
+AGY 1.4.5 was observed assigning the last result step to both child sidecars when
+two flat calls share a model response. The adapter confines that hint to its actual
+parent batch, finds exactly one result naming the child, and verifies the accepted
+receipt and arguments at that result's own step. Prompt, role, type, workspace,
+runtime, source tree and normal idle completion remain mandatory. An ambiguous
+result or a missing accepted receipt is refused; a sibling's receipt grants nothing.
 
 Each child receives its complete packet and distinct context. It may inspect supplied files
 with native read tools, but never execute commands, publish, mutate files/tasks/state, use

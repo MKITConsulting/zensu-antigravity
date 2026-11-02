@@ -23,7 +23,8 @@ set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
-OUT="$HERE/results"
+OUT="${ZENSU_LIVE_EVIDENCE_DIR:+$ZENSU_LIVE_EVIDENCE_DIR/results}"
+OUT="${OUT:-$HERE/results}"
 mkdir -p "$OUT"
 
 PROMPTFOO="$ROOT/node_modules/.bin/promptfoo"
@@ -41,6 +42,22 @@ elif ! command -v agy >/dev/null 2>&1; then
   exit 1
 else
   printf 'live suite: driving a real agy install. This makes one model call per scenario.\n\n'
+fi
+
+CONCURRENCY=2
+if [ "${ZENSU_LIVE_INTERACTIVE:-}" = "1" ]; then
+  # Each native TUI owns the terminal while its operator reviews one-time asks.
+  # Parallel TUIs would mix prompts and send a choice to the wrong conversation.
+  CONCURRENCY=1
+  if [ ! -t 0 ] || [ ! -t 1 ]; then
+    printf 'live suite: interactive mode requires a terminal; no headless approval fallback.\n' >&2
+    exit 1
+  fi
+  if [ -z "${ZENSU_LIVE_PLUGIN_ROOT:-}" ] || [ -z "${ZENSU_LIVE_EVIDENCE_DIR:-}" ] \
+      || [ -z "${ZENSU_LIVE_WORKSPACE_MANIFEST:-}" ]; then
+    printf 'live suite: interactive mode requires a frozen plugin, evidence directory and exact workspace manifest.\n' >&2
+    exit 1
+  fi
 fi
 
 # Same hardening the offline runner has. This suite handles real model output, so
@@ -65,6 +82,7 @@ $PROMPTFOO validate config --config promptfooconfig.yaml >/dev/null || exit 1
 JSON="$OUT/live-$(date +%Y%m%d-%H%M%S).json"
 
 $PROMPTFOO eval --config promptfooconfig.yaml \
+  --max-concurrency "$CONCURRENCY" \
   --no-cache --no-progress-bar --no-share --no-write \
   --output "$JSON" >"$OUT/last-run.txt" 2>&1
 STATUS=$?

@@ -39,44 +39,60 @@ Read the one-fix-round latch: `selfReviewFixed` in the session chain-state.
   `## Open`. When nothing yields a command, log `FULL SUITE UNRESOLVED — {reason}`,
   carry it into `## Open` and claim NO test verdict. The runner's own summary line
   is this run's verdict. Then
-  invoke the `/zensu-tdd` Phase 6 step 5b **Edit Landing Audit** UNCHANGED —
-  when that procedure is not in your context, `Read` it from
-  `{plugin_root}/skills/tdd/references/audit.md`, whose `{plugin_root}` is
-  `{plugin_root}`; re-invoking the `/zensu-tdd` skill is forbidden below —
-  writing its mandatory start marker as `EDIT LANDING AUDIT STARTED — round
-  self-review` (a label disjoint from `phase6` and `fix-{N}`, so its
-  round-scoped window covers exactly this round's claims). Re-derive the inputs here — this stage can be forced cold by the
-  Stop hook, so resolve `TOP` yourself and, when this session committed mid-run
-  but no `BASELINE_SHA` is available, take the audit's documented
-  `PENDING PREDICATE (no session baseline)` branch — clearable by a passing
-  step (d) predicate re-read, NOT the terminal `UNVERIFIED` — rather than
-  widening the enumeration. With no mid-run commit the ordinary union applies
-  and nothing degrades. A mechanical or bulk replacement
-  that matched nothing would otherwise leave the chain unnoticed. This stage
-  gets no second fix round, so the only terminus remedy for an unlanded claim
-  is `CLAIM WITHDRAWN — {step_id}: {file}` plus carrying every
-  `EDIT NOT LANDED` line into the CHAIN-END SUMMARY verbatim; never close the
-  chain as if the claim had landed. Then set the latch with
-  `{session-helper} --helper log -- --self-review-fixed --claimed-review-ticket "<review-ticket>"` and re-run
-  `/zensu-self-review` (pass 2 to confirm). The pass-2 invocation MUST carry the
-  same captured `SELF-REVIEW-TICKET: <review-ticket>` line again and, for a
-  bound handoff, the same captured official envelope exactly once:
-  `ZENSU-DELEGATED-CALLER: autopilot`,
-  `AUTOPILOT-BINDING: run=<runId> attempt=<attempt> chain=<chainId>`, and
-  `AUTOPILOT-STAGE: <returnStage>`. Do not re-read, re-derive, or omit either generation token or any envelope line. In this branch you MUST NOT:
-  - run `--tdd-complete` (implementation is already complete);
-  - spawn the `zensu-code-reviewer` agent — self-review is terminal, so do not spawn it;
-  - re-invoke the whole `/zensu-tdd` skill (its Phase 6 tail would re-spawn the reviewer).
+  invoke the `/zensu-tdd` Phase 6 step 5b **Edit Landing Audit** with this generation's
+  retained original baseline, cumulative dirty paths and append-only claim history.
+  Read `{plugin_root}/skills/tdd/references/audit.md` directly if needed; do not reload
+  either workflow skill. Use the exact session-bound helper with explicit
+  `--session "{conversation_id}"` and `--predicates <JSON file>` when dirty claims need
+  current literal/hash proofs. Omitting previous context cannot clear a pending claim.
+  Re-read current files and provide proofs for every applicable historical and new claim.
+  A withdrawn claim remains unresolved; neither prose nor green tests clears it.
+  Only after the audit is clean continue to the latch:
+  `{session-helper} --helper log -- --self-review-fixed --claimed-review-ticket "<review-ticket>"`.
+  Refresh every acceptance criterion affected by the changed tree with
+  `/zensu-verify-feature --chain --log <run-log>`, retaining the same session and ticket.
+  Continue directly to the finalize branch below with this same loaded procedure.
+  Do not invoke `/zensu-self-review` again, run `--tdd-complete`, spawn another reviewer,
+  restart the workflow, or spend a second fix round. If an edit claim remains unresolved,
+  report its concrete blocker and leave the chain open.
 
 - **Otherwise** (no must-fix, OR `selfReviewFixed` is already true) — finalize:
-  1. Standalone handoffs keep the unqualified terminus: run `{session-helper} --helper log -- --chain-done --claimed-review-ticket "<review-ticket>"`. For a verified Autopilot binding, run `{session-helper} --helper log -- --chain-done --autopilot-run "$RUN_ID" --autopilot-attempt "$ATTEMPT" --chain-id "$CHAIN_ID" --claimed-review-ticket "<review-ticket>"`. This is the ticket- and generation-bound chain terminus, and it applies the full-suite gate: it prints a `FULL SUITE — <state> | …` line on stderr and refuses (exit 1) on a missing, red, running, interrupted or stale full-suite record — in CI mode on a missing, red, running, interrupted or stale local test run, and it passes as `deferred-ci` with a second `FULL SUITE — CI contract` line. On such a refusal the chain stays open: run the command its `run:` segment names, or wait for a `running` record to land, then run this step again. It applies the acceptance gate as well: it prints `ACCEPTANCE — <state> | …` lines and refuses while any active criterion lacks a `pass` on the current tree; on that refusal follow the remedy the line names: a `run:` segment means run `/zensu-verify-feature --chain` with the log it names, then this step again; a `fix:` segment means a criterion fails on this tree and needs the one fix round; an `add:` or `restore:` segment, or a refusal with no remedy, goes into your report and to the user. If the refusal is `failed` and the one fix round is already spent, do not edit again: carry the refusal line into your report, stop, and leave `ZENSU_FULL_SUITE_GATE` to the user. The same holds for a criterion that is still `fail` or `partial` after the spent round: carry the `ACCEPTANCE — …` refusal into your report, stop, and leave `ZENSU_ACCEPTANCE_GATE` to the user. Any other failure is stale: stop and do not render a successful final report.
+  1. Standalone handoffs keep the unqualified terminus: run `{session-helper} --helper log -- --chain-done --claimed-review-ticket "<review-ticket>"`. For a verified Autopilot binding, run `{session-helper} --helper log -- --chain-done --autopilot-run "$RUN_ID" --autopilot-attempt "$ATTEMPT" --chain-id "$CHAIN_ID" --claimed-review-ticket "<review-ticket>"`. This is the ticket- and generation-bound chain terminus. It first requires a clean, fresh edit-landing receipt for the current session, generation, log claims and tree. On refusal run its exact recovery command with current proofs, then refresh stale acceptance evidence; never downgrade audit context. It also applies the full-suite gate: it prints a `FULL SUITE — <state> | …` line on stderr and refuses (exit 1) on a missing, red, running, interrupted or stale full-suite record — in CI mode on a missing, red, running, interrupted or stale local test run, and it passes as `deferred-ci` with a second `FULL SUITE — CI contract` line. On such a refusal the chain stays open: run the command its `run:` segment names, or wait for a `running` record to land, then run this step again. It applies the acceptance gate as well: it prints `ACCEPTANCE — <state> | …` lines and refuses while any active criterion lacks a `pass` on the current tree; on that refusal follow the remedy the line names: a `run:` segment means run `/zensu-verify-feature --chain` with the log it names, then this step again; a `fix:` segment means a criterion fails on this tree and needs the one fix round; an `add:` or `restore:` segment, or a refusal with no remedy, goes into your report and to the user. If the refusal is `failed` and the one fix round is already spent, do not edit again: carry the refusal line into your report, stop, and leave `ZENSU_FULL_SUITE_GATE` to the user. The same holds for a criterion that is still `fail` or `partial` after the spent round: carry the `ACCEPTANCE — …` refusal into your report, stop, and leave `ZENSU_ACCEPTANCE_GATE` to the user. Any other failure is stale: stop and do not render a successful final report.
   2. **Carry the full-suite verdict.** Copy every `FULL SUITE — …` line the terminus
      printed — the verdict, plus the `flaky` line and the gate-mode disclosure when
      present — into the `Full suite` verdict cell verbatim. Copy every `ACCEPTANCE — …`
      line the same way into the `Acceptance` verdict cell.
-  3. Render the final report (below), then stop.
+  3. Read `{session-helper} --helper workflow-artifacts -- report --claimed-review-ticket "<review-ticket>"`
+     and require `status: closed` with `nextAction: render-report-only`. Reconcile the plan
+     using `{session-helper} --helper workflow-artifacts -- sync` if its managed table needs
+     a refresh, then render the final report (below) and stop. Never rerun the chain to
+     repair a progress display; progress is evidence-derived and grants no completion.
 
 ### Final report
+
+Before rendering, reconcile every factual claim against the actual current-tree evidence.
+Use the required tables and status markers even when zen-mode or another terse response
+style is active. Those style preferences cannot shorten or replace this report.
+
+- Copy test counts and their nouns from the final runner output. Tests, suites, assertions
+  and files are different units; never rename 17 tests as 17 suites. Do not infer a
+  per-file split from the total. When no split was measured, report only the observed total.
+- Describe only security properties the inspected code and named checks establish.
+  Rejecting malformed JSON does not establish denial-of-service or prototype-pollution
+  protection. Generic validation, reviewer approval and green tests do not establish
+  untested security guarantees. Mark unmeasured coverage explicitly.
+- A package archive is not an installed-consumer test. Claim consumer verification only
+  after installing that exact archive into a separate directory and importing the package
+  by name from that directory, with the actual command and result observed. Node's `-C`
+  selects export conditions; it does not change the working directory. Use the shell
+  tool's explicit directory argument or a separately observed `cd` command instead.
+- Preserve every required gate row, its verbatim evidence and marker. Decode table escaping
+  when comparing it with the source; never paraphrase a gate line to fit the table.
+- Report only observed open findings. Do not invent follow-up features, security claims or
+  new product advice while correcting a report. The optional converge line below is the
+  only prescribed offer. A closed generation stays closed: report corrections do not
+  restart self-review, spawn reviews, consume another ticket or mutate workflow state.
+
 
 Render a CHAIN-END SUMMARY as TABLES, not prose: every section below is a table
 plus at most one line of text, never a paragraph — the sole exception is

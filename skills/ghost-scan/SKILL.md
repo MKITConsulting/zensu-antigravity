@@ -28,12 +28,12 @@ For reanchor, set the shell tool's native working-directory property to the targ
 
 All state-changing helper calls use `{session-helper} --helper <name> -- <arguments>`.
 Read `{plugin_root}/docs/upstream-parity.md` when this skill names a host facility.
-Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles,
-with one call per role containing `TypeName`, `Role`, `Workspace: "inherit"`,
-`Model: "inherit"` and a complete `Prompt`. CLI 1.4.7 accepts this flat descriptor;
-only older hosts whose tool schema requires it use a `Subagents` array. Follow the calling review procedure's private
-lease and actual child-UUID completion checks; a role name or model-written result is not
-proof of execution. Keep implementation in the main conversation. No source-host Agent,
+Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles.
+On agy 1.4.3, use one flat call per role with `TypeName`, `Role`, `Workspace: "inherit"`,
+`Model: "inherit"` and a complete `Prompt`. Use a legacy `Subagents` array only when the
+exposed host schema permits it; never mix both forms or add unknown arguments. Follow the
+calling review procedure's private lease and actual child-UUID completion checks; a role
+name or model-written result is not proof of execution. Keep implementation in the main conversation. No source-host Agent,
 SendMessage, Workflow, desktop transfer or implicit plan-approval callback is assumed.
 Use a direct user question for required input and a persisted step table for progress.
 

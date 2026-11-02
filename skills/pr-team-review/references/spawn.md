@@ -6,11 +6,14 @@ When `REUSE_DURABLE_PAYLOAD=true`, skip Phases B, C, and the synthesis portion o
 The prior process may have crashed after the forge accepted the remote write; the retry must not re-synthesize or overwrite the operation-bound payload. Continue only with the fresh
 OPEN/head guard and Phase D reconcile call using the returned `REVIEW_PAYLOAD` path.
 
-Call the native `invoke_subagent` tool once per role with a flat descriptor. Include each
-accepted role exactly once as `{ "TypeName": "zensu-pr-review-worker", "Role": "<role-id>",
+Call the native `invoke_subagent` tool once per accepted role, covering every role exactly
+once. On agy 1.4.3, each call has flat arguments `{ "TypeName": "zensu-pr-review-worker", "Role": "<role-id>",
 "Workspace": "inherit", "Model": "inherit", "Prompt": "<complete role packet>" }`.
-Only older host schemas require a `Subagents` array. Expand every placeholder and include the exact output schema inside `Prompt`. Record each
-actual `conversation_id` returned in `subagent_info.subagents[]` next to its exact role.
+Use a legacy `Subagents` array only when the exposed host schema accepts it; never mix
+the two forms or add unknown arguments.
+Expand every placeholder and include the exact output schema inside `Prompt`. Record each
+actual `conversation_id` returned by the native tool next to its exact role; do not infer
+an unobserved result envelope or fabricate an ID.
 The native adapter proves the parent step, type, role, prompt and workspace before it binds
 the child to the private lease. Do not infer completion from the returned UUID alone.
 

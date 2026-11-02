@@ -24,21 +24,24 @@ The Stop backstop now keeps the unfinished chain visible.
 
 ## 2. Build the review packet
 
-Use the complete Phase 6 step 5b changed-file enumeration, including untracked files,
-unborn HEAD and commits made during this session. Read the current changed hunks and every
-new file. Anchor all Git commands to the validated absolute project root and use literal
-pathspecs. The review packet contains:
+Use the maintained cumulative change-set procedure:
+`node "{plugin_root}/hooks/lib/review-packet-v1.js" changes --root "{project_root}" --baseline "<original audit baseline>"`.
+Use the original receipt baseline when available; omit the operand only when no baseline
+exists. It includes untracked files, unborn HEAD and session commits. A Git failure blocks
+packet preparation; never replace it with an empty list. Read changed hunks and new files.
 
-- the title `REVIEW PACKET v1`, `policy: reviewer-readonly-v1`, `changed_files`,
-  `implementation_summary`, `requirements_baseline` (stable requirement IDs or `none`),
-  `diff_summary`;
-- the evidence runner's exact `test_evidence`, `build_evidence`, `coverage_evidence` lines;
-- `edit_landing_evidence` and the current `ACCEPTANCE STATUS` lines;
-- `execution: delegated`, naming the actual native reviewer generation.
+Write a bounded regular JSON input file with nonempty string fields
+`implementation_summary`, `requirements_baseline`, `diff_summary`, `test_evidence`,
+`build_evidence` and `coverage_evidence`. Cite the runner's exact evidence and current
+`ACCEPTANCE STATUS` lines; missing evidence reads `not run — <reason>`. Include scoped
+CHECKPOINTs and every audit disclosure. The native begin helper in
+[native reviewer execution](native-reviewers.md) generates the single canonical packet from
+this input, the full cumulative change set and the clean, fresh canonical audit receipt.
+Use its returned `packetBlock` unchanged in every aspect, custom, judge and consume prompt.
+Never rebuild it manually; native prompt validation enforces its exact bytes and hash for
+this generation, round and tree. Role concerns and incremental review scope are separate
+instructions outside the packet and cannot replace its full changed-file inventory.
 
-Missing evidence reads `not run — <reason>`, never a fabricated pass. Include scoped
-CHECKPOINT lines and the clean Edit Landing Audit close marker plus every `EDIT NOT LANDED`
-line. Freeze one packet for this round and reuse it byte-for-byte across its passes.
 Discover custom personas by piping the change list into
 `node "{plugin_root}/hooks/lib/persona-activation.js" "$TOP/.agents"`. Record every skip/drop
 verdict as `PERSONA SKIPPED — <name> (no activation match | malformed)` or
@@ -87,10 +90,10 @@ disabled, run the whole base panel, including on a re-review.
 
 When incremental rounds are enabled, use
 `node "{plugin_root}/hooks/lib/review-round-scope-v1.js" --log <run-log> --round <fix-round> --root "{project_root}"`.
-Only `status=ok` permits the panel packet's changed paths to become the union of its `file`
-lines and paths cited by every still-open finding. `status=empty` or `status=degraded`
-retains the full cumulative change set. Preserve a second, complete packet for the judge
-and deterministic finding validator; neither is narrowed to the panel's delta.
+Only `status=ok` permits additional panel focus instructions to name the union of its
+`file` lines and paths cited by still-open findings. `status=empty` or `status=degraded`
+retains full cumulative focus. Every child still receives the same complete canonical packet;
+the judge and deterministic finding validator always use its full inventory.
 
 Open the exact ticket/tree lease before dispatch as `native-reviewers.md` requires.
 Any subsequent reproduction-test edit invalidates those receipts and requires a fresh ticket
@@ -98,8 +101,8 @@ and a complete required-role re-review on the final tree, without resetting the 
 
 ## 4. Dispatch each perspective, then synthesize
 
-Use one native `invoke_subagent` batch with the configured registered aspect profile and
-complete original packets. Collect actual child UUIDs, wait for their normal completion,
+Use one flat native `invoke_subagent` call per role with the configured registered aspect
+profile and complete original packets. Collect actual child UUIDs, wait for their normal completion,
 and preserve their raw JSON exactly. Each child records a truthful nonempty summary and
 concrete findings or an empty list. No reviewer runs tests, builds, edits, state transitions,
 task mutations or nested agents. Custom concerns run as additional fixed-type children.
@@ -146,16 +149,18 @@ produced prose. Source import-only gap-worker branches therefore have no native 
 When `hooks.findingVerification` is off, skip all three stages. When it is on, grade every
 merged panel, custom and judge finding in this thread before any fix routing.
 
-**Stage 1 (deterministic, model-free).** Run
-`node "{plugin_root}/hooks/lib/finding-verify-v1.js" --root "{project_root}"` with a quoted
-heredoc containing `CHANGED-FILES`, the full cumulative change list, `FINDINGS`, then one
-line per merged finding in order. The stateless validator accepts this input directly;
-the session helper's stricter standalone command grammar applies only to bound helpers.
-Its verdicts are `anchor-ok`, `off-changeset`, `line-out-of-range`, `phantom-path`,
-`out-of-root` and `no-anchor`. Exit 0 means verdict data, not a pass. Its returned `total`
-must equal the count submitted. Missing Node, non-zero exit, an unparsable summary or a
-count mismatch records `FINDING VERIFICATION DEGRADED — <reason>`; continue Stage 2 by hand
-instead of wedging the chain or inventing a successful check.
+**Stage 1 (deterministic, model-free).** Write a bounded JSON file using native file-edit
+operations with the exact shape `{"changedFiles":["src/a.js"],"findings":["R1-F1 src/a.js:1 — evidence"]}`.
+Use the full cumulative paths and one string array item per merged finding, preserving
+newlines, `FINDINGS`, quotes, backticks and shell syntax as data. Run
+`node "{plugin_root}/hooks/lib/finding-verify-v1.js" --root "{project_root}" --input "<absolute-findings.json>"`.
+Never embed payload text in a shell heredoc or interpolate it into a command. Legacy marker
+stdin remains supported for existing callers. Its verdicts are `anchor-ok`, `off-changeset`,
+`line-out-of-range`, `phantom-path`, `out-of-root` and `no-anchor`. Exit 0 is verdict data,
+not a pass. Require its `total` to equal the number of submitted array items, including zero.
+An `invalid-input` or `truncated` line, missing Node, nonzero exit, malformed summary or
+count mismatch records `FINDING VERIFICATION DEGRADED — <reason>` and continues Stage 2
+by hand; never call malformed zero-count input a clean result.
 
 **Stage 2 (your own read).** Read every `anchor-ok` or `off-changeset` cited region with
 offset `max(1, line - 10)` and limit 25, and compare its actual contents with that finding's
@@ -292,6 +297,11 @@ synthetic metadata, handwritten workflow state, a reused ticket or early `--chai
 
 ## 7. Fix rounds and termination
 
+The consume review's quality verdict does not select the fix policy. Only the native helper
+applies effective `autoFixSeverity` to verified, non-exempt findings; PASS WITH SUGGESTIONS
+can still require an IMPORTANT fix. Never invent a competing routing directive or assume
+critical-only routing.
+
 When routed to fix findings, implement them in this thread under the mode frozen at begin.
 For every changed file log the current `R<N>-<step> IMPL completed — files:` claim, re-run the
 Edit Landing Audit and the round's own affected suites. Rebuild the packet and repeat this
@@ -307,7 +317,7 @@ Check `--acceptance-status --log <run-log>` on the current tree and invoke
 Use the exact ticket-bound `--code-review-done` command the native routing directive gives,
 then execute `/zensu-self-review`. That skill owns `--chain-done` and its one bounded final
 fix round. If self-review is disabled, use the directive's ticket-bound terminus only after
-current suite and acceptance receipts pass. Do not bundle completion, review submission and
+a clean fresh audit receipt and current suite and acceptance receipts pass. Do not bundle completion, review submission and
 chain termination into one shell call. The zero-change exception applies only when the
 runtime confirms no changed files; never commit, stash or revert to manufacture that state.
 

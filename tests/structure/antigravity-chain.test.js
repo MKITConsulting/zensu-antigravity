@@ -15,11 +15,6 @@ try {
     fs.copyFileSync(path.join(root, 'hooks', 'antigravity', name), path.join(adapter, name));
   }
   fs.copyFileSync(path.join(root, 'hooks', 'hooks.json'), path.join(hooks, 'hooks.json'));
-  fs.writeFileSync(path.join(adapter, 'normalize-payload.js'), `
-    const fs=require('fs'),j=JSON.parse(fs.readFileSync(0,'utf8')),a=j.toolCall.args;
-    process.stdout.write(j.workspacePaths[0]+'\\n'+JSON.stringify({session_id:j.conversationId,
-      tool_name:j.toolCall.name,tool_input:{command:a.CommandLine,file_path:a.TargetFile,content:a.CodeContent}})+'\\n');
-  `);
   // Session bootstrap/guard behavior has separate contract tests. Here they
   // deliberately add no state, so each chain test controls only gate decisions.
   fs.writeFileSync(path.join(adapter, 'session-bootstrap.js'), `process.stdout.write(process.argv.includes('--data-root') ? ${JSON.stringify(path.join(temp, 'data'))} : JSON.stringify({zensuBootstrap:{created:process.env.ZENSU_TEST_CREATED==='1'}}));`);
@@ -34,8 +29,12 @@ try {
   const trace = path.join(temp, 'trace'), decisions = path.join(temp, 'decisions');
   function run(tool = 'write_to_file', entry = 'pre-tool-chain.sh', event = 'PreToolUse', created = false, command = 'echo probe') {
     fs.writeFileSync(trace, ''); fs.writeFileSync(decisions, '');
-    const payload = { conversationId: 'ba91d910-530e-4a9e-bd12-309a50446a50', workspacePaths: [temp],
-      toolCall: { name: tool === 'run_command' ? 'Bash' : 'Write', args: tool === 'run_command' ? { CommandLine: command, Cwd: temp } : { TargetFile: path.join(temp, 'probe.txt'), CodeContent: 'probe' } } };
+    // Principal binding is covered separately. Use the compatibility identity
+    // here while exercising the real native tool/argument normalization.
+    const payload = { session_id: 'ba91d910-530e-4a9e-bd12-309a50446a50', workspacePaths: [temp],
+      toolCall: { name: tool, args: tool === 'run_command' ? { CommandLine: command, Cwd: temp }
+        : tool === 'write_file' ? { Path: path.join(temp, 'probe.txt'), Content: 'probe' }
+          : { TargetFile: path.join(temp, 'probe.txt'), CodeContent: 'probe' } } };
     const result = spawnSync('bash', [shim, entry, event], { input: JSON.stringify(payload), encoding: 'utf8',
       env: { ...process.env, ZENSU_SHIM_TRACE: trace, ZENSU_SHIM_DECISIONS: decisions, ZENSU_TEST_CREATED: created ? '1' : '0' } });
     assert.equal(result.status, 0, result.stderr);
@@ -49,6 +48,12 @@ try {
   assert.ok(result.decisions.some(row => row.script === 'pre-write-secret-scan.sh' && row.decision === 'deny' && row.contentDigest.length === 64));
   assert.ok(!fs.readFileSync(decisions, 'utf8').includes('secret blocked'));
   assert.ok(!fs.readFileSync(decisions, 'utf8').includes('CodeContent'));
+  result = run('write_file');
+  assert.equal(result.verdict.decision, 'deny'); assert.equal(result.verdict.reason, 'secret blocked');
+  assert.match(result.trace, /pre-edit-tdd-reminder.sh ran/);
+  assert.match(result.trace, /pre-write-secret-scan.sh ran/);
+  assert.ok(result.decisions.some(row => row.script === 'pre-write-secret-scan.sh'
+    && row.decision === 'deny' && row.tool === 'Write'));
   clear(); stub('pre-reviewer-capability-gate.sh', deny('first blocked'));
   result = run(); assert.equal(result.verdict.reason, 'first blocked');
   assert.doesNotMatch(result.trace, /pre-write-secret-scan.sh ran/);
