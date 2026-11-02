@@ -1,6 +1,6 @@
 # Zensu for Antigravity
 
-![version](https://img.shields.io/badge/version-0.5.0-blue)
+![version](https://img.shields.io/badge/version-0.6.0-blue)
 ![host](https://img.shields.io/badge/host-Google%20Antigravity-blue)
 ![license](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue)
 
