@@ -15,6 +15,9 @@ test('native account reporting derives its scope from the immutable binding', ()
   const resolver = () => ({ projectRoot: '/bound/worktree' });
   const value = capture.options({ session_id: id, cwd: '/untrusted/payload-path' }, ['--task', 'goal', '--title', 'Agreed goal', '--criteria', 'v1'], {}, resolver);
   assert.equal(value.workspace, '/bound/worktree'); assert.match(value.session, /^awcv1_[a-f0-9]{64}$/);
+  assert.equal(value['cross-product-reason'], undefined);
+  assert.equal(capture.options({ session_id: id }, ['--cross-product-reason', 'Explicit shared goal'], {}, resolver)['cross-product-reason'], 'Explicit shared goal');
+  assert.match(capture.primer({ session_id: id }, root), /explicit human confirmation/);
   assert.throws(() => capture.options({ session_id: id }, ['--workspace', '/other'], {}, resolver), /Invalid/);
   assert.notEqual(value.session, capture.options({ session_id: 'c4a00f40-89bd-4bb8-b555-3603f5abb49f' }, [], {}, resolver).session);
 });
@@ -42,4 +45,22 @@ test('native Stop errors are nonblocking and never expose payload or server deta
   assert.equal(result.status, 0); assert.match(result.stderr, /capture incomplete/); assert.doesNotMatch(result.stderr, /private-invalid/);
   const child = cp.spawnSync(process.execPath, [path.join(root, 'hooks/antigravity/ai-work.js'), 'checkpoint-hook'], { input: JSON.stringify({ session_id: id, agent_id: 'child' }), encoding: 'utf8' });
   assert.equal(child.status, 0); assert.equal(child.stdout + child.stderr, '');
+});
+test('helper receipts preserve their lifetime when the issuance clock advances', t => {
+  const data = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'agy-capture-clock-')));
+  t.after(() => fs.rmSync(data, { recursive: true, force: true }));
+  let now = 1000;
+  t.mock.method(Date, 'now', () => now++);
+  const request = { sessionId: id, helper: 'ai-work', args: ['checkpoint'] };
+  const file = helpers.authorize(request, { pluginData: data });
+  const receipt = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(receipt.created_at_ms, 1000);
+  assert.equal(receipt.expires_at_ms, 601000);
+  helpers.consumeAuthorization(request, { pluginData: data, now: 1002 });
+  assert.throws(() => helpers.consumeAuthorization(request, { pluginData: data, now: 1002 }), /No current PreToolUse authorization/);
+  const explicit = helpers.authorize(request, { pluginData: data, now: 0 });
+  const explicitReceipt = JSON.parse(fs.readFileSync(explicit, 'utf8'));
+  assert.equal(explicitReceipt.created_at_ms, 0);
+  assert.equal(explicitReceipt.expires_at_ms, 600000);
+  assert.throws(() => helpers.consumeAuthorization(request, { pluginData: data, now: 600001 }), /No current PreToolUse authorization/);
 });
