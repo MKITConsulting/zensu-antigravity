@@ -3,8 +3,10 @@
 This change preserves native Antigravity execution while repairing audit scope,
 review closure, session identity and workflow reporting. It also adds an
 interactive native acceptance runner with individual one-time approvals and
-workspace-specific temporary trust. Native acceptance remains partial: worker
-preparation has not yet produced a successful protected receipt.
+workspace-specific temporary trust. The previously open native Stop and worker
+preparation checks now have successful, separately dated follow-up evidence. The
+original full sweep remains recorded as 43 verified and two unverified; this is
+not a new complete 45-scenario run or a claim of human acceptance.
 
 ## Implementation
 
@@ -60,6 +62,7 @@ or `rg` normalization was ported. Shared importer/template files remain intact.
 | Full native suite, October 23 | 43 verified, two unverified; exit 1 | Original controlled Stop and worker preparation gaps; not 45/45. |
 | Controlled Stop follow-up, October 23 | PASS | Actual native block, same UUID and completed individually approved helper call. No workflow-complete claim. |
 | Worker follow-up, October 24 Europe/Berlin | UNVERIFIED; exit 1 | Fresh quota 429 after about 17.5 seconds, zero completed model responses, zero tool calls and no preparation receipt. Original timeout 180 seconds. |
+| Worker follow-up, November 2 Europe/Berlin | PASS; acceptance exit 0 | AGY 1.4.8; exactly one completed `READY` response, zero tool calls and a real protected receipt bound to the native session, workspace and unchanged frozen runtime. Independent evidence 23/23; preservation 18/18. |
 | Assisted invoice workflow | Completed native eight-child review chain, current-tree closure and report checks | Five explicit interventions, including missing self-review reads and two report corrections. Not unattended compliance or live finding-reproduction coverage. |
 | Independent invoice npm package | 14/14 original assertions and direct installed CLI pass | Real consumer cwd; separate from plugin/native acceptance. |
 | README and audit UX | Three executed examples; 25/25 audit checks | Bounded cases; no native Git-fault injection or general security certification. |
@@ -94,17 +97,47 @@ previously tested frozen payload. Only the ZIP container hash differs:
 This is a fresh package comparison, not another native acceptance run or a full
 local-gate rerun. The original dirty checkout and its index remain unchanged.
 
-## Remaining native acceptance
+## Successful native worker follow-up — November 2
 
-The production `harness/launcher.js --prepare` must complete exactly one tool-free
-`READY` response and create its protected preparation receipt bound to the real
-session, workspace and frozen runtime. The latest observed quota estimate is
-historical, not a claim that the path is currently ready. No model substitution,
-synthetic receipt, timeout increase or gate relaxation replaces this proof.
+The unchanged production `harness/launcher.js --prepare` completed the original
+`live-native-worker-prepare` scenario on **AGY 1.4.8**, from **08:46:57 to
+08:47:20 UTC** (09:46:57–09:47:20 Europe/Berlin). The actual public transcript
+contains exactly one completed `READY` response and **zero tool calls**. Its own
+new CLI log names the exact disposable workspace and real native conversation.
+A protected `0600` preparation receipt was created during the run and validates
+against the immutable native identity, workspace, plugin root and runtime.
 
-The diagnostic scenario assertion accepts an inconclusive marker, but the
-unchanged opted-in unverified scanner correctly makes the run fail. Keep this
-PR in draft while that native proof is missing.
+The original diagnostic assertion and opted-in unverified scanner both pass,
+giving **acceptance exit 0**. Independent verification passes **23/23** checks;
+preservation passes **18/18**. The catalog timeout remains 180 seconds, with the
+original 120-second print limit, 150-second launcher limit and 210-second outer
+provider limit. No model override, synthetic receipt, gate change or forced
+cleanup was used. This resolves the previously observed worker quota blocker;
+the October 24 failure remains historical evidence above.
+
+The native build came from PR head
+`b625a309beac25950a67f9c07568fbd90741f50e`. All **325** ZIP files independently
+match its source or exact portable hook-template render; its runtime digest
+matches the earlier tested payload. The native archive SHA-256 is
+`8d9ce22a8d0edc46b125a36ea583eaa7dfcc38bda67576e462529907ebd32a92`.
+This evidence update changes only files under `validation/`, outside the
+shipped runtime.
+
+Exactly one temporary workspace trust entry was removed after all owned
+processes exited. Settings were restored byte-for-byte; no tool approval was
+needed because no tool call occurred. Shared plugins and configuration, the
+central handoff, and the original dirty checkout and index remained unchanged.
+
+The supplementary independent checker initially omitted the schema's hash
+domain prefix. It was corrected to the existing domain-separated session hash
+and replayed against the same native evidence. The initial checker failure is
+retained locally; no repository assertion, scanner, launcher or gate changed.
+
+The previously missing preparation proof is now present. This targeted recheck
+does not claim a new full suite on AGY 1.4.8, rerun the earlier assisted invoice
+workflow or npm package checks, or establish human acceptance. The original
+matrix and each follow-up retain their separate dates and limits. PR CI is
+checked independently for the final documentation commit before merge.
 
 To reproduce the deterministic gate, run `ZENSU_TEST_JOBS=2 bash tests/run-all.sh`
 from a clean checkout after `npm ci`. The supported default remains unchanged.

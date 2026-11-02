@@ -1,11 +1,11 @@
 {
   "schema": "zensu-workflow-repair-pr-evidence-v1",
-  "status": "native-acceptance-partial",
+  "status": "recorded-native-gaps-closed-by-followups",
   "originalSourceHead": "94044ffa2ef3dffc7075096b52a9ec6dbd5583a8",
   "runtimeDigest": "sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531",
   "nativePayloadFiles": 325,
   "nativeArchiveSha256": "ac382c60feb7ef1226935b0b7d29f0bec98705199d032dc1fa8e36ef794fdc74",
-  "scope": "Recorded pre-PR local and native observations; not a new complete native run or GitHub CI result",
+  "scope": "Dated local and native observations plus successful November 2 worker follow-up; not a new complete native run, GitHub CI result or human acceptance",
   "deterministic": {
     "dateUtc": "2026-10-23",
     "finalStatus": "PASS",
@@ -55,22 +55,161 @@
     "limits": "Controlled Stop block and same-session completed tool continuation; not workflow closure or a fresh 45-scenario run."
   },
   "workerFollowup": {
-    "localDate": "2026-10-24",
+    "localDate": "2026-11-02",
     "timezone": "Europe/Berlin",
-    "startedAt": "2026-10-23T22:07:49.796223+00:00",
-    "finishedAt": "2026-10-23T22:08:07.301741+00:00",
-    "host": "AGY 1.4.6",
-    "status": "UNVERIFIED",
-    "acceptanceExitCode": 1,
+    "startedAt": "2026-11-02T08:46:57.142126+00:00",
+    "finishedAt": "2026-11-02T08:47:20.442184+00:00",
+    "host": "AGY 1.4.8",
+    "status": "PASS",
+    "scenario": "live-native-worker-prepare",
+    "sourceHead": "b625a309beac25950a67f9c07568fbd90741f50e",
+    "acceptanceExitCode": 0,
     "catalogTimeoutSeconds": 180,
-    "elapsedSecondsApprox": 17.5,
-    "blocker": "RESOURCE_EXHAUSTED (code 429): Individual quota reached",
-    "reportedResetEstimate": "46h34m44s at the observed run; not current readiness",
-    "completedModelResponses": 0,
+    "printTimeoutSeconds": 120,
+    "launcherTimeoutSeconds": 150,
+    "providerTimeoutSeconds": 210,
+    "marker": "NATIVE-WORKER-PREPARED BOUND-TOOL-FREE",
+    "completedModelResponses": 1,
+    "response": "READY",
     "toolCalls": 0,
-    "preparationReceiptExists": false,
+    "sessionIdHash": "sha256:35ed0eecf07083b68f6d90d3c8a79e26be4158e6367d64717d9a691f2a407f71",
+    "preparationReceiptExists": true,
+    "receiptMode": "0600",
+    "receiptCreatedDuringRun": true,
+    "nativeIdentityWorkspaceRuntimeBindingVerified": true,
+    "runtimeDigest": "sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531",
+    "independentEvidence": {
+      "passed": 23,
+      "total": 23,
+      "checks": [
+        {
+          "name": "original diagnostic assertion passes",
+          "pass": true
+        },
+        {
+          "name": "original opted-in scanner reports no unverified result",
+          "pass": true
+        },
+        {
+          "name": "explicit native success marker",
+          "pass": true
+        },
+        {
+          "name": "provider completed normally with no forced cleanup",
+          "pass": true
+        },
+        {
+          "name": "catalog timeout unchanged",
+          "pass": true
+        },
+        {
+          "name": "actual UUID and expected workspace",
+          "pass": true
+        },
+        {
+          "name": "one newly written workspace-correlated log with actual UUID",
+          "pass": true
+        },
+        {
+          "name": "own log hash and both identifiers match",
+          "pass": true
+        },
+        {
+          "name": "no hook parse rejection in own log",
+          "pass": true
+        },
+        {
+          "name": "no quota exhaustion in own log",
+          "pass": true
+        },
+        {
+          "name": "one exact explicit preparation request",
+          "pass": true
+        },
+        {
+          "name": "exactly one completed public READY response",
+          "pass": true
+        },
+        {
+          "name": "zero native tool calls",
+          "pass": true
+        },
+        {
+          "name": "original transcript proof accepts actual native rows",
+          "pass": true
+        },
+        {
+          "name": "protected real preparation receipt",
+          "pass": true
+        },
+        {
+          "name": "receipt created inside this live run",
+          "pass": true
+        },
+        {
+          "name": "immutable native identity binding",
+          "pass": true
+        },
+        {
+          "name": "immutable exact workspace and plugin binding",
+          "pass": true
+        },
+        {
+          "name": "immutable runtime matches fresh package and measured payload",
+          "pass": true
+        },
+        {
+          "name": "unchanged production prepared predicate accepts",
+          "pass": true
+        },
+        {
+          "name": "native settings unchanged during the run",
+          "pass": true
+        },
+        {
+          "name": "all owned processes exited",
+          "pass": true
+        },
+        {
+          "name": "temporary trust removed and original settings restored byte-for-byte",
+          "pass": true
+        }
+      ]
+    },
+    "preservation": {
+      "passed": 18,
+      "total": 18,
+      "originalSourceFiles": 619,
+      "sharedPluginsUnchanged": true
+    },
+    "nativePackage": {
+      "fileCount": 325,
+      "sourceByteMatches": true,
+      "hooksRenderMatches": true,
+      "archiveSha256": "8d9ce22a8d0edc46b125a36ea583eaa7dfcc38bda67576e462529907ebd32a92"
+    },
+    "modelOverride": false,
+    "forcedCleanup": false,
+    "toolApprovalRequests": 0,
     "temporaryTrustEntriesRemoved": 1,
-    "settingsRestoredByteForByte": true
+    "settingsRestoredByteForByte": true,
+    "recordHashes": {
+      "ownCliLog": "06ce85403adcf48b59009fcf57f25a6862136d00c857c796e268acef54834473",
+      "nativeTranscript": "100674c8a3ab542f057f9e3fe2b1c1da5d43c3222037855cc9d654191d150e47",
+      "protectedPreparationReceipt": "7bfe2e9795616b8cb64e632f31c8565cd8a336219fca14e527fffbccd86a5165",
+      "result.json": "4d9c64832b49c6e220adb570ad8067abd04f710b1bd55b3949116b6c1b897dae",
+      "independent-evidence.json": "a49c0d852735d0a428636c7606a3b65b2357a52318a9ae6118410876fdd36f5c",
+      "assertion-replay.json": "e7f754d2333267245ff091080286461f6c7e90228b8ef12e58c59136b39b2ac6",
+      "preservation.json": "634f396b3545a3cc26d7aa8cdcdd27a40d7519d2d6990fafb757bd32cd37fd7d",
+      "package-verification.json": "8ba9befdaa91f058561ba8a1d272bdc82184647b1ca08fb3b568dda04f63e3cf",
+      "verify-native.js": "f6a989b079d4a7d6b18c791c4257e9d6233c1292a15643a0162a75e4399e50a5",
+      "run-native.py": "e16237904f3a995536d6e7902fa8a4e1dc10231d508680af42d5468b471c19b7",
+      "scenario.json": "135c0d5cd52f2b32870abd62d24e146a977f044abd653d208147d10c07afbd9c",
+      "trust-add-applied.json": "46f4a3c5324685b331f409ea287bd0d9bb7fd49ce3e78d579b280aa9157415bf",
+      "trust-remove-applied.json": "91d9f304828eb22fccba8e8114cc85fb60d823cecd5d663a499ae5b6c97f1f6b"
+    },
+    "verificationCorrection": "The first supplementary independent hash check omitted the session schema domain prefix. It was corrected to the pinned schema: SHA256(zensu.session-control/v1/session-id + NUL + native UUID). The initial failed check is retained. No repository code, assertion, scanner, launcher, timeout or gate changed, and the native model call was not repeated.",
+    "limits": "One successful production-launcher preparation with original gates; not a new full 45-scenario run or invoice/npm rerun. No private transcript or absolute machine path is published."
   },
   "invoice": {
     "date": "2026-10-23",
@@ -108,7 +247,8 @@
     "native-repairs-invoice-20261023.json": "83840a0cc1cb33b6e4492ba68e806ac725a9e298955b9bb2775de6aef5579f37",
     "native-20261023-package.json": "a8585b60ca0cec617809606a3396e463450c9c5e1888203ba7786f03a76002e9",
     "native-repairs-audit-20261023.json": "437a2faf5a756e1df3283e48eba0df14d144ea8d1eec8fd70b8a786bb63d9284",
-    "native-20261023-readme.json": "9d2922644fdfb8e372b8d7c1b866039e1d462dadcfce70d5e7140f64752c5dd7"
+    "native-20261023-readme.json": "9d2922644fdfb8e372b8d7c1b866039e1d462dadcfce70d5e7140f64752c5dd7",
+    "worker-recheck-native-20261102.json": "a183898441b4078c54aeb3122ce2a570a6e049326eb9521d015d384cc3c23d17"
   },
   "freshPrChecks": {
     "startedAt": "2026-10-24T17:21:04.190109+00:00",
@@ -138,5 +278,25 @@
       "resolution": "Regenerated the local ignored hooks.json through tests/prepare-runtime.js and reran unchanged tests; no source or gate edits."
     },
     "recordSha256": "e3f96c17dbeb2bff48b2875b439680603c20b0dc301d0a07f043efcf82bd0edb"
-  }
+  },
+  "workerFollowupHistory": [
+    {
+      "localDate": "2026-10-24",
+      "timezone": "Europe/Berlin",
+      "startedAt": "2026-10-23T22:07:49.796223+00:00",
+      "finishedAt": "2026-10-23T22:08:07.301741+00:00",
+      "host": "AGY 1.4.6",
+      "status": "UNVERIFIED",
+      "acceptanceExitCode": 1,
+      "catalogTimeoutSeconds": 180,
+      "elapsedSecondsApprox": 17.5,
+      "blocker": "RESOURCE_EXHAUSTED (code 429): Individual quota reached",
+      "reportedResetEstimate": "46h34m44s at the observed run; not current readiness",
+      "completedModelResponses": 0,
+      "toolCalls": 0,
+      "preparationReceiptExists": false,
+      "temporaryTrustEntriesRemoved": 1,
+      "settingsRestoredByteForByte": true
+    }
+  ]
 }
