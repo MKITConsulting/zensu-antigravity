@@ -216,6 +216,45 @@ source. This is fresh worker-preparation proof, not a rerun of the earlier full
 native matrix or invoice/npm acceptance. Previous v0.2.0 and v0.5.0 successes
 remain separately recorded. Merge is conditional on green CI for the final head.
 
+## Subsequent feature-scope integration and fresh worker proof — November 2
+
+The earlier final-head CI on `6d14578464e2426eb3cdb3e5abab73e01945b0af`
+passed **83/83 suites**, but `main` subsequently advanced to
+`6a1626664340ca38ebd420bbe6bfc67aaee256ea` with explicit feature scope for captured
+goals. Two registry conflicts were resolved by retaining the complete inventory,
+updating the capture registrations to **16** and **6**, and regenerating the suite
+overview through its canonical renderer. All executable incoming changes merge
+without conflict. No assertion or timeout was removed or weakened. The two
+capture suites, registry driver and version invariant pass unchanged.
+
+A fresh frozen package was tested on **AGY 1.4.12**, from
+`2026-11-02T22:06:35.031035+00:00` to `2026-11-02T22:06:52.706167+00:00`. The unchanged production worker
+launcher produced exactly one completed `READY` response, zero tool calls and a
+real protected receipt bound to the native session, workspace, plugin and runtime.
+Original assertion/scanner: **acceptance exit 0**; independent verification
+**23/23**. All **337** package files match source or the exact portable hook render.
+Runtime digest:
+
+`sha256:53e437d6b716d5db6aaa0a0813f492ee8b0d106b3b99c526095246221ffcba85`
+
+Archive SHA-256:
+
+`ed861f9a50cf3faf32a3521a6e4210a1c39a7cddd9bdba34917cd47dfb6f4c21`
+
+The single temporary trust entry was removed. Settings changed between the broad
+preflight observation and the later pre-run backup, before this test's trust
+write. The runner preserved that newer baseline byte-for-byte. All eight scoped
+preservation checks pass; the earlier broad settings mismatch remains recorded.
+Shared plugins, the central handoff and the original 623-file working tree/index
+were unchanged. Only validation documentation is updated after freezing.
+
+The earlier temporary raw-evidence directories were no longer present after an
+interrupted turn. Their bounded verification results and hashes remain committed;
+raw hashes alone do not provide independently accessible evidence. This new
+follow-up has new native records and its own independently verified package.
+Previous native matrix and invoice/npm results retain their original scope and
+dates. The integrated head must pass the complete CI before merge.
+
 To reproduce the deterministic gate, run `ZENSU_TEST_JOBS=2 bash tests/run-all.sh`
 from a clean checkout after `npm ci`. The supported default remains unchanged.
 For native testing, follow [the interactive runner instructions](../../evals/promptfoo/live/INTERACTIVE.md),
