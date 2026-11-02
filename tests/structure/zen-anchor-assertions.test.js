@@ -1261,7 +1261,7 @@ test("the case table exercises every grader in both directions", () => {
     { label: "anchor-failed-step", cases: FAILED_CASES, exempt: 0, floor: 8 },
     { label: "safety-carve-out", cases: SAFETY_CASES, exempt: 0, floor: 9 },
     { label: "session-block", cases: SESSION_CASES, exempt: 0, floor: 14 },
-    { label: "session-block-first-turn", cases: FIRST_TURN_CASES, exempt: 0, floor: 9 },
+    { label: "session-block-first-turn", cases: FIRST_TURN_CASES, exempt: 0, floor: 16 },
   ];
   for (const t of tables) {
     assert.ok(
