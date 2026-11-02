@@ -16,6 +16,9 @@ test('native account reporting derives its scope from the immutable binding', ()
   const value = capture.options({ session_id: id, cwd: '/untrusted/payload-path' }, ['--task', 'goal', '--title', 'Agreed goal', '--criteria', 'v1'], {}, resolver);
   assert.equal(value.workspace, '/bound/worktree'); assert.match(value.session, /^awcv1_[a-f0-9]{64}$/);
   assert.equal(value['cross-product-reason'], undefined);
+  const goal = capture.options({ session_id: id }, ['--feature', id, '--feature-revision', id], {}, resolver);
+  assert.equal(goal.feature, id); assert.equal(goal['feature-revision'], id);
+  assert.equal(capture.options({ session_id: id }, ['--maintenance-reason', 'Upgrade tooling'], {}, resolver)['maintenance-reason'], 'Upgrade tooling');
   assert.equal(capture.options({ session_id: id }, ['--cross-product-reason', 'Explicit shared goal'], {}, resolver)['cross-product-reason'], 'Explicit shared goal');
   assert.match(capture.primer({ session_id: id }, root), /explicit human confirmation/);
   assert.throws(() => capture.options({ session_id: id }, ['--workspace', '/other'], {}, resolver), /Invalid/);
@@ -45,6 +48,26 @@ test('native Stop errors are nonblocking and never expose payload or server deta
   assert.equal(result.status, 0); assert.match(result.stderr, /capture incomplete/); assert.doesNotMatch(result.stderr, /private-invalid/);
   const child = cp.spawnSync(process.execPath, [path.join(root, 'hooks/antigravity/ai-work.js'), 'checkpoint-hook'], { input: JSON.stringify({ session_id: id, agent_id: 'child' }), encoding: 'utf8' });
   assert.equal(child.status, 0); assert.equal(child.stdout + child.stderr, '');
+});
+test('native entry points preserve goal flags and render checkpoint outcomes', () => {
+  const target = path.join(root, 'hooks/antigravity/ai-work.js');
+  const script = `const Module=require('node:module'),original=Module._load;
+    Module._load=function(name,parent,isMain){
+      if(name==='../lib/runtime-hook-session-v1.js') return {resolveHookSession:()=>({projectRoot:'/fixture'})};
+      if(name==='../lib/ai-work-capture-v1.js') return {run:(action,options)=>({status:process.env.TEST_CAPTURE_STATUS,action,feature:options.feature,revision:options['feature-revision'],maintenance:options['maintenance-reason']})};
+      return original.call(this,name,parent,isMain);
+    };
+    const target=process.argv[1]; process.argv=[process.execPath,target,...process.argv.slice(2)]; Module._load(target,null,true);`;
+  const call = (args, status = 'recording') => cp.spawnSync(process.execPath, ['-e', script, target, ...args], { input: JSON.stringify({ session_id: id }), encoding: 'utf8', env: { ...process.env, ZENSU_HOST_SESSION_ID: id, TEST_CAPTURE_STATUS: status } });
+  const begin = call(['begin', '--task', 'goal', '--title', 'Objective', '--criteria', 'v1', '--feature', id, '--feature-revision', id]);
+  assert.equal(begin.status, 0); assert.deepEqual(JSON.parse(begin.stdout), { status: 'recording', action: 'begin', feature: id, revision: id });
+  const maintenance = call(['begin', '--maintenance-reason', 'Build tooling']);
+  assert.equal(maintenance.status, 0); assert.equal(JSON.parse(maintenance.stdout).maintenance, 'Build tooling');
+  assert.equal(call(['checkpoint', '--feature', id]).status, 1);
+  const skipped = call(['checkpoint-hook'], 'not_started');
+  assert.equal(skipped.status, 0); assert.equal(skipped.stdout, '');
+  const paused = call(['checkpoint-hook'], 'skipped_missing_feature');
+  assert.equal(paused.status, 0); assert.match(paused.stdout, /skipped_missing_feature/); assert.match(paused.stdout, /not acceptance/);
 });
 test('helper receipts preserve their lifetime when the issuance clock advances', t => {
   const data = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'agy-capture-clock-')));
