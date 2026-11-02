@@ -213,28 +213,6 @@ function verifyParentLaunch(receipt, childId, childTranscript, options = {}) {
   if (!same(descriptors(planner.tool_calls[index].args), receipt.entries)) fail('native dispatch arguments differ from the accepted invocation');
   return { resultStep: result.step_index, children };
 }
-function resolveLaunchStep(source, parent, sidecar) {
-  // AGY 1.4.5 can stamp all sidecars in one parallel batch with its last
-  // result step. Treat that step only as a batch anchor. Authority still comes
-  // from one exact accepted call and its actual child result, never the hint.
-  const transcript = path.join(source.brain, parent.parentSessionId, '.system_generated', 'logs', path.basename(source.transcript));
-  const rows = transcriptRows(transcript);
-  const { planner } = launchBatch(rows, sidecar.spawnStepIndex);
-  const anchor = rows.find(row => row.step_index === sidecar.spawnStepIndex);
-  if (!anchor || anchor.type !== 'GENERIC' || anchor.source !== 'MODEL' || anchor.status !== 'DONE') fail('native sidecar batch anchor is incomplete');
-  spawnedChildren(anchor.content);
-  const candidates = [];
-  for (let index = 0; index < planner.tool_calls.length; index += 1) {
-    if (planner.tool_calls[index]?.name !== 'invoke_subagent') continue;
-    const step = planner.step_index + index + 1;
-    const result = rows.find(row => row.step_index === step);
-    if (!result || result.type !== 'GENERIC' || result.source !== 'MODEL' || result.status !== 'DONE') continue;
-    const children = spawnedChildren(result.content);
-    for (const child of children) if (child.conversationId === source.sessionId) candidates.push(step);
-  }
-  if (candidates.length !== 1) fail('native child has no unique result in its sidecar batch');
-  return candidates[0];
-}
 function validateReceipt(receipt, source, workspace, options) {
   const now = options.now === undefined ? Date.now() : options.now;
   if (!receipt || receipt.schema !== SCHEMA || receipt.brain !== source.brain || receipt.workspaceRoot !== workspace
@@ -246,6 +224,45 @@ function validateReceipt(receipt, source, workspace, options) {
       || binding.context.runtime_digest !== receipt.runtimeDigest || binding.sessionKey !== receipt.sessionKey) fail('launch context is no longer valid');
   return binding;
 }
+function childLaunchStep(source, parent, sidecar) {
+  const file = path.join(source.brain, parent.parentSessionId, '.system_generated', 'logs', path.basename(source.transcript));
+  const rows = transcriptRows(file);
+  if (!rows.every((row, index) => !index || row.step_index > rows[index - 1].step_index)) fail('parent transcript steps are not ordered');
+  const anchor = rows.find(row => row.step_index === sidecar.spawnStepIndex);
+  if (anchor) {
+    if (anchor.type !== 'GENERIC' || anchor.source !== 'MODEL' || anchor.status !== 'DONE') fail('native sidecar batch anchor is incomplete');
+    spawnedChildren(anchor.content);
+  }
+  const matches = rows.filter(row => {
+    if (row.type !== 'GENERIC' || row.source !== 'MODEL' || row.status !== 'DONE') return false;
+    try { return spawnedChildren(row.content).some(child => child.conversationId === source.sessionId); }
+    catch { return false; }
+  });
+  if (matches.length !== 1) fail('the child has no unique completed parent result');
+  const result = matches[0];
+  if (sidecar.spawnStepIndex !== result.step_index) {
+    // CLI 1.4.7 assigns every sidecar in a multi-call planner response the final
+    // tool-step index. Accept only that observed shape, with the child's exact
+    // UUID in its own completed result and its descriptor at the matching offset.
+    const planner = [...rows].reverse().find(row => row.step_index < result.step_index
+      && row.type === 'PLANNER_RESPONSE' && row.source === 'MODEL' && row.status === 'DONE');
+    const calls = planner?.tool_calls;
+    if (!Array.isArray(calls) || calls.length < 2 || calls.length > 16
+        || sidecar.spawnStepIndex !== planner.step_index + calls.length
+        || calls.some(call => call.name !== 'invoke_subagent' || !call.args || Object.hasOwn(call.args, 'Subagents'))) {
+      fail('native sidecar dispatch step differs from the completed result');
+    }
+    const entries = calls.map(call => descriptors(call.args)[0]);
+    const index = result.step_index - planner.step_index - 1;
+    const entry = entries[index];
+    if (!entry || entry.typeName !== sidecar.subagentDescriptor.typeName
+        || entry.role !== sidecar.subagentDescriptor.role || entry.prompt !== parent.prompt
+        || new Set(entries.map(item => item.role)).size !== entries.length
+        || rows.some(row => row.step_index > planner.step_index && row.step_index <= sidecar.spawnStepIndex
+          && row.type === 'PLANNER_RESPONSE')) fail('native multi-call sidecar does not match its exact role and result');
+  }
+  return result.step_index;
+}
 function verifyChild(payload, options = {}) {
   const source = location(payload), workspace = safeRoot(payload.workspace_root);
   const rows = transcriptRows(source.transcript), parent = initialParentMessage(rows);
@@ -256,7 +273,7 @@ function verifyChild(payload, options = {}) {
   if (sidecar.conversationId !== source.sessionId || !Number.isSafeInteger(sidecar.spawnStepIndex)
       || sidecar.spawnStepIndex < 0 || !sidecar.subagentDescriptor || !validType(sidecar.subagentDescriptor.typeName)
       || !same(sidecar.workspaceUris, [pathToFileURL(workspace).href])) fail('native child descriptor does not match');
-  const spawnStepIndex = resolveLaunchStep(source, parent, sidecar);
+  const spawnStepIndex = childLaunchStep(source, parent, sidecar);
   const dirs = recordDirs(options), file = launchFile(dirs, parent.parentSessionId, spawnStepIndex);
   return core.withFileLock(dirs.locks, `launch-${hash(`${parent.parentSessionId}:${spawnStepIndex}`)}`, () => {
     const receipt = paths.readPrivateJson(file);

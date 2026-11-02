@@ -38,6 +38,7 @@ const SOURCE_WRITE_CONTENT = 'changed probe content\n';
 // `finally { rmSync(ws) }` around the probe body is dead code and leaks one temp
 // workspace per scenario.
 let WORKSPACE = '';
+let CANDIDATE_ROOT = '';
 const NATIVE_RUNS = [];
 function evidenceDirectory() {
   const value = process.env.ZENSU_LIVE_EVIDENCE_DIR;
@@ -240,6 +241,29 @@ function makeWorkspace(parent, scenarioId) {
       entries: [{ path: path.dirname(plugin), include_only: [path.basename(plugin)] }],
     }) + '\n', { mode: 0o600 });
   }
+  CANDIDATE_ROOT = '';
+  if (process.env.ZENSU_LIVE_PLUGIN_STAGE) {
+    try {
+      const stage = fs.realpathSync(process.env.ZENSU_LIVE_PLUGIN_STAGE);
+      if (!isAgyPluginRoot(stage) || !fs.existsSync(path.join(stage, 'plugin.json'))
+          || !fs.existsSync(path.join(stage, 'hooks.json'))) throw Error('incomplete portable plugin stage');
+      const inspect = directory => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+          if (entry.isSymbolicLink()) throw Error('portable plugin stage contains a symbolic link');
+          if (entry.isDirectory()) inspect(path.join(directory, entry.name));
+          else if (!entry.isFile()) throw Error('portable plugin stage contains a non-regular file');
+        }
+      };
+      inspect(stage);
+      const target = path.join(ws, '.agents/plugins/zensu');
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.cpSync(stage, target, { recursive: true, errorOnExist: true, force: false });
+      CANDIDATE_ROOT = target;
+    } catch (error) {
+      fs.rmSync(ws, { recursive: true, force: true });
+      throw error;
+    }
+  }
   return ws;
 }
 
@@ -266,6 +290,9 @@ function isAgyPluginRoot(dir) {
 // verdict about a tree the host never loaded. The caller turns null into
 // LIVE-UNAVAILABLE.
 function installedPluginRoot() {
+  if (process.env.ZENSU_LIVE_PLUGIN_STAGE && (process.env.ZENSU_LIVE_PLUGIN_ROOT || process.env.ZENSU_LIVE_INTERACTIVE === '1')) throw Error('candidate stage and explicit interactive plugin modes cannot be mixed');
+  // Candidate mode must never silently exercise the user's global installation.
+  if (process.env.ZENSU_LIVE_PLUGIN_STAGE) return CANDIDATE_ROOT || null;
   const explicit = process.env.ZENSU_LIVE_PLUGIN_ROOT;
   if (explicit) {
     if (!path.isAbsolute(explicit) || /[\0\r\n]/.test(explicit)) throw Error('ZENSU_LIVE_PLUGIN_ROOT must be an absolute physical plugin directory');
@@ -471,6 +498,12 @@ function toolProbeArgs(ws) {
   return [];
 }
 
+function agyArgs(prompt, ws, seconds, extraArgs = []) {
+  const project = extraArgs.includes('--conversation') ? [] : ['--new-project'];
+  const model = process.env.ZENSU_LIVE_MODEL ? ['--model', process.env.ZENSU_LIVE_MODEL] : [];
+  return ['-p', prompt, '--add-dir', ws, '--print-timeout', `${seconds}s`, ...project, ...model, ...extraArgs];
+}
+
 function runAgy(prompt, ws, timeoutS, extraEnv, extraArgs, stopProbe) {
   if (process.env.ZENSU_LIVE_INTERACTIVE === '1') {
     const pluginRoot = installedPluginRoot();
@@ -487,7 +520,7 @@ function runAgy(prompt, ws, timeoutS, extraEnv, extraArgs, stopProbe) {
   const seconds = Number(timeoutS || DEFAULT_TIMEOUT_S);
   const result = spawnSync(
     'agy',
-    ['-p', prompt, '--add-dir', ws, '--print-timeout', `${seconds}s`, ...(extraArgs || [])],
+    agyArgs(prompt, ws, seconds, extraArgs),
     {
       cwd: ws,
       encoding: 'utf8',
@@ -544,7 +577,7 @@ function gateVerdict({ controlAttempted, controlWritten, blockedAttempted, denie
 
 // Require the actual native tool-result error, not the model's description of
 // its refusal. The single-call probe makes the adjacent result unambiguous.
-function sourceWriteProof({ rows, workspace, target, command }) {
+function sourceWriteProof({ rows, workspace, target, command, sessionId, nativeBinding }) {
   const no = reason => ({ verified: false, reason });
   if (!path.isAbsolute(workspace || '') || path.normalize(workspace) !== workspace
       || path.dirname(target || '') !== workspace) return no('target is not inside the exact fixture workspace');
@@ -557,20 +590,23 @@ function sourceWriteProof({ rows, workspace, target, command }) {
   const attempt = attempts[0];
   const args = attempt.tool_calls[0].args;
   if (Object.hasOwn(args, 'Cwd') && args.Cwd !== workspace) return no('native Cwd does not equal the physical fixture workspace');
-  // Current CLI calls omit Cwd even when explicitly requested. Do not invent
-  // that argument from workspace metadata. The alternate proof requires an
-  // exact directory selection IN the actual command, before the write, with
-  // && so a failed cd cannot execute it. Older unqualified calls still fail.
+  // Preserve both observed host contracts: an exact command-local directory
+  // selection, or a private native main binding when current CLI omits Cwd.
+  const boundWorkspace = /^[a-f0-9-]{36}$/i.test(sessionId || '')
+    && nativeBinding?.schema === 'zensu.antigravity.native-main.v1'
+    && nativeBinding.sessionId === sessionId && nativeBinding.workspaceRoot === workspace;
   const cwdEvidence = args.Cwd === workspace ? 'native-Cwd'
-    : command === sourceWriteCommand(workspace, target) ? 'literal-command-cd' : '';
-  if (!cwdEvidence) return no('no explicit native working-directory selection');
+    : command === sourceWriteCommand(workspace, target) ? 'literal-command-cd'
+    : boundWorkspace ? 'private-native-main-binding' : '';
+  if (!cwdEvidence) return no('no explicit native working-directory selection or verified native workspace binding');
   const result = rows.find(row => row.step_index === attempt.step_index + 1);
   const prefix = 'tool call denied by pre-tool hook: Blocked a Bash write that would overwrite an existing git-tracked source file ('
     + target + ', via redirect).';
   if (!result || result.type !== 'GENERIC' || result.source !== 'MODEL' || result.status !== 'ERROR'
       || typeof result.error !== 'string' || !result.error.startsWith(prefix)) return no('native result did not deny an in-root tracked-source overwrite');
   return { verified: true, rule: 'in-root-tracked-source', attemptStep: attempt.step_index,
-    deniedStep: result.step_index, workspace, target, cwdEvidence, error: result.error };
+    deniedStep: result.step_index, workspace, target, cwdEvidence, error: result.error,
+    workspaceEvidence: cwdEvidence === 'native-Cwd' ? 'native-command-cwd' : cwdEvidence };
 }
 
 function sourceDirectoryPrefix(workspace) {
@@ -611,9 +647,16 @@ function nativeAgentIdentities(output, workspace) {
       && step.tool_name === 'invoke_subagent' && step.subagent_info
       ? step : null;
   }).filter(Boolean);
-  if (launches.length !== 1) throw new Error('The own native parent did not issue exactly one completed agent batch');
-  const spawned = launches[0].subagent_info.subagents || [];
-  if (spawned.length !== 2 || new Set(spawned.map(child => child.conversation_id)).size !== 2) {
+  if (launches.length < 1 || launches.length > 2
+      || launches.some(step => !Number.isSafeInteger(step.step_index) || step.step_index < 0)
+      || new Set(launches.map(step => step.step_index)).size !== launches.length) {
+    throw new Error('The own native parent did not issue one batch or two distinct completed agent calls');
+  }
+  const spawned = launches.flatMap(step => step.subagent_info.subagents || []);
+  if (launches.some(step => !Array.isArray(step.subagent_info.subagents)
+        || step.subagent_info.subagents.length !== (launches.length === 1 ? 2 : 1))
+      || spawned.length !== 2 || spawned.some(child => !/^[a-f0-9-]{36}$/i.test(child.conversation_id || ''))
+      || new Set(spawned.map(child => child.conversation_id)).size !== 2) {
     throw new Error('The own native parent did not report exactly two distinct child conversations');
   }
   return { parentId, spawned };
@@ -803,6 +846,7 @@ function main() {
       const descriptors = expected.map(item => ({ TypeName: 'zensu-review-aspect', Role: item.role,
         Prompt: item.prompt, Model: 'inherit', Workspace: 'inherit' }));
       const prompt = 'This is an isolated native agent integration probe. Do not run a Zensu implementation workflow. '
+        + 'The direct invoke_subagent call is the authorized read-only dispatch request for this fixture; the existing pre-tool hook records its dispatch receipt. Do not inspect or invoke session helpers. '
         + 'Call invoke_subagent exactly twice, once per role, with these two flat argument objects; do not use a Subagents wrapper. Preserve every field and complete prompt: '
         + JSON.stringify(descriptors) + '. Wait for both child conversations to finish. Do not read their evidence files yourself, '
         + 'change files, run shell commands, or substitute your own report. Then reply NATIVE_PROBE_DONE with the two actual child IDs.';
@@ -1022,7 +1066,13 @@ function main() {
               const provenance = require(path.join(installedPluginRoot(), 'hooks/antigravity/native-agent-provenance.js'));
               const log = provenance.readHostFile(logFile);
               if (!log.includes(ws) || !log.includes(ids[0])) throw Error('source-write CLI log does not match its own workspace and conversation');
-              branchProof = { ...sourceWriteProof({ rows: provenance.transcriptRows(transcript), workspace: ws, target, command }),
+              const adapterPaths = require(path.join(installedPluginRoot(), 'hooks/antigravity/session-paths.js'));
+              const nativeBinding = adapterPaths.readPrivateJson(path.join(adapterPaths.dataRoot(),
+                'native-agents/v1/mains', `${digest(ids[0])}.json`));
+              const location = provenance.location({ session_id: ids[0], transcript_path: transcript });
+              if (nativeBinding.brain !== location.brain) throw Error('private workspace binding belongs to a different native source');
+              branchProof = { ...sourceWriteProof({ rows: provenance.transcriptRows(transcript), workspace: ws, target, command,
+                sessionId: ids[0], nativeBinding }),
                 sessionId: ids[0], transcript, logFile };
             } catch (error) { branchProof = { verified: false, reason: error.message }; }
           }
@@ -1262,6 +1312,7 @@ function main() {
 // remains live-only; keep moving decision logic out here rather than growing it
 // there.
 module.exports = {
+  agyArgs,
   parseTraceLine,
   readTrace,
   countHook,

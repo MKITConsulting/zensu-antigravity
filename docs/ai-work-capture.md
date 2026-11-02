@@ -1,0 +1,125 @@
+# Automatic work capture
+
+## Confirmed product scope
+
+Automatic capture requires an explicitly human-confirmed repository product.
+After the user confirms the exact product, run `zensu ai-work bind --product <uuid> --confirm`
+in the repository. Never infer confirmation from a folder name, remote, existing
+configuration, a prior unassigned record, or permission to implement a task.
+The CLI validates the product against the current personal OAuth account and
+organization. Its private binding lives in the Git common directory, outside
+tracked files, and is shared by worktrees of that repository. It contains IDs and
+an origin fingerprint, never credentials or the remote URL.
+
+`zensu ai-work context` revalidates the binding. A host, account, organization,
+origin or product-access change requires renewed explicit confirmation. Missing
+bindings return `ready=false` and `workScope=unassigned`; the helper returns
+`skipped_unassigned` without creating a work entry. Continue authorized coding.
+Do not create a placeholder or silently switch to cross-product capture.
+
+Only when the user explicitly requests work spanning products, supply
+`--cross-product-reason <specific-reason>` on `begin`. The reason is required for
+that goal and cannot be a repository default. Normal product work (including its
+tests) keeps the confirmed product; run purpose and product scope are independent.
+
+Receipts freeze product/cross-product scope, reason and authenticated identity
+before declaration. Checkpoints revalidate the same scope. A changed binding
+cannot retarget a pending report. Legacy receipts without confirmed scope remain
+untouched and cannot auto-submit new results: use a new explicitly scoped goal.
+Existing unassigned server entries appear in the separate **Unassigned** tab,
+excluded from regular result metrics, with history and human acceptance retained.
+
+Requires the product-scope backend and CLI `ai-work bind`, `context --cross-product`,
+and `start --product/--cross-product-reason`. Upgrade backend, CLI, then plugins;
+missing protocol support is visible incomplete capture. No fallback to an older
+unscoped command is allowed. Submission never accepts a result.
+
+
+A personal `zensu auth login` identifies the reporting account. Use Zensu CLI v0.11.0 or newer. The CLI must
+provide `ai-work context/start/get/submit`, and the server must provide the
+capture endpoints and CLI provenance migration. Missing prerequisites remain
+visible incomplete capture; never borrow credentials or change login automatically.
+
+Record one already agreed implementation goal using a stable task key, a concise
+objective (at most 160 characters), and the agreed criteria version or digest.
+Reuse all three on retries; changed scope uses a new task key. Do not record work
+for startup, greetings or read-only questions. Capture applies in direct mode too
+and is independent of private Pulse opt-in.
+
+Only a new clean Git HEAD is submitted. A private receipt in the worktree Git
+metadata persists stable IDs before requests, binds API host and reporting account,
+and retries the same result after interrupted delivery. Dirty or unchanged work,
+identity changes and version conflicts remain incomplete. Do not discard pending
+receipts to hide an error. A process crash can leave a lock requiring inspection.
+
+Include the returned exact `reviewUrl` at handoff. Human acceptance and revocation
+are explicit authenticated web decisions about that result version. Never accept
+from an agent, infer approval from a merge/release/test, or operate the decision
+dialog on the human's behalf. Later results do not inherit acceptance. Attribution
+identifies an authenticated reporting account, not human code authorship.
+
+No code, transcripts, prompts, diffs, file lists, credentials or token usage are
+uploaded. Both dashboard scopes use the same canonical units and credits.
+
+## Antigravity
+
+Use the exact native `{session-helper}` prefix from the session bootstrap, with
+`--helper ai-work -- begin --task <key> --title <objective> --criteria <version>`
+or `--helper ai-work -- checkpoint`. Quote every value. The one-use native
+PreToolUse receipt binds the conversation; direct helper calls and model-supplied
+workspace/session selectors are refused. Child conversations do not report.
+The native Stop chain provides a bounded retry backstop and prints a diagnostic;
+checkpoint before handoff to return the review link in the agent's response.
+
+## Validation boundary
+
+Native capture passed on Antigravity CLI 1.4.7 with Gemini 3.8 Flash medium and
+Zensu CLI 0.11.0 on 2026-10-25. The real host declared the agreed goal, edited and
+committed a disposable fixture, submitted its clean HEAD, and repeated the
+checkpoint. Both repetition and native Stop returned `already_submitted`.
+Independent CLI read-back verified authenticated attribution, exactly one start
+and one submission, and no human decision. See the [native validation report](validation/2026-10-25-native-ai-work-capture.md)
+for source binding, observed startup latency and the limits of this result.
+
+Earlier quota-blocked probes below remain historical evidence, not successful
+native validation.
+
+Deterministic fixtures cover native binding, one-use helper authorization,
+child refusal, durable retries and nonblocking capture errors. An isolated
+staged-plugin probe on 2026-10-24 confirmed native startup and Stop-chain delivery
+for its own conversation. Antigravity then returned RESOURCE_EXHAUSTED (429)
+because the account quota was exhausted. No model result or work submission was
+produced, so that probe did not verify full native capture. The installed
+plugin and existing conversations were not modified.
+
+A fresh isolated Antigravity CLI 1.4.7 probe on 2026-10-25 at 14:35 UTC
+again observed startup and Stop delivery for its own native conversation. The
+provider returned RESOURCE_EXHAUSTED (429), reporting 6h7m until reset at the
+observation time. No model result or work submission was produced. The tested
+runtime was `c9f5120d672a31d10e16057db1238e544f99a314`, before synchronizing the
+subsequent feature-context documentation/read mapping from main. Full native
+capture remained unverified by that probe; unchanged configuration hashes do not
+substitute for that missing result.
+
+
+## Declared source and run purpose
+
+The reporter supplies its plugin name and packaged version automatically. These
+are client declarations; personal OAuth authenticates the reporting account,
+not the host or authorship. Use `--run-kind work` (the default) for normal product
+implementation, including writing/running tests. Use `--run-kind test` explicitly
+when the goal itself is a validation, demo or capture probe. Never guess from the
+title, test commands or a green suite. Preserve the agreed purpose on retries.
+
+New receipts freeze source, version and initial purpose before the first request.
+An upgrade preserves existing receipt metadata; a receipt without confirmed product scope cannot resume automatic reporting. Historical receipts keep missing
+metadata unknown; do not rewrite or delete them to force attribution. Purpose
+corrections belong to the current owner/admin in the web UI, with a reason; the
+reporter cannot classify, accept or revoke. Both dashboard scopes exclude declared
+tests by default but offer an include-tests switch. Unknown records remain visible.
+Billing credits stay separately unfiltered because they are not linked to runs.
+
+Requires a CLI supporting the `ai-work start --source --source-version --run-kind`
+flags and a backend supporting run metadata. Upgrade backend and CLI before the
+plugin. Missing support is an incomplete capture, never a silent fallback. The
+internal `--legacy-metadata` flag only replays pre-metadata receipts unchanged.

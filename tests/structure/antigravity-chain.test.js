@@ -11,7 +11,7 @@ const temp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'zensu-chain-
 try {
   const plugin = path.join(temp, 'plugin'), hooks = path.join(plugin, 'hooks'), adapter = path.join(hooks, 'antigravity');
   fs.mkdirSync(adapter, { recursive: true });
-  for (const name of ['antigravity-shim.sh', 'emit-verdict.js', 'normalize-payload.js', 'session-paths.js']) {
+  for (const name of ['antigravity-shim.sh', 'emit-verdict.js', 'normalize-payload.js', 'invocation-chain.js', 'render-context.js', 'session-paths.js']) {
     fs.copyFileSync(path.join(root, 'hooks', 'antigravity', name), path.join(adapter, name));
   }
   fs.copyFileSync(path.join(root, 'hooks', 'hooks.json'), path.join(hooks, 'hooks.json'));

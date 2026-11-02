@@ -5,6 +5,82 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-28
+
+### Added
+
+- **capture**: Preserve plugin origin and explicit run purpose
+- **context**: Automatically discover relevant features from task descriptions
+
+## [0.4.3] - 2026-10-28
+
+### Fixed
+
+- **context**: Prioritize relevant evidence and preserve related sources (#19)
+
+## [0.4.2] - 2026-10-27
+
+### Fixed
+
+- Support the Antigravity CLI 1.4.7 single-descriptor agent call and singular launch result while preserving older batch dispatch.
+- Bind multi-call children to their actual completed parent result and exact accepted role when the host sidecar reports the final sibling step.
+- Update native dispatch guidance and the two-child live verification without weakening read-only gates or normal-Stop completion requirements.
+
+## [0.4.1] - 2026-10-26
+
+### Added
+
+- **context**: Load tracked feature context automatically (#16)
+
+## [0.4.0] - 2026-10-26
+
+### Added
+
+- Record implementation context-package retrievals with the declared Antigravity host and retain the server-issued load receipt.
+- Correlate subsequent knowledge-source retrievals with that package so the Context Board can show the authenticated account, server timestamps and returned source kinds.
+- Report receipt failures explicitly and distinguish file references from local file reads or model understanding.
+
+Requires Zensu CLI 0.13.0 or newer and the backend context-load endpoints. Deterministic CI validates the package; native provider sessions were not rerun for this instruction-only integration.
+
+## [0.3.1] - 2026-10-25
+
+### Fixed
+
+- Normalize Antigravity CLI 1.4.7 `read_file`, `write_file` and `edit_file` names and Path/Target/Replacement fields so native file operations reach the existing read/write protection gates.
+- Reduce cumulative startup overhead by composing pre-invocation advisory output in one Node process instead of spawning separate JSON, rendering and de-bounce helpers for every hook.
+- Preserve engine order, startup context, private session binding, duplicate suppression, refusal precedence and the existing 90-second host deadline.
+- Let native validation load a frozen candidate in isolated projects and select a process-local model without replacing the global plugin.
+- Add a packaged startup subprocess budget and regression coverage for advisory composition. Tool authorization and Stop enforcement retain their existing path.
+
+## [0.3.0] - 2026-10-25
+
+### Added
+
+- Automatically capture agreed implementation goals and new clean Git results through personal Zensu CLI authentication, including direct implementation mode.
+- Bind capture to the native main conversation and its workspace with one-use helper authorization; reject unbound or child reporting.
+- Persist retry-safe private receipts and provide idempotent explicit checkpoints plus a native Stop backstop.
+- Return result-specific review links while keeping acceptance and revocation as explicit human web decisions. No code, prompts, transcripts or token usage are uploaded.
+
+### Validation
+
+- Verified the complete native CLI capture path with Antigravity CLI 1.4.7, Gemini 3.8 Flash medium and Zensu CLI 0.11.0, including authenticated ownership, duplicate prevention and no inferred acceptance.
+- Recorded the observed startup-hook timeout and earlier excluded probes in the native validation report.
+
+Requires Zensu CLI 0.11.0 or newer and the authenticated capture API. Missing prerequisites remain visible incomplete capture.
+
+## [0.2.1] - 2026-10-24
+
+### Added
+
+- **context**: Load and hydrate linked feature evidence (#11)
+- Package native Antigravity distribution (#6)
+
+### Changed
+
+- Archive Marketplace submission evidence (#8)
+- Archive Google Marketplace submission evidence
+- Record Antigravity Marketplace interest submission (#7)
+
 ### Added
 
 - Native distribution packages with relative hooks, tracked-source validation and SHA-256 checksums, built without invoking Antigravity.

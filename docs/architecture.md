@@ -75,6 +75,13 @@ privately. This is lazy initialization, not a native SessionStart event. No sour
 compact or SessionEnd event is synthesized; native child lifecycle uses the separately
 verified parent spawn step, child metadata and actual child Stop.
 
+After native principal verification and session bootstrap, `invocation-chain.js` composes
+the startup and UserPromptSubmit inventories in one Node process. It executes the same
+shell engines sequentially, renders native helper commands, consumes private pending
+context and retains the existing per-turn advisory de-bounce. This avoids repeated Node
+launches for each JSON/render/cache step. The 90-second PreInvocation deadline remains
+unchanged; PreToolUse authorization and Stop enforcement keep their existing shim path.
+
 Native `transcriptPath` is read only when it belongs to the current conversation and contains
 recognized native user records. Tool steps are correlated by conversation and step index. Missing
 exit/result fields remain missing; tool completion by itself is not a passing test receipt.

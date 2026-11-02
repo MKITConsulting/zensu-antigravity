@@ -70,7 +70,8 @@ or `rg` normalization was ported. Shared importer/template files remain intact.
 The observed native payload contains 325 files with runtime digest
 `sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531`.
 It was generated through `package-native.sh`; archive bytes were independently
-compared with the extracted payload. The PR preserves that payload. This report
+compared with the extracted payload. This is the original v0.2.0 payload; the
+resolved v0.5.0 integration has its own fresh verification below. This report
 lives under `validation/`, which is outside the curated shipped runtime.
 
 One explanatory sentence in `evals/promptfoo/live/INTERACTIVE.md` was clarified
@@ -97,7 +98,7 @@ previously tested frozen payload. Only the ZIP container hash differs:
 This is a fresh package comparison, not another native acceptance run or a full
 local-gate rerun. The original dirty checkout and its index remain unchanged.
 
-## Successful native worker follow-up — November 2
+## Successful native worker follow-up — November 2, before main integration
 
 The unchanged production `harness/launcher.js --prepare` completed the original
 `live-native-worker-prepare` scenario on **AGY 1.4.8**, from **08:46:57 to
@@ -138,6 +139,54 @@ does not claim a new full suite on AGY 1.4.8, rerun the earlier assisted invoice
 workflow or npm package checks, or establish human acceptance. The original
 matrix and each follow-up retain their separate dates and limits. PR CI is
 checked independently for the final documentation commit before merge.
+
+## Main integration and fresh native worker proof — November 2
+
+Current `main` at `63165be6d66aa9a8aa3e0e32695051f557a81275` contains native
+runtime changes released after this repair branch: confirmed product-scoped work
+capture, automatic context discovery, composed startup invocations and current
+read/edit tool mappings. Its integration required resolving 52 conflicting files,
+mostly shared native dispatch prose and overlapping adapter/test changes.
+
+The resolution preserves both sets of functionality and every existing test
+assertion. Native read/edit mapping coexists with strict `write_file` Path/Content
+validation, including empty writes. Child correlation accepts a completed early
+child result before its sibling result is recorded while rejecting malformed or
+unfinished existing batch anchors. Live tests retain both explicit command-local
+directory evidence and protected native workspace-binding evidence, plus frozen
+interactive-root and candidate-stage discovery. Review packet, audit freshness,
+normal idle child Stop, and one-time approval checks remain enforced.
+
+Focused checks pass: native provenance **38/38**, session adapter **29/29**,
+live-provider helpers **76/76**, both directory-proof fixture sets, registry
+**5/5**, and all 32 skill body bounds plus seven lossless split procedures.
+Registry counts and instruction hashes reflect the combined source; no assertion
+or timeout was removed or relaxed.
+
+The resolved **v0.5.0** runtime was frozen
+again and tested through the unchanged production launcher on AGY 1.4.8, from
+`2026-11-02T12:08:02.183374+00:00` to `2026-11-02T12:08:36.906809+00:00`. It produced exactly one
+completed `READY` response, zero tool calls and a real protected bound preparation
+receipt. Original assertion/scanner: **acceptance exit 0**; independent proof
+**23/23**; preservation **18/18**. All **336** native package files match their
+resolved source or exact portable hook render. Runtime digest:
+
+`sha256:6b5bc1fdcf9cf4b52591b72f98fbffc7199817535bfa2dd4a7464f86afbb4193`
+
+Native ZIP SHA-256:
+
+`f066527164ca5e6021635d458152e31990ecd53c5c237bbbddd15435f3650b8c`
+
+All 638 frozen integration source files must match the final source before push;
+only validation documents are subsequently updated. One additional exact test
+workspace was temporarily trusted. Its entry was removed after owned processes
+exited, settings restored byte-for-byte, and shared plugins left unchanged.
+
+The pre-integration success is retained above and in `workerFollowupHistory`.
+The integrated runtime has its own proof; the original v0.2.0 receipt is not
+reused as proof for v0.5.0. The earlier full native matrix and assisted invoice/npm
+results remain historical; this is not a new full suite or human acceptance.
+Merge remains conditional on successful CI for the final PR head.
 
 To reproduce the deterministic gate, run `ZENSU_TEST_JOBS=2 bash tests/run-all.sh`
 from a clean checkout after `npm ci`. The supported default remains unchanged.

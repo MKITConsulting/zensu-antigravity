@@ -278,6 +278,15 @@ else
   esac
 fi
 
+# Compose the advisory-only invocation inventory in one Node process. The
+# native principal and private session binding above remain mandatory. Tool
+# authorization and Stop enforcement retain their existing transport path.
+if [ "$SCRIPT_NAME" = pre-invocation-chain.sh ] && [ "$HOOK_EVENT" = PreInvocation ] && [ -f "$SHIM_DIR/invocation-chain.js" ]; then
+  printf '%s' "$PAYLOAD" | ZV_BOOT_CREATED="$BOOT_CREATED" ZV_BOOT_CONTEXT="$BOOT_CONTEXT" \
+    node "$SHIM_DIR/invocation-chain.js"
+  exit $?
+fi
+
 # Only this trusted adapter creates the neutral reviewer outcome. The normalizer
 # drops caller-authored fields; native errors are never synthesized as Agent rows.
 if [ "$NATIVE_STATUS" = main ] && [ "$HOOK_EVENT" = Stop ]; then
@@ -297,6 +306,13 @@ if ! select_scripts "$ENTRY_NAME" "$TOOL"; then
     *) emit "" "" ;;
   esac
   echo; exit 0
+fi
+
+# Capture is an advisory backstop after native binding, independent of the
+# review chain. Children already exited through their own lifecycle above.
+# The adapter's total time budget is bounded and it never blocks Stop.
+if [ "$HOOK_EVENT" = Stop ]; then
+  printf '%s' "$PAYLOAD" | node "$SHIM_DIR/ai-work.js" checkpoint-hook >&2 || true
 fi
 
 NORMAL_SCRIPTS=("${SCRIPTS[@]}")

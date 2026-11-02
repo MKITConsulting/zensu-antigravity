@@ -28,7 +28,7 @@ OUT="$(node -e '
   const m = require(process.env.PROVIDER);
   process.stdout.write(Object.keys(m).sort().join(","));
 ' 2>&1)"
-EXPECTED_SURFACE="countHook,digest,fireReport,gateRequest,gateVerdict,installedPluginRoot,isAgyPluginRoot,logSnapshot,logWrittenDuring,makeWorkspace,matchingDecisions,nativeAgentIdentities,nativeAgentTranscriptIdentities,nativeAgentVerdict,parseTraceLine,readDecisions,readTrace,resolveTraceFile,sourceWriteCommand,sourceWriteProof,stopContinuationProof,stopCyclePrompt,stopVerdicts,toolProbeArgs,unavailableReason"
+EXPECTED_SURFACE="agyArgs,countHook,digest,fireReport,gateRequest,gateVerdict,installedPluginRoot,isAgyPluginRoot,logSnapshot,logWrittenDuring,makeWorkspace,matchingDecisions,nativeAgentIdentities,nativeAgentTranscriptIdentities,nativeAgentVerdict,parseTraceLine,readDecisions,readTrace,resolveTraceFile,sourceWriteCommand,sourceWriteProof,stopContinuationProof,stopCyclePrompt,stopVerdicts,toolProbeArgs,unavailableReason"
 [ "$OUT" = "$EXPECTED_SURFACE" ] \
   && ok "requiring the provider exports the helpers without running a probe" \
   || bad "unexpected module surface: $OUT"
@@ -313,6 +313,18 @@ ZENSU_LIVE_INTERACTIVE=1 ZENSU_LIVE_EVIDENCE_DIR="$INTERACTIVE_FIXTURE/evidence"
 ZENSU_LIVE_INTERACTIVE=1 ZENSU_LIVE_EVIDENCE_DIR="$INTERACTIVE_FIXTURE/evidence" ZENSU_LIVE_PLUGIN_ROOT="$INTERACTIVE_FIXTURE/plugin" \
   check "a live-named symlink cannot authorize a real project" "true" \
   '(() => { const fs=require("fs"),p=require("path"); const ws=p.join(process.env.ZENSU_LIVE_EVIDENCE_DIR,"workspaces/zensu-live-test"+process.pid); fs.symlinkSync(process.env.TMP,ws); try{try{H.toolProbeArgs(ws);return false}catch(e){return /physical disposable live-probe/.test(e.message)}}finally{fs.unlinkSync(ws)} })()'
+# Candidate staging preserves exact bytes, binds helper calls to that copy and
+# refuses an invalid stage instead of silently testing the global installation.
+check "candidate stage is copied byte-for-byte into the probe project" "true" \
+  '(() => { const fs=require("fs"),os=require("os"),p=require("path"); const stage=fs.mkdtempSync(p.join(os.tmpdir(),"zensu-stage-")); let ws; try{fs.mkdirSync(p.join(stage,"hooks/antigravity"),{recursive:true});fs.mkdirSync(p.join(stage,"hooks/lib"));for(const f of ["plugin.json","hooks.json","hooks/antigravity/antigravity-shim.sh","hooks/lib/zensu-log.sh"])fs.writeFileSync(p.join(stage,f),"candidate bytes");process.env.ZENSU_LIVE_PLUGIN_STAGE=stage;ws=H.makeWorkspace();const actual=H.installedPluginRoot();return actual===p.join(ws,".agents/plugins/zensu")&&fs.readFileSync(p.join(actual,"hooks.json"),"utf8")==="candidate bytes"}finally{delete process.env.ZENSU_LIVE_PLUGIN_STAGE;if(ws)fs.rmSync(ws,{recursive:true,force:true});fs.rmSync(stage,{recursive:true,force:true})} })()'
+check "invalid candidate stage fails without falling back to a global plugin" "true" \
+  '(() => {process.env.ZENSU_LIVE_PLUGIN_STAGE="/nonexistent-zensu-stage";try{try{H.makeWorkspace();return false}catch{return H.installedPluginRoot()===null}}finally{delete process.env.ZENSU_LIVE_PLUGIN_STAGE}})()'
+check "fresh native probes always create their own project" "true" \
+  'H.agyArgs("READY","/fixture",120).includes("--new-project")'
+check "an exact conversation resume does not create a different project" "false" \
+  'H.agyArgs("READY","/fixture",120,["--conversation","fixture-id"]).includes("--new-project")'
+check "probe model selection is process-local and one argument" "gemini-3.8-flash-medium" \
+  '(() => {process.env.ZENSU_LIVE_MODEL="gemini-3.8-flash-medium";try{const args=H.agyArgs("READY","/fixture",120);return args[args.indexOf("--model")+1]}finally{delete process.env.ZENSU_LIVE_MODEL}})()'
 
 # --- unavailableReason ------------------------------------------------------
 check "a clean run is available" "" \

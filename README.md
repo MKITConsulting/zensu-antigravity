@@ -1,6 +1,6 @@
 # Zensu for Antigravity
 
-![version](https://img.shields.io/badge/version-0.2.0-blue)
+![version](https://img.shields.io/badge/version-0.5.0-blue)
 ![host](https://img.shields.io/badge/host-Google%20Antigravity-blue)
 ![license](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue)
 
@@ -14,6 +14,10 @@ Implementation defaults to **vanilla**. Strict RED→GREEN is opt-in via
 `hooks.tddImplementation=true`; evidence audits, the review chain and completion gates remain
 active in both modes when a workflow is armed. A user's explicit direct-implementation choice
 is retained. No workflow is silently armed after that choice.
+
+Native delegation supports CLI 1.4.7 single-agent calls and older batch calls.
+The [native validation](docs/validation/2026-10-27-native-delegation.md) records two
+real child completions and an enforced protected-file denial.
 
 ## Install
 
@@ -171,6 +175,19 @@ ships this product policy and never edits the user's workspace `AGENTS.md`; repo
 development conventions are not installed as product instructions. Rule loading steers
 the model; runtime gates still enforce session, capability and completion checks.
 
+Native file-tool aliases from Antigravity CLI 1.4.7 (`read_file`, `write_file`,
+`edit_file`) map to the same read/write/edit policy gates as the earlier host names.
+
+Startup and pre-invocation advisory composition share one Node process, reducing
+process-launch overhead while retaining the 90-second host deadline and every
+registered engine hook. Native tool authorization and Stop enforcement are unchanged.
+For native candidate validation, stage the plugin with `install.sh --portable-stage-only`
+and set `ZENSU_LIVE_PLUGIN_STAGE` to the resulting `zensu` directory when running
+`ZENSU_LIVE_AGY=1 bash evals/promptfoo/live/run-live.sh`. Each probe copies the
+unchanged stage into its own native project. `ZENSU_LIVE_MODEL` optionally selects
+that probe's model without changing global settings. Without candidate mode the
+suite continues to validate the installed plugin.
+
 The native host lacks the source platform's SessionStart/SubagentStart/SessionEnd and
 plan-approval events. First-registration bootstrap and PreInvocation provide the supported
 steering. Child identity and completion are derived from verified native spawn/transcript/Stop
@@ -211,3 +228,45 @@ question can return. A direct answer decides that plan or request only; use
 configured `hooks.defaultDeliveryRoute` can decide the route without asking. The user's
 own explicit preference still wins for the current request; Autopilot and Pilot remain
 per-plan choices. See [delivery-route configuration](docs/configuration.md#hook-opt-out).
+
+## Automatic work capture
+
+Agreed implementation goals and new clean commits can be reported through personal
+CLI OAuth in direct or workflow mode. Acceptance and revocation remain human web
+decisions. See [capture behavior and host limits](docs/ai-work-capture.md).
+
+## Feature context retrieval
+
+Tracked implementation loads the linked context package through
+`zensu knowledge context-pack <feature-ref> --json --agent antigravity`, then hydrates relevant items
+with `zensu knowledge get <item-id> --json --context-load <load-id>` and reads referenced files from the
+authorized checkout. Supplementary search uses `--json` so passages are retained.
+The CLI must expose `knowledge context-pack --help`; older installations report
+the missing capability instead of silently falling back. See the
+[context procedure](skills/implement/references/knowledge-context.md)
+for truncation, access failures and evidence handoff. These reads supplement feature,
+security and design context. The context board records these API retrievals by package `load_id`, declared agent and server time. Local file reads and model comprehension are not recorded.
+
+## Automatic feature context
+
+An explicit, unambiguous feature key in a main user prompt automatically loads its tracked context package, including outside the Implement skill and in direct mode. Relevant source reads retain the returned `load_id`. The automatic package presents `layers` first and keeps `related_layers` as a separate bounded metadata index with reasons and directed paths. Choose additional sources for a specific task question; never bulk-fetch either group. Disable with `hooks.contextAutoLoad: false`. See [automatic context](docs/automatic-context.md) for host support, bounded reads, failure behavior and evidence limits.
+
+
+AI work capture declares this plugin's source/version and a work/test purpose.
+Use `--run-kind test` for explicit validation or demo goals; ordinary product work
+with tests remains work. Test runs are hidden from default My work/Organization
+metrics; billing credits remain separately unfiltered. Update the backend and
+CLI to the metadata-capable contract before installing this reporter update.
+See the shipped `docs/ai-work-capture.md` for retries and historical unknowns.
+
+Task-description context: prompts without a feature key now automatically retrieve bounded candidates through `zensu knowledge context-search --query <task> --json`. The main agent resolves task and product/repository scope, automatically loads the matching tracked package, and asks only when the feature remains ambiguous. Discovery is not a package receipt. See the automatic-context documentation for transmitted task text, limits and host support.
+
+### Confirmed product scope for AI work
+
+Automatic AI-work capture now requires a product explicitly confirmed by the user
+via `zensu ai-work bind --product <uuid> --confirm`. Missing or changed bindings
+skip capture while coding continues. Cross-product work requires explicit intent
+and a reason for each goal; it is never an automatic fallback. Existing unassigned
+entries remain in the separate Unassigned view with their history and acceptance.
+Upgrade the product-scope backend and CLI before the plugin. See the shipped
+`docs/ai-work-capture.md` for identity checks and legacy receipt handling.

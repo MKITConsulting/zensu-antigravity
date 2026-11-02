@@ -83,7 +83,6 @@ Each child must return one raw JSON object as its entire ordinary final response
     "failure_scenario": "Concrete supported trigger",
     "fix": "Concrete correction",
     "confidence": 90
-  }]
 }
 ```
 
