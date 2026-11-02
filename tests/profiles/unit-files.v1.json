@@ -539,7 +539,7 @@
     },
     {
       "path": "tests/structure/ai-work-capture.test.js",
-      "registered": 12,
+      "registered": 16,
       "runs": [
         {
           "driver": "tests/structure/test-ai-work-capture.sh"
@@ -549,7 +549,7 @@
     },
     {
       "path": "tests/structure/ai-work-native.test.js",
-      "registered": 5,
+      "registered": 6,
       "runs": [
         {
           "driver": "tests/structure/test-ai-work-capture.sh"
