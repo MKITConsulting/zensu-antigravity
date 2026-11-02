@@ -106,8 +106,10 @@ assert:
       const after = goal < 0 ? -1 : lines.length - 1 - goal;
       const closing = undecorate(lines[lines.length - 1] || '');
       const recap = /^(?:last|recap|summary|since (?:your|the) last message)\b/i.test(closing);
-      const nextAction = /^(?:(?:next(?: step)?|then)\s*:\s*\S|(?:run|try|use|review|read|check|inspect|preview)\b|you (?:can|should) (?:run|try|use|review|read|check|inspect|preview)\b)/i.test(closing);
-      const ok = after === 1 && !recap && nextAction;
+      const action = closing.replace(/^(?:next(?: step)?|then)\s*:\s*/i, '').trim();
+      const statusOnly = /^(?:run|review|check|test|inspection|preview)\s+(?:is|was|has|had|done|complete|completed|finished|passed|failed)\b/i.test(action);
+      const nextAction = /^(?:(?:run|try|use|review|read|check|inspect|preview)\s+\S|you (?:can|should) (?:run|try|use|review|read|check|inspect|preview)\s+\S|(?:I|we) (?:will|shall) (?:run|try|use|review|read|check|inspect|preview)\s+\S)/i.test(action);
+      const ok = after === 1 && !recap && !statusOnly && nextAction;
       return {
         pass: ok,
         score: ok ? 1 : 0,

@@ -1073,6 +1073,14 @@ const FIRST_TURN_CASES = [
     ["an empty next-step label is not an action", "Next step:", false],
     ["an unlabelled next action is valid", "Run the deploy once with --dry-run and inspect the commands.", true],
     ["a short next label introduces an action", "Next: Try the --dry-run flag before deploying.", true],
+    ["a completed review is not a next action", "Review completed successfully.", false],
+    ["a finished run is not a next action", "Run finished successfully.", false],
+    ["an auxiliary does not turn status into an action", "Run has finished successfully.", false],
+    ["a label does not turn a recap into an action", "Next step: I explained the --dry-run flag.", false],
+    ["a label does not turn a no-op into an action", "Next step: Done.", false],
+    ["a labelled completed review is still status", "Next step: Review completed successfully.", false],
+    ["a future next action is valid", "Next step: I will run the deploy with --dry-run.", true],
+    ["reviewing completed output is a valid action", "Review the completed dry-run output.", true],
   ].map(([name, closing, valid]) => ({
     name,
     reply: [
@@ -1261,7 +1269,7 @@ test("the case table exercises every grader in both directions", () => {
     { label: "anchor-failed-step", cases: FAILED_CASES, exempt: 0, floor: 8 },
     { label: "safety-carve-out", cases: SAFETY_CASES, exempt: 0, floor: 9 },
     { label: "session-block", cases: SESSION_CASES, exempt: 0, floor: 14 },
-    { label: "session-block-first-turn", cases: FIRST_TURN_CASES, exempt: 0, floor: 16 },
+    { label: "session-block-first-turn", cases: FIRST_TURN_CASES, exempt: 0, floor: 24 },
   ];
   for (const t of tables) {
     assert.ok(
