@@ -5,6 +5,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-02
+
+### Added
+
+- **ai-work**: Require explicit feature scope for captured goals (#26)
+
 ## [0.6.0] - 2026-11-02
 
 ### Added
