@@ -36,7 +36,7 @@ Generated from `tests/profiles/unit-files.v1.json` by `node tests/structure/lib-
 | `host/test-native-rules-worker-probes.js` | 2 | – | `test-native-session-bridge.sh` | Native rule and worker probes reject tools, missing completion, mismatched responses and uncorrelated shared logs. |
 | `host/test-native-spawn-allow.js` | 6 | – | `test-native-session-bridge.sh` | Native spawn allow: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-review-worker.js` | 8 | – | `test-native-session-bridge.sh` | Native review worker: real assertions with strict count, completion and no-unexpected-skip verification. |
-| `host/test-session-adapter.js` | 29 | – | `test-native-session-bridge.sh` | Native session adapter: real assertions with strict count, completion and no-unexpected-skip verification. |
+| `host/test-session-adapter.js` | 30 | – | `test-native-session-bridge.sh` | Native session adapter: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `host/test-stop-session-state.js` | 4 | – | `test-stop-enforcer.sh` | Native stop session state: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `structure/acceptance-verify-v1.test.js` | 26 | – | `test-acceptance-gate.sh` | Acceptance records: the record schema and store, the verify-feature driver ids, criteria from the shared lister, the chain anchor, criterion and gate verdicts, and retention. |
 | `structure/agy-interactive-run.test.js` | 57 | – | `test-interactive-live-runner.sh` | Interactive live transport: exact native turn and child provenance, refusal of permission bypass, one-time operator input, private reasoning redaction and hermetic PTY relay. |
@@ -81,7 +81,7 @@ Generated from `tests/profiles/unit-files.v1.json` by `node tests/structure/lib-
 | `structure/work-order-v1.test.js` | 38 | win32 not run | `test-work-order-runtime.sh` | The work-order runtime: the CLI error grammar, the ledger-to-stage mapping, lease renewal and expiry, the inert context outside the mode, the DONE delivery order, the gate and the takeover release plan. |
 | `structure/workflow-artifacts-v1.test.js` | 6 | – | `test-workflow-repairs.sh` | Generation-bound execution markers and evidence-derived native plan progress. |
 | `structure/workflow-guidance.test.js` | 6 | – | `test-workflow-repairs.sh` | Bounded native guidance, safe diagnostics, routing and observed acceptance reuse. |
-| `structure/zen-anchor-assertions.test.js` | 12 | – | `test-zen-mode.sh` | The zen-mode eval graders: every assertion body compiled and a pinned pass and fail vector. |
+| `structure/zen-anchor-assertions.test.js` | 15 | – | `test-zen-mode.sh` | The zen-mode eval graders: every assertion body compiled and a pinned pass and fail vector. |
 | `structure/zen-anchor-v1.test.js` | 25 | – | `test-zen-mode.sh` | The zen-mode chain anchor: the shape-to-line mapping, the failed mark and the closed chain. |
 | `structure/zensu-doctor-invocation.test.js` | 27 | – | `test-semantic-units.sh` | The /zensu-doctor invocation allowlist. |
 <!-- unit-registry:end section-4 -->

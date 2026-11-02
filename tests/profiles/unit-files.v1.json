@@ -103,7 +103,7 @@
     },
     {
       "path": "tests/host/test-session-adapter.js",
-      "registered": 29,
+      "registered": 30,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
@@ -607,7 +607,7 @@
     },
     {
       "path": "tests/structure/zen-anchor-assertions.test.js",
-      "registered": 12,
+      "registered": 15,
       "runs": [
         {
           "driver": "tests/structure/test-zen-mode.sh"

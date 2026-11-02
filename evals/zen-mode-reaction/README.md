@@ -1,8 +1,8 @@
 # Native Zen reaction evaluation
 
 This opt-in suite uses the configured Antigravity account and is NOT a CI gate. It measures
-model reaction to the full and compact Zen contracts in eight synthetic prompts, each in a
-fresh disposable workspace. Deterministic assertions cover concise full sentences, scope,
+model reaction to the full and compact Zen contracts in twelve synthetic prompts, each in a
+fresh disposable workspace. Deterministic assertions cover result-first answers, closing session blocks, the user's chosen style, scope,
 safety exceptions and honest chain-progress anchors. The scenario text is checked against
 the real hook by `test-promptfoo-zen-mode.sh` and `test-zen-mode.sh` without model calls.
 
@@ -16,6 +16,10 @@ this suite does not attest tool-execution absence, the real hook injection path,
 review execution or the chain gate. Those require their dedicated native probes.
 
 The adapter encloses observed native prose in `[assistant_text]` for the existing graders.
-It does not manufacture tool-call sections or execution attestations. The eight scenarios
+It does not manufacture tool-call sections or execution attestations. The twelve scenarios
 retain their canonical assertion bodies and are repeated three times to expose variation.
 Review a failed style proxy in context instead of treating it as a product correctness gate.
+
+The session-block and first-turn scenarios each have a short-contract twin.
+Their deterministic grader vectors reject invented history, duplicate current work,
+missing unverified labels, excessive history, and progress invented without a chain.
