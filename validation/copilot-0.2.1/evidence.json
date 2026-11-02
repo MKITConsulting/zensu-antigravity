@@ -2,9 +2,9 @@
   "schema": "zensu-workflow-repair-pr-evidence-v1",
   "status": "recorded-native-gaps-closed-by-followups",
   "originalSourceHead": "94044ffa2ef3dffc7075096b52a9ec6dbd5583a8",
-  "runtimeDigest": "sha256:6b5bc1fdcf9cf4b52591b72f98fbffc7199817535bfa2dd4a7464f86afbb4193",
+  "runtimeDigest": "sha256:0b4107d027772a16bbe29a02e7b983386c0c88cf6e0a1773519f3e4b316cabeb",
   "nativePayloadFiles": 336,
-  "nativeArchiveSha256": "f066527164ca5e6021635d458152e31990ecd53c5c237bbbddd15435f3650b8c",
+  "nativeArchiveSha256": "1a88928dd44099719e8d73fa364d5c57edbb2a1ed5cb98a431bd8ac5f1bf4627",
   "scope": "Dated local and native observations plus successful November 2 worker follow-up; not a new complete native run, GitHub CI result or human acceptance",
   "deterministic": {
     "dateUtc": "2026-10-23",
@@ -57,8 +57,8 @@
   "workerFollowup": {
     "localDate": "2026-11-02",
     "timezone": "Europe/Berlin",
-    "startedAt": "2026-11-02T12:08:02.183374+00:00",
-    "finishedAt": "2026-11-02T12:08:36.906809+00:00",
+    "startedAt": "2026-11-02T13:03:39.238897+00:00",
+    "finishedAt": "2026-11-02T13:04:07.641825+00:00",
     "host": "AGY 1.4.8",
     "status": "PASS",
     "scenario": "live-native-worker-prepare",
@@ -72,12 +72,12 @@
     "completedModelResponses": 1,
     "response": "READY",
     "toolCalls": 0,
-    "sessionIdHash": "sha256:351342fef93dfbf842e487172317e05795c231747bbde95faef7a815801d01dd",
+    "sessionIdHash": "sha256:574a4d917980221965c1630021fb54c4132cfb4a184ab33135ff5c74c53dddc2",
     "preparationReceiptExists": true,
     "receiptMode": "0600",
     "receiptCreatedDuringRun": true,
     "nativeIdentityWorkspaceRuntimeBindingVerified": true,
-    "runtimeDigest": "sha256:6b5bc1fdcf9cf4b52591b72f98fbffc7199817535bfa2dd4a7464f86afbb4193",
+    "runtimeDigest": "sha256:0b4107d027772a16bbe29a02e7b983386c0c88cf6e0a1773519f3e4b316cabeb",
     "independentEvidence": {
       "passed": 23,
       "total": 23,
@@ -187,7 +187,7 @@
       "fileCount": 336,
       "sourceByteMatches": true,
       "hooksRenderMatches": true,
-      "archiveSha256": "f066527164ca5e6021635d458152e31990ecd53c5c237bbbddd15435f3650b8c"
+      "archiveSha256": "1a88928dd44099719e8d73fa364d5c57edbb2a1ed5cb98a431bd8ac5f1bf4627"
     },
     "modelOverride": false,
     "forcedCleanup": false,
@@ -195,28 +195,28 @@
     "temporaryTrustEntriesRemoved": 1,
     "settingsRestoredByteForByte": true,
     "recordHashes": {
-      "ownCliLog": "b1eacdd5adf08b2ef3288f43d8018aa8c2fa90029f87a440a9a16cb15968183a",
-      "nativeTranscript": "2b41fae44f2c46300747c58b75ad392f55b075ce20050445c77e5c37099dfcae",
-      "protectedPreparationReceipt": "9eed46478cad2047a39a21e9ae3b7005edddf5b3ab716bd29f22d6d384eca221",
-      "result.json": "d5a5675becd1225ce8914e0a74048564bbaf6dfcf1a31b74ba9d00e85c520584",
-      "independent-evidence.json": "59bd16b65324c83bf780e066adb69899cd6a4b7734f171837bbbaf95c01faf3a",
-      "assertion-replay.json": "9714ea150a7709d33742fb9335fb4af2ed066751ec4d9efa5fab09aaa44054ed",
-      "preservation.json": "2c5574b72e440cceff393c463a90a08690f9d98af44bf5e52285dc800fd57ec5",
-      "package-verification.json": "16b33f8950b54998b371da69902c99e81e3ad5608b567cbab709eddd91ec52a4",
+      "ownCliLog": "37f2bd6e8bc93eac7385eec8eb2d77ee978ecb3c9d3771936fe1b6977f840db2",
+      "nativeTranscript": "b33700b8d5fc658adf9ce1f42045aa97436b257b556ac62cdabd5a5959004f11",
+      "protectedPreparationReceipt": "7ebae529964bfc8bbd554be4f77e12f840a3adafd261c5426e137cefee84b097",
+      "result.json": "7d191e8523d864c2136d86e14a77138bb1109788b5097e5738b42f608b4b6401",
+      "independent-evidence.json": "5860ff11e038493415a015b3437567addb6109c14edf7a4d150cc9e66963ebf0",
+      "assertion-replay.json": "c68bd3c4aeb0d3e747d65753717d107a2996f40f07fc16c9857bfdbe9cb3b6a5",
+      "preservation.json": "26ce9f9a8839938f9f31b347d447738e4da27f6e3dee2f305cbf1cf09691aa6f",
+      "package-verification.json": "713715e47273560021aabe46bcb83b14bc8afbcecae85f3f4fff24fa56bd3141",
       "verify-native.js": "f6a989b079d4a7d6b18c791c4257e9d6233c1292a15643a0162a75e4399e50a5",
       "run-native.py": "e16237904f3a995536d6e7902fa8a4e1dc10231d508680af42d5468b471c19b7",
       "scenario.json": "135c0d5cd52f2b32870abd62d24e146a977f044abd653d208147d10c07afbd9c",
-      "trust-add-applied.json": "e77707ad0d96b90d92faea0c7a0969e8a5efe08b4270df4deeb269ce1d5a5f89",
-      "trust-remove-applied.json": "fc8351071d13c5c906dbd89368741ae143a0b73fd8705a1307dbdcf16bab5d84"
+      "trust-add-applied.json": "6f1df7b6dc646cf5ad81644b4c6852e262b32b2f5bda3ceb820eeeb3eb697474",
+      "trust-remove-applied.json": "e5aef5df54e62f26da9af168463b24db7b861b0f502da83347c475cff583fd3a"
     },
     "verificationCorrection": "None in this integration recheck; the checker already uses the pinned domain-separated session hash.",
-    "limits": "Successful unchanged production-launcher preparation of the merged v0.5.0 runtime. Prior full native matrix and invoice/npm checks remain separately dated; no fresh full 45-scenario claim.",
+    "limits": "Successful unchanged production-launcher preparation of the integrated v0.6.0 runtime. Prior full native matrix and invoice/npm checks remain separately dated; no fresh full 45-scenario claim.",
     "sourceParents": [
-      "ca85a62ed023512da3517ad6406787a961eef6f3",
-      "63165be6d66aa9a8aa3e0e32695051f557a81275"
+      "a4857b26615d7b0eec2ce0196abf63bd56379cb1",
+      "58381928bfc519d808853b7d0cec4833c25e3424"
     ],
-    "sourceScope": "Frozen resolved integration snapshot; final source files must match this snapshot byte-for-byte before push. Validation documents are outside the shipped runtime.",
-    "pluginVersion": "0.5.0"
+    "sourceScope": "Frozen integration of the subsequent main version-only 0.6.0 commit. All 638 source files must match the final source before push. Validation documents are outside the shipped runtime.",
+    "pluginVersion": "0.6.0"
   },
   "invoice": {
     "date": "2026-10-23",
@@ -461,6 +461,170 @@
       },
       "verificationCorrection": "The first supplementary independent hash check omitted the session schema domain prefix. It was corrected to the pinned schema: SHA256(zensu.session-control/v1/session-id + NUL + native UUID). The initial failed check is retained. No repository code, assertion, scanner, launcher, timeout or gate changed, and the native model call was not repeated.",
       "limits": "One successful production-launcher preparation with original gates; not a new full 45-scenario run or invoice/npm rerun. No private transcript or absolute machine path is published."
+    },
+    {
+      "localDate": "2026-11-02",
+      "timezone": "Europe/Berlin",
+      "startedAt": "2026-11-02T12:08:02.183374+00:00",
+      "finishedAt": "2026-11-02T12:08:36.906809+00:00",
+      "host": "AGY 1.4.8",
+      "status": "PASS",
+      "scenario": "live-native-worker-prepare",
+      "sourceHead": null,
+      "acceptanceExitCode": 0,
+      "catalogTimeoutSeconds": 180,
+      "printTimeoutSeconds": 120,
+      "launcherTimeoutSeconds": 150,
+      "providerTimeoutSeconds": 210,
+      "marker": "NATIVE-WORKER-PREPARED BOUND-TOOL-FREE",
+      "completedModelResponses": 1,
+      "response": "READY",
+      "toolCalls": 0,
+      "sessionIdHash": "sha256:351342fef93dfbf842e487172317e05795c231747bbde95faef7a815801d01dd",
+      "preparationReceiptExists": true,
+      "receiptMode": "0600",
+      "receiptCreatedDuringRun": true,
+      "nativeIdentityWorkspaceRuntimeBindingVerified": true,
+      "runtimeDigest": "sha256:6b5bc1fdcf9cf4b52591b72f98fbffc7199817535bfa2dd4a7464f86afbb4193",
+      "independentEvidence": {
+        "passed": 23,
+        "total": 23,
+        "checks": [
+          {
+            "name": "original diagnostic assertion passes",
+            "pass": true
+          },
+          {
+            "name": "original opted-in scanner reports no unverified result",
+            "pass": true
+          },
+          {
+            "name": "explicit native success marker",
+            "pass": true
+          },
+          {
+            "name": "provider completed normally with no forced cleanup",
+            "pass": true
+          },
+          {
+            "name": "catalog timeout unchanged",
+            "pass": true
+          },
+          {
+            "name": "actual UUID and expected workspace",
+            "pass": true
+          },
+          {
+            "name": "one newly written workspace-correlated log with actual UUID",
+            "pass": true
+          },
+          {
+            "name": "own log hash and both identifiers match",
+            "pass": true
+          },
+          {
+            "name": "no hook parse rejection in own log",
+            "pass": true
+          },
+          {
+            "name": "no quota exhaustion in own log",
+            "pass": true
+          },
+          {
+            "name": "one exact explicit preparation request",
+            "pass": true
+          },
+          {
+            "name": "exactly one completed public READY response",
+            "pass": true
+          },
+          {
+            "name": "zero native tool calls",
+            "pass": true
+          },
+          {
+            "name": "original transcript proof accepts actual native rows",
+            "pass": true
+          },
+          {
+            "name": "protected real preparation receipt",
+            "pass": true
+          },
+          {
+            "name": "receipt created inside this live run",
+            "pass": true
+          },
+          {
+            "name": "immutable native identity binding",
+            "pass": true
+          },
+          {
+            "name": "immutable exact workspace and plugin binding",
+            "pass": true
+          },
+          {
+            "name": "immutable runtime matches fresh package and measured payload",
+            "pass": true
+          },
+          {
+            "name": "unchanged production prepared predicate accepts",
+            "pass": true
+          },
+          {
+            "name": "native settings unchanged during the run",
+            "pass": true
+          },
+          {
+            "name": "all owned processes exited",
+            "pass": true
+          },
+          {
+            "name": "temporary trust removed and original settings restored byte-for-byte",
+            "pass": true
+          }
+        ]
+      },
+      "preservation": {
+        "passed": 18,
+        "total": 18,
+        "originalSourceFiles": 619,
+        "integrationSourceFiles": 638,
+        "sharedPluginsUnchanged": true
+      },
+      "nativePackage": {
+        "fileCount": 336,
+        "sourceByteMatches": true,
+        "hooksRenderMatches": true,
+        "archiveSha256": "f066527164ca5e6021635d458152e31990ecd53c5c237bbbddd15435f3650b8c"
+      },
+      "modelOverride": false,
+      "forcedCleanup": false,
+      "toolApprovalRequests": 0,
+      "temporaryTrustEntriesRemoved": 1,
+      "settingsRestoredByteForByte": true,
+      "recordHashes": {
+        "ownCliLog": "b1eacdd5adf08b2ef3288f43d8018aa8c2fa90029f87a440a9a16cb15968183a",
+        "nativeTranscript": "2b41fae44f2c46300747c58b75ad392f55b075ce20050445c77e5c37099dfcae",
+        "protectedPreparationReceipt": "9eed46478cad2047a39a21e9ae3b7005edddf5b3ab716bd29f22d6d384eca221",
+        "result.json": "d5a5675becd1225ce8914e0a74048564bbaf6dfcf1a31b74ba9d00e85c520584",
+        "independent-evidence.json": "59bd16b65324c83bf780e066adb69899cd6a4b7734f171837bbbaf95c01faf3a",
+        "assertion-replay.json": "9714ea150a7709d33742fb9335fb4af2ed066751ec4d9efa5fab09aaa44054ed",
+        "preservation.json": "2c5574b72e440cceff393c463a90a08690f9d98af44bf5e52285dc800fd57ec5",
+        "package-verification.json": "16b33f8950b54998b371da69902c99e81e3ad5608b567cbab709eddd91ec52a4",
+        "verify-native.js": "f6a989b079d4a7d6b18c791c4257e9d6233c1292a15643a0162a75e4399e50a5",
+        "run-native.py": "e16237904f3a995536d6e7902fa8a4e1dc10231d508680af42d5468b471c19b7",
+        "scenario.json": "135c0d5cd52f2b32870abd62d24e146a977f044abd653d208147d10c07afbd9c",
+        "trust-add-applied.json": "e77707ad0d96b90d92faea0c7a0969e8a5efe08b4270df4deeb269ce1d5a5f89",
+        "trust-remove-applied.json": "fc8351071d13c5c906dbd89368741ae143a0b73fd8705a1307dbdcf16bab5d84"
+      },
+      "verificationCorrection": "None in this integration recheck; the checker already uses the pinned domain-separated session hash.",
+      "limits": "Successful unchanged production-launcher preparation of the merged v0.5.0 runtime. Prior full native matrix and invoice/npm checks remain separately dated; no fresh full 45-scenario claim.",
+      "sourceParents": [
+        "ca85a62ed023512da3517ad6406787a961eef6f3",
+        "63165be6d66aa9a8aa3e0e32695051f557a81275"
+      ],
+      "sourceScope": "Frozen resolved integration snapshot; final source files must match this snapshot byte-for-byte before push. Validation documents are outside the shipped runtime.",
+      "pluginVersion": "0.5.0"
     }
   ],
   "originalRuntimeDigest": "sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531",
@@ -491,5 +655,20 @@
       "bothDirectoryProofFixtures": true
     },
     "limits": "Every assertion from both parents is retained. Registry counts and instruction pins were regenerated for the combined source. Final-head CI is an independent merge gate."
+  },
+  "versionOnlyMainFollowup": {
+    "mainHead": "58381928bfc519d808853b7d0cec4833c25e3424",
+    "priorMainHead": "63165be6d66aa9a8aa3e0e32695051f557a81275",
+    "changedFiles": [
+      "CHANGELOG.md",
+      "README.md",
+      "plugin.json"
+    ],
+    "executableChanges": false,
+    "versionGate": {
+      "passed": 4,
+      "failed": 0
+    },
+    "freshNativeWorkerProof": true
   }
 }

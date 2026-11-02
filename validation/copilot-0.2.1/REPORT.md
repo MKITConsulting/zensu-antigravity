@@ -188,6 +188,34 @@ reused as proof for v0.5.0. The earlier full native matrix and assisted invoice/
 results remain historical; this is not a new full suite or human acceptance.
 Merge remains conditional on successful CI for the final PR head.
 
+## Version-only main follow-up and fresh worker proof — November 2
+
+While the integration CI was running, `main` advanced to
+`58381928bfc519d808853b7d0cec4833c25e3424`. That commit changes only
+`plugin.json`, the README version badge and the CHANGELOG to **0.6.0**; it changes
+no executable source or tests. The version invariant passes **4/4** checks.
+
+A new isolated package and production worker-preparation run verifies the exact
+v0.6.0 integration, from `2026-11-02T13:03:39.238897+00:00` to `2026-11-02T13:04:07.641825+00:00` on AGY 1.4.8.
+The unchanged launcher produces one completed `READY` response, zero tool calls,
+and a protected preparation receipt bound to the real native session, workspace,
+plugin root and runtime. Original assertion/scanner: **acceptance exit 0**;
+independent verification **23/23**; preservation **18/18**. All **336** package
+files match the frozen source or exact portable hook render. Runtime digest:
+
+`sha256:0b4107d027772a16bbe29a02e7b983386c0c88cf6e0a1773519f3e4b316cabeb`
+
+Native ZIP SHA-256:
+
+`1a88928dd44099719e8d73fa364d5c57edbb2a1ed5cb98a431bd8ac5f1bf4627`
+
+The single temporary workspace trust entry was removed after owned processes
+exited. Settings were restored byte-for-byte; shared plugins and the original
+checkout remain unchanged. All 638 frozen source files must match the final PR
+source. This is fresh worker-preparation proof, not a rerun of the earlier full
+native matrix or invoice/npm acceptance. Previous v0.2.0 and v0.5.0 successes
+remain separately recorded. Merge is conditional on green CI for the final head.
+
 To reproduce the deterministic gate, run `ZENSU_TEST_JOBS=2 bash tests/run-all.sh`
 from a clean checkout after `npm ci`. The supported default remains unchanged.
 For native testing, follow [the interactive runner instructions](../../evals/promptfoo/live/INTERACTIVE.md),

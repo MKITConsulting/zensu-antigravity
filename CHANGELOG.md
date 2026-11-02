@@ -5,6 +5,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-02
+
+### Added
+
+- **ai-work**: Bind automatic capture to a confirmed product (#24)
+
 ## [0.5.0] - 2026-10-28
 
 ### Added
