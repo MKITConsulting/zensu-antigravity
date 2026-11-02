@@ -95,10 +95,32 @@ apply_event() {
 
 tdd_cycle() {
   local attempt="$1" return_stage="$2" chain_id="$3"
+  local stem="2026-01-01-0101_tdd-full-cycle-$1" plan log proof
+  plan="$PROJECT/.zensu/plans/$stem.md"
+  log="$PROJECT/.zensu/logs/$stem.log"
+  proof="$ROOT/predicates-$attempt.json"
   ZENSU_PROJECT_DIR="$PROJECT" bash "$LOG_HELPER" --tdd-begin \
     --session "$SESSION" --autopilot-run "$RUN" --autopilot-attempt "$attempt" \
-    --autopilot-return-stage "$return_stage" --chain-id "$chain_id" >/dev/null \
-    && ZENSU_PROJECT_DIR="$PROJECT" bash "$LOG_HELPER" --tdd-complete \
+    --autopilot-return-stage "$return_stage" --chain-id "$chain_id" >/dev/null || return 1
+  mkdir -p "$PROJECT/.zensu/plans" "$PROJECT/.zensu/logs"
+  printf '# Fixture implementation\n\n## Requirements\n| ID | Requirement | Source |\n| --- | --- | --- |\n| FR-001 | Persist this implementation attempt | fixture |\n' > "$plan"
+  printf 'implementation attempt %s\n' "$attempt" > "$PROJECT/work.txt"
+  printf 'S1 IMPL completed — files: work.txt\n' > "$log"
+  # This composed lifecycle fixture is intentionally non-Git. Real bounded
+  # current-file proofs establish its audit scope instead of a fabricated clean
+  # receipt; the shell helper binds each receipt to this actual TDD generation.
+  node - "$PROJECT/work.txt" "$proof" <<'NODE'
+const fs = require('node:fs'), crypto = require('node:crypto');
+const bytes = fs.readFileSync(process.argv[2]);
+fs.writeFileSync(process.argv[3], JSON.stringify({ schema: 'edit-landing-predicates-v1', claims: [{
+  step: 'S1', path: 'work.txt', sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+  present: [bytes.toString('utf8')],
+}] }));
+NODE
+  [ "$?" -eq 0 ] || return 1
+  ZENSU_PROJECT_DIR="$PROJECT" bash "$PLUGIN_DIR/hooks/lib/zensu-edit-landing.sh" \
+    --project "$PROJECT" --log "$log" --session "$SESSION" --predicates "$proof" >/dev/null \
+    && ZENSU_PROJECT_DIR="$PROJECT" bash "$LOG_HELPER" --tdd-complete --plan "$plan" \
       --session "$SESSION" --autopilot-run "$RUN" --autopilot-attempt "$attempt" \
       --autopilot-return-stage "$return_stage" --chain-id "$chain_id" >/dev/null \
     && ZENSU_PROJECT_DIR="$PROJECT" bash "$LOG_HELPER" --chain-done \

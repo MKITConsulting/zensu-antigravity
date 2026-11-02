@@ -85,6 +85,10 @@ function normalize(input, event = '', options = {}) {
   out.tool_name = TOOL_NAMES[nativeName] || nativeName;
   if (nativeName) out.native_tool_name = nativeName;
   out.native_tool_input = { ...args };
+  // AGY 1.4.3 writes through Path/Content. Compatibility fields must never
+  // shadow the actual target or body (including an empty-file write).
+  if (nativeName === 'write_file' && (typeof args.Path !== 'string' || !args.Path
+      || typeof args.Content !== 'string')) throw new Error('write_file requires Path and Content strings');
   const currentFileTool = ['read_file', 'write_file', 'edit_file'].includes(nativeName);
   // Native fields are authoritative: compatibility aliases cannot redirect a file gate.
   const ti = currentFileTool ? {} : { ...prior };
@@ -111,7 +115,7 @@ function normalize(input, event = '', options = {}) {
     if (Object.prototype.hasOwnProperty.call(args, 'Recipient')) ti.recipient = args.Recipient;
     if (Object.prototype.hasOwnProperty.call(args, 'Message')) ti.message = args.Message;
   }
-  const content = currentFileTool ? (nativeName === 'write_file' ? firstString(args.Content) : '')
+  const content = currentFileTool ? (nativeName === 'write_file' ? args.Content : '')
     : firstString(args.CodeContent, args.Content, args.content, args.NewContent, args.CodeEdit, prior.content);
   if (content) ti.content = content;
   const replacement = currentFileTool ? '' : firstString(args.ReplacementContent, args.NewContent, args.new_string, prior.new_string);
@@ -135,7 +139,8 @@ function normalize(input, event = '', options = {}) {
   }
   if (edits.length) ti.edits = edits;
   const bodies = [content, nativeName === 'edit_file' ? ti.new_string : replacement, ...edits.map((edit) => edit.new_string)].filter(Boolean);
-  if (bodies.length) ti.content = bodies.join('\n');
+  if (nativeName === 'write_file') ti.content = content;
+  else if (bodies.length) ti.content = bodies.join('\n');
   if (out.tool_name === 'Edit' && !ti.new_string && content) ti.new_string = content;
   out.tool_input = ti;
   const workspaces = Array.isArray(raw.workspacePaths) ? raw.workspacePaths : raw.workspace_paths;

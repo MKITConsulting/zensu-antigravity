@@ -1,0 +1,854 @@
+{
+  "schema": "zensu-workflow-repair-pr-evidence-v1",
+  "status": "recorded-native-gaps-closed-by-followups",
+  "originalSourceHead": "94044ffa2ef3dffc7075096b52a9ec6dbd5583a8",
+  "runtimeDigest": "sha256:53e437d6b716d5db6aaa0a0813f492ee8b0d106b3b99c526095246221ffcba85",
+  "nativePayloadFiles": 337,
+  "nativeArchiveSha256": "ed861f9a50cf3faf32a3521a6e4210a1c39a7cddd9bdba34917cd47dfb6f4c21",
+  "scope": "Dated local and native observations plus successful November 2 worker follow-up; not a new complete native run, GitHub CI result or human acceptance",
+  "deterministic": {
+    "dateUtc": "2026-10-23",
+    "finalStatus": "PASS",
+    "suites": {
+      "passed": 79,
+      "failed": 0
+    },
+    "structure": {
+      "passed": 77,
+      "failed": 0
+    },
+    "offline": {
+      "configuration": 57,
+      "promptfoo": 110
+    },
+    "outerWorkers": 2,
+    "priorFourWorkerResult": {
+      "passed": 78,
+      "failed": 1
+    },
+    "limits": "Three timing failures in the first run passed in unchanged isolated reruns and the complete two-worker rerun. Assertions and timeouts were not relaxed."
+  },
+  "fullNativeSweep": {
+    "date": "2026-10-23",
+    "host": "AGY 1.4.6",
+    "verified": 43,
+    "unverified": 2,
+    "exitCode": 1,
+    "openAtThatRun": [
+      "live-stop-block-and-resume",
+      "live-native-worker-prepare"
+    ]
+  },
+  "stopFollowup": {
+    "dateUtc": "2026-10-23",
+    "status": "PASS",
+    "continuation": {
+      "verified": true,
+      "armedUserStep": 3,
+      "blockedStep": 7,
+      "resumedStep": 9,
+      "activity": "tool-call",
+      "completedToolResults": 1
+    },
+    "workflowComplete": false,
+    "oneTimeApprovals": 1,
+    "limits": "Controlled Stop block and same-session completed tool continuation; not workflow closure or a fresh 45-scenario run."
+  },
+  "workerFollowup": {
+    "localDate": "2026-11-02",
+    "timezone": "Europe/Berlin",
+    "startedAt": "2026-11-02T22:06:35.031035+00:00",
+    "finishedAt": "2026-11-02T22:06:52.706167+00:00",
+    "host": "AGY 1.4.12",
+    "status": "PASS",
+    "scenario": "live-native-worker-prepare",
+    "sourceHead": null,
+    "acceptanceExitCode": 0,
+    "catalogTimeoutSeconds": 180,
+    "printTimeoutSeconds": 120,
+    "launcherTimeoutSeconds": 150,
+    "providerTimeoutSeconds": 210,
+    "marker": "NATIVE-WORKER-PREPARED BOUND-TOOL-FREE",
+    "completedModelResponses": 1,
+    "response": "READY",
+    "toolCalls": 0,
+    "sessionIdHash": "sha256:8d4f28fc6e56a7d9d0fe342c006e395441bb26dbc025b4118f085c98834b6d4a",
+    "preparationReceiptExists": true,
+    "receiptMode": "0600",
+    "receiptCreatedDuringRun": true,
+    "nativeIdentityWorkspaceRuntimeBindingVerified": true,
+    "runtimeDigest": "sha256:53e437d6b716d5db6aaa0a0813f492ee8b0d106b3b99c526095246221ffcba85",
+    "independentEvidence": {
+      "passed": 23,
+      "total": 23,
+      "checks": [
+        {
+          "name": "original diagnostic assertion passes",
+          "pass": true
+        },
+        {
+          "name": "original opted-in scanner reports no unverified result",
+          "pass": true
+        },
+        {
+          "name": "explicit native success marker",
+          "pass": true
+        },
+        {
+          "name": "provider completed normally without forced cleanup",
+          "pass": true
+        },
+        {
+          "name": "catalog timeout unchanged",
+          "pass": true
+        },
+        {
+          "name": "actual UUID and exact workspace",
+          "pass": true
+        },
+        {
+          "name": "one newly written correlated log with actual UUID",
+          "pass": true
+        },
+        {
+          "name": "own log hash and both identities match",
+          "pass": true
+        },
+        {
+          "name": "no hook parse rejection in own log",
+          "pass": true
+        },
+        {
+          "name": "no quota exhaustion in own log",
+          "pass": true
+        },
+        {
+          "name": "one exact explicit preparation request",
+          "pass": true
+        },
+        {
+          "name": "exactly one completed public READY response",
+          "pass": true
+        },
+        {
+          "name": "zero native tool calls",
+          "pass": true
+        },
+        {
+          "name": "original transcript proof accepts actual native rows",
+          "pass": true
+        },
+        {
+          "name": "protected real preparation receipt",
+          "pass": true
+        },
+        {
+          "name": "receipt created inside this run",
+          "pass": true
+        },
+        {
+          "name": "immutable native identity binding",
+          "pass": true
+        },
+        {
+          "name": "immutable exact workspace and plugin binding",
+          "pass": true
+        },
+        {
+          "name": "immutable runtime matches measured fresh package",
+          "pass": true
+        },
+        {
+          "name": "unchanged production preparation predicate accepts",
+          "pass": true
+        },
+        {
+          "name": "settings unchanged during native run",
+          "pass": true
+        },
+        {
+          "name": "all owned processes exited",
+          "pass": true
+        },
+        {
+          "name": "temporary trust removed with byte-exact settings restoration",
+          "pass": true
+        }
+      ]
+    },
+    "preservation": {
+      "passed": 8,
+      "total": 8,
+      "originalSourceFiles": 623,
+      "sharedPluginsUnchanged": true,
+      "settingsObservation": "The broad preflight settings observation changed before the preparation backup and owned trust write. That newer state was preserved byte-for-byte. The earlier failed aggregate is retained, and no unrelated settings were overwritten."
+    },
+    "nativePackage": {
+      "fileCount": 337,
+      "sourceByteMatches": true,
+      "hooksRenderMatches": true,
+      "archiveSha256": "ed861f9a50cf3faf32a3521a6e4210a1c39a7cddd9bdba34917cd47dfb6f4c21"
+    },
+    "modelOverride": false,
+    "forcedCleanup": false,
+    "toolApprovalRequests": 0,
+    "temporaryTrustEntriesRemoved": 1,
+    "settingsRestoredByteForByte": true,
+    "recordHashes": {
+      "ownCliLogSha256": "c060b9dfa295008c85d083c526c3d219cfaa17d5268bd2418053135b495a0693",
+      "transcriptSha256": "9a7e8be9cf112f8ca6df513ab838414fa0b02c2d610130acb648660aefe50dfe",
+      "preparationReceiptSha256": "15bf29cdde8e9fbacb2227483dd5650fca8f9232f5dc5da33775fce482cd2af0",
+      "result.json": "308f056007d87a1a77e5abbcaa9def669a3fb755e45f6a88ec3fa08b4b277783",
+      "package-verification.json": "9aac98d5f99a8f0a675a2d78537221cd653b423bbdf7b2871f7cc4d8bd10bb95",
+      "assertion-replay.json": "d2c0928bae4a57d46ef79c6cc5dea2a8eed2c3e07071213b0fa5dc91b4ce0c22",
+      "trust-add-applied.json": "88be66301c9d9e145eff20bc5f814380c37ab5a03605c7488c567866fb32dffe",
+      "trust-remove-applied.json": "fe30dc1592e6bbe2bad074d6fc0ab06a7a169b362ae7691a57390abc836cb5d6",
+      "nativeProof": "9fb84719a9be050e9a7e6cc68df816cf47fe62219d65cf11ff7fa4d037d61fa2"
+    },
+    "verificationCorrection": "None in this integration recheck; the checker already uses the pinned domain-separated session hash.",
+    "limits": "Successful unchanged production-launcher preparation on the newly integrated feature-scope runtime. Earlier full native matrix and invoice/npm checks remain separately dated; this is not a new full 45-scenario claim.",
+    "sourceParents": [
+      "6d14578464e2426eb3cdb3e5abab73e01945b0af",
+      "6a1626664340ca38ebd420bbe6bfc67aaee256ea"
+    ],
+    "sourceScope": "Frozen resolved integration including the subsequent main feature-scope change. Only two registry conflicts were resolved by retaining all entries, updating the capture counts and regenerating the overview.",
+    "pluginVersion": "0.6.0"
+  },
+  "invoice": {
+    "date": "2026-10-23",
+    "nativeCompletionPass": true,
+    "childChainPass": true,
+    "nativeChildren": 8,
+    "reportPass": true,
+    "operatorInterventions": [
+      "Unapproved consumer command was stopped; same-session continuation required project-local offline install and observable consumer cwd.",
+      "A 3600-second bounded turn timed out; same-session continuation used frozen native documentation pointers.",
+      "Premature chain-done was not approved because required current-file self-review reads were absent; the native continuation then read all nine files fully.",
+      "First closed-generation report correction fixed created-vs-total counts, vanilla mode and missing reflection.",
+      "Second literal report-only correction removed invented product advice and bounded dimension notes."
+    ],
+    "limits": [
+      "Assisted native workflow and report correction; not unattended execution or unassisted model-quality proof.",
+      "Thin consume skips standalone inspection under its frozen contract; its unsuccessful optional read remains recorded, all provenance/completion gates passed.",
+      "Security child raw assertions exceed executed security-test coverage; final report limits claims to observed checks.",
+      "Zero findings exercise verification and routing of an empty set, not live finding reproduction or a terminal fix round."
+    ]
+  },
+  "independentInvoicePackage": {
+    "date": "2026-10-23",
+    "status": "pass",
+    "originalChecksPassed": 14,
+    "directInstalledNpmBinPass": true,
+    "tarballSha256": "08c9536c204a731c159c04f0113a4d4ba8b9b922dda3e9ec5897e506d71502c7",
+    "scope": "Installed built invoice npm package from a real consumer cwd; separate from plugin/native acceptance"
+  },
+  "sourceRecordHashes": {
+    "stop-resume-local-gate-20261023.json": "cd7f62b2a8eeb38a50d1c84faf08e57a7e85b0550293df5990494bf3031b184f",
+    "stop-resume-native-20261023.json": "e5e9b45fdfd8b9c69aee9b9bbcae7d07254e48460bb6ef9dc7f40138a77b7bd0",
+    "worker-recheck-native-20261024.json": "f80293b94ae50ce50abfaf89bcee299a96ea1b112fdf012f31716a57b68804c2",
+    "native-repairs-live-20261023.json": "a532f237b72b8b93a65cb2a63be84a0d0999324bbb4184e4b669ae286b37ed2f",
+    "native-repairs-invoice-20261023.json": "83840a0cc1cb33b6e4492ba68e806ac725a9e298955b9bb2775de6aef5579f37",
+    "native-20261023-package.json": "a8585b60ca0cec617809606a3396e463450c9c5e1888203ba7786f03a76002e9",
+    "native-repairs-audit-20261023.json": "437a2faf5a756e1df3283e48eba0df14d144ea8d1eec8fd70b8a786bb63d9284",
+    "native-20261023-readme.json": "9d2922644fdfb8e372b8d7c1b866039e1d462dadcfce70d5e7140f64752c5dd7",
+    "worker-recheck-native-20261102.json": "a183898441b4078c54aeb3122ce2a570a6e049326eb9521d015d384cc3c23d17"
+  },
+  "freshPrChecks": {
+    "startedAt": "2026-10-24T17:21:04.190109+00:00",
+    "finishedAt": "2026-10-24T17:22:42.433295+00:00",
+    "scope": "Fresh focused deterministic checks and native ZIP verification in the isolated PR worktree; no model calls",
+    "allStepsPassed": true,
+    "interactiveTests": 57,
+    "workflowTests": {
+      "auditScope": 22,
+      "nativeAuditSessionFixtures": 7,
+      "workflowArtifacts": 6,
+      "workflowGuidance": 6
+    },
+    "liveProviderAssertions": 71,
+    "pairedGateVerdictsPassed": true,
+    "testRegistryPassed": true,
+    "nativePackage": {
+      "fileCount": 325,
+      "allFilesMatchPreviouslyTestedFrozenPlugin": true,
+      "archiveSha256": "8c5f1160c98bcd49c1ad38b7f5e3fc65c54e3dfc3788fac818f412111896e41d",
+      "runtimeDigest": "sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531"
+    },
+    "firstAttempt": {
+      "status": "FAIL",
+      "failedInteractiveCases": 3,
+      "reason": "Direct isolated test invocation omitted the existing tests/prepare-runtime.js prerequisite; hooks.json was missing. The normal full runner already performs this step.",
+      "resolution": "Regenerated the local ignored hooks.json through tests/prepare-runtime.js and reran unchanged tests; no source or gate edits."
+    },
+    "recordSha256": "e3f96c17dbeb2bff48b2875b439680603c20b0dc301d0a07f043efcf82bd0edb"
+  },
+  "workerFollowupHistory": [
+    {
+      "localDate": "2026-10-24",
+      "timezone": "Europe/Berlin",
+      "startedAt": "2026-10-23T22:07:49.796223+00:00",
+      "finishedAt": "2026-10-23T22:08:07.301741+00:00",
+      "host": "AGY 1.4.6",
+      "status": "UNVERIFIED",
+      "acceptanceExitCode": 1,
+      "catalogTimeoutSeconds": 180,
+      "elapsedSecondsApprox": 17.5,
+      "blocker": "RESOURCE_EXHAUSTED (code 429): Individual quota reached",
+      "reportedResetEstimate": "46h34m44s at the observed run; not current readiness",
+      "completedModelResponses": 0,
+      "toolCalls": 0,
+      "preparationReceiptExists": false,
+      "temporaryTrustEntriesRemoved": 1,
+      "settingsRestoredByteForByte": true
+    },
+    {
+      "localDate": "2026-11-02",
+      "timezone": "Europe/Berlin",
+      "startedAt": "2026-11-02T08:46:57.142126+00:00",
+      "finishedAt": "2026-11-02T08:47:20.442184+00:00",
+      "host": "AGY 1.4.8",
+      "status": "PASS",
+      "scenario": "live-native-worker-prepare",
+      "sourceHead": "b625a309beac25950a67f9c07568fbd90741f50e",
+      "acceptanceExitCode": 0,
+      "catalogTimeoutSeconds": 180,
+      "printTimeoutSeconds": 120,
+      "launcherTimeoutSeconds": 150,
+      "providerTimeoutSeconds": 210,
+      "marker": "NATIVE-WORKER-PREPARED BOUND-TOOL-FREE",
+      "completedModelResponses": 1,
+      "response": "READY",
+      "toolCalls": 0,
+      "sessionIdHash": "sha256:35ed0eecf07083b68f6d90d3c8a79e26be4158e6367d64717d9a691f2a407f71",
+      "preparationReceiptExists": true,
+      "receiptMode": "0600",
+      "receiptCreatedDuringRun": true,
+      "nativeIdentityWorkspaceRuntimeBindingVerified": true,
+      "runtimeDigest": "sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531",
+      "independentEvidence": {
+        "passed": 23,
+        "total": 23,
+        "checks": [
+          {
+            "name": "original diagnostic assertion passes",
+            "pass": true
+          },
+          {
+            "name": "original opted-in scanner reports no unverified result",
+            "pass": true
+          },
+          {
+            "name": "explicit native success marker",
+            "pass": true
+          },
+          {
+            "name": "provider completed normally with no forced cleanup",
+            "pass": true
+          },
+          {
+            "name": "catalog timeout unchanged",
+            "pass": true
+          },
+          {
+            "name": "actual UUID and expected workspace",
+            "pass": true
+          },
+          {
+            "name": "one newly written workspace-correlated log with actual UUID",
+            "pass": true
+          },
+          {
+            "name": "own log hash and both identifiers match",
+            "pass": true
+          },
+          {
+            "name": "no hook parse rejection in own log",
+            "pass": true
+          },
+          {
+            "name": "no quota exhaustion in own log",
+            "pass": true
+          },
+          {
+            "name": "one exact explicit preparation request",
+            "pass": true
+          },
+          {
+            "name": "exactly one completed public READY response",
+            "pass": true
+          },
+          {
+            "name": "zero native tool calls",
+            "pass": true
+          },
+          {
+            "name": "original transcript proof accepts actual native rows",
+            "pass": true
+          },
+          {
+            "name": "protected real preparation receipt",
+            "pass": true
+          },
+          {
+            "name": "receipt created inside this live run",
+            "pass": true
+          },
+          {
+            "name": "immutable native identity binding",
+            "pass": true
+          },
+          {
+            "name": "immutable exact workspace and plugin binding",
+            "pass": true
+          },
+          {
+            "name": "immutable runtime matches fresh package and measured payload",
+            "pass": true
+          },
+          {
+            "name": "unchanged production prepared predicate accepts",
+            "pass": true
+          },
+          {
+            "name": "native settings unchanged during the run",
+            "pass": true
+          },
+          {
+            "name": "all owned processes exited",
+            "pass": true
+          },
+          {
+            "name": "temporary trust removed and original settings restored byte-for-byte",
+            "pass": true
+          }
+        ]
+      },
+      "preservation": {
+        "passed": 18,
+        "total": 18,
+        "originalSourceFiles": 619,
+        "sharedPluginsUnchanged": true
+      },
+      "nativePackage": {
+        "fileCount": 325,
+        "sourceByteMatches": true,
+        "hooksRenderMatches": true,
+        "archiveSha256": "8d9ce22a8d0edc46b125a36ea583eaa7dfcc38bda67576e462529907ebd32a92"
+      },
+      "modelOverride": false,
+      "forcedCleanup": false,
+      "toolApprovalRequests": 0,
+      "temporaryTrustEntriesRemoved": 1,
+      "settingsRestoredByteForByte": true,
+      "recordHashes": {
+        "ownCliLog": "06ce85403adcf48b59009fcf57f25a6862136d00c857c796e268acef54834473",
+        "nativeTranscript": "100674c8a3ab542f057f9e3fe2b1c1da5d43c3222037855cc9d654191d150e47",
+        "protectedPreparationReceipt": "7bfe2e9795616b8cb64e632f31c8565cd8a336219fca14e527fffbccd86a5165",
+        "result.json": "4d9c64832b49c6e220adb570ad8067abd04f710b1bd55b3949116b6c1b897dae",
+        "independent-evidence.json": "a49c0d852735d0a428636c7606a3b65b2357a52318a9ae6118410876fdd36f5c",
+        "assertion-replay.json": "e7f754d2333267245ff091080286461f6c7e90228b8ef12e58c59136b39b2ac6",
+        "preservation.json": "634f396b3545a3cc26d7aa8cdcdd27a40d7519d2d6990fafb757bd32cd37fd7d",
+        "package-verification.json": "8ba9befdaa91f058561ba8a1d272bdc82184647b1ca08fb3b568dda04f63e3cf",
+        "verify-native.js": "f6a989b079d4a7d6b18c791c4257e9d6233c1292a15643a0162a75e4399e50a5",
+        "run-native.py": "e16237904f3a995536d6e7902fa8a4e1dc10231d508680af42d5468b471c19b7",
+        "scenario.json": "135c0d5cd52f2b32870abd62d24e146a977f044abd653d208147d10c07afbd9c",
+        "trust-add-applied.json": "46f4a3c5324685b331f409ea287bd0d9bb7fd49ce3e78d579b280aa9157415bf",
+        "trust-remove-applied.json": "91d9f304828eb22fccba8e8114cc85fb60d823cecd5d663a499ae5b6c97f1f6b"
+      },
+      "verificationCorrection": "The first supplementary independent hash check omitted the session schema domain prefix. It was corrected to the pinned schema: SHA256(zensu.session-control/v1/session-id + NUL + native UUID). The initial failed check is retained. No repository code, assertion, scanner, launcher, timeout or gate changed, and the native model call was not repeated.",
+      "limits": "One successful production-launcher preparation with original gates; not a new full 45-scenario run or invoice/npm rerun. No private transcript or absolute machine path is published."
+    },
+    {
+      "localDate": "2026-11-02",
+      "timezone": "Europe/Berlin",
+      "startedAt": "2026-11-02T12:08:02.183374+00:00",
+      "finishedAt": "2026-11-02T12:08:36.906809+00:00",
+      "host": "AGY 1.4.8",
+      "status": "PASS",
+      "scenario": "live-native-worker-prepare",
+      "sourceHead": null,
+      "acceptanceExitCode": 0,
+      "catalogTimeoutSeconds": 180,
+      "printTimeoutSeconds": 120,
+      "launcherTimeoutSeconds": 150,
+      "providerTimeoutSeconds": 210,
+      "marker": "NATIVE-WORKER-PREPARED BOUND-TOOL-FREE",
+      "completedModelResponses": 1,
+      "response": "READY",
+      "toolCalls": 0,
+      "sessionIdHash": "sha256:351342fef93dfbf842e487172317e05795c231747bbde95faef7a815801d01dd",
+      "preparationReceiptExists": true,
+      "receiptMode": "0600",
+      "receiptCreatedDuringRun": true,
+      "nativeIdentityWorkspaceRuntimeBindingVerified": true,
+      "runtimeDigest": "sha256:6b5bc1fdcf9cf4b52591b72f98fbffc7199817535bfa2dd4a7464f86afbb4193",
+      "independentEvidence": {
+        "passed": 23,
+        "total": 23,
+        "checks": [
+          {
+            "name": "original diagnostic assertion passes",
+            "pass": true
+          },
+          {
+            "name": "original opted-in scanner reports no unverified result",
+            "pass": true
+          },
+          {
+            "name": "explicit native success marker",
+            "pass": true
+          },
+          {
+            "name": "provider completed normally with no forced cleanup",
+            "pass": true
+          },
+          {
+            "name": "catalog timeout unchanged",
+            "pass": true
+          },
+          {
+            "name": "actual UUID and expected workspace",
+            "pass": true
+          },
+          {
+            "name": "one newly written workspace-correlated log with actual UUID",
+            "pass": true
+          },
+          {
+            "name": "own log hash and both identifiers match",
+            "pass": true
+          },
+          {
+            "name": "no hook parse rejection in own log",
+            "pass": true
+          },
+          {
+            "name": "no quota exhaustion in own log",
+            "pass": true
+          },
+          {
+            "name": "one exact explicit preparation request",
+            "pass": true
+          },
+          {
+            "name": "exactly one completed public READY response",
+            "pass": true
+          },
+          {
+            "name": "zero native tool calls",
+            "pass": true
+          },
+          {
+            "name": "original transcript proof accepts actual native rows",
+            "pass": true
+          },
+          {
+            "name": "protected real preparation receipt",
+            "pass": true
+          },
+          {
+            "name": "receipt created inside this live run",
+            "pass": true
+          },
+          {
+            "name": "immutable native identity binding",
+            "pass": true
+          },
+          {
+            "name": "immutable exact workspace and plugin binding",
+            "pass": true
+          },
+          {
+            "name": "immutable runtime matches fresh package and measured payload",
+            "pass": true
+          },
+          {
+            "name": "unchanged production prepared predicate accepts",
+            "pass": true
+          },
+          {
+            "name": "native settings unchanged during the run",
+            "pass": true
+          },
+          {
+            "name": "all owned processes exited",
+            "pass": true
+          },
+          {
+            "name": "temporary trust removed and original settings restored byte-for-byte",
+            "pass": true
+          }
+        ]
+      },
+      "preservation": {
+        "passed": 18,
+        "total": 18,
+        "originalSourceFiles": 619,
+        "integrationSourceFiles": 638,
+        "sharedPluginsUnchanged": true
+      },
+      "nativePackage": {
+        "fileCount": 336,
+        "sourceByteMatches": true,
+        "hooksRenderMatches": true,
+        "archiveSha256": "f066527164ca5e6021635d458152e31990ecd53c5c237bbbddd15435f3650b8c"
+      },
+      "modelOverride": false,
+      "forcedCleanup": false,
+      "toolApprovalRequests": 0,
+      "temporaryTrustEntriesRemoved": 1,
+      "settingsRestoredByteForByte": true,
+      "recordHashes": {
+        "ownCliLog": "b1eacdd5adf08b2ef3288f43d8018aa8c2fa90029f87a440a9a16cb15968183a",
+        "nativeTranscript": "2b41fae44f2c46300747c58b75ad392f55b075ce20050445c77e5c37099dfcae",
+        "protectedPreparationReceipt": "9eed46478cad2047a39a21e9ae3b7005edddf5b3ab716bd29f22d6d384eca221",
+        "result.json": "d5a5675becd1225ce8914e0a74048564bbaf6dfcf1a31b74ba9d00e85c520584",
+        "independent-evidence.json": "59bd16b65324c83bf780e066adb69899cd6a4b7734f171837bbbaf95c01faf3a",
+        "assertion-replay.json": "9714ea150a7709d33742fb9335fb4af2ed066751ec4d9efa5fab09aaa44054ed",
+        "preservation.json": "2c5574b72e440cceff393c463a90a08690f9d98af44bf5e52285dc800fd57ec5",
+        "package-verification.json": "16b33f8950b54998b371da69902c99e81e3ad5608b567cbab709eddd91ec52a4",
+        "verify-native.js": "f6a989b079d4a7d6b18c791c4257e9d6233c1292a15643a0162a75e4399e50a5",
+        "run-native.py": "e16237904f3a995536d6e7902fa8a4e1dc10231d508680af42d5468b471c19b7",
+        "scenario.json": "135c0d5cd52f2b32870abd62d24e146a977f044abd653d208147d10c07afbd9c",
+        "trust-add-applied.json": "e77707ad0d96b90d92faea0c7a0969e8a5efe08b4270df4deeb269ce1d5a5f89",
+        "trust-remove-applied.json": "fc8351071d13c5c906dbd89368741ae143a0b73fd8705a1307dbdcf16bab5d84"
+      },
+      "verificationCorrection": "None in this integration recheck; the checker already uses the pinned domain-separated session hash.",
+      "limits": "Successful unchanged production-launcher preparation of the merged v0.5.0 runtime. Prior full native matrix and invoice/npm checks remain separately dated; no fresh full 45-scenario claim.",
+      "sourceParents": [
+        "ca85a62ed023512da3517ad6406787a961eef6f3",
+        "63165be6d66aa9a8aa3e0e32695051f557a81275"
+      ],
+      "sourceScope": "Frozen resolved integration snapshot; final source files must match this snapshot byte-for-byte before push. Validation documents are outside the shipped runtime.",
+      "pluginVersion": "0.5.0"
+    },
+    {
+      "localDate": "2026-11-02",
+      "timezone": "Europe/Berlin",
+      "startedAt": "2026-11-02T13:03:39.238897+00:00",
+      "finishedAt": "2026-11-02T13:04:07.641825+00:00",
+      "host": "AGY 1.4.8",
+      "status": "PASS",
+      "scenario": "live-native-worker-prepare",
+      "sourceHead": null,
+      "acceptanceExitCode": 0,
+      "catalogTimeoutSeconds": 180,
+      "printTimeoutSeconds": 120,
+      "launcherTimeoutSeconds": 150,
+      "providerTimeoutSeconds": 210,
+      "marker": "NATIVE-WORKER-PREPARED BOUND-TOOL-FREE",
+      "completedModelResponses": 1,
+      "response": "READY",
+      "toolCalls": 0,
+      "sessionIdHash": "sha256:574a4d917980221965c1630021fb54c4132cfb4a184ab33135ff5c74c53dddc2",
+      "preparationReceiptExists": true,
+      "receiptMode": "0600",
+      "receiptCreatedDuringRun": true,
+      "nativeIdentityWorkspaceRuntimeBindingVerified": true,
+      "runtimeDigest": "sha256:0b4107d027772a16bbe29a02e7b983386c0c88cf6e0a1773519f3e4b316cabeb",
+      "independentEvidence": {
+        "passed": 23,
+        "total": 23,
+        "checks": [
+          {
+            "name": "original diagnostic assertion passes",
+            "pass": true
+          },
+          {
+            "name": "original opted-in scanner reports no unverified result",
+            "pass": true
+          },
+          {
+            "name": "explicit native success marker",
+            "pass": true
+          },
+          {
+            "name": "provider completed normally with no forced cleanup",
+            "pass": true
+          },
+          {
+            "name": "catalog timeout unchanged",
+            "pass": true
+          },
+          {
+            "name": "actual UUID and expected workspace",
+            "pass": true
+          },
+          {
+            "name": "one newly written workspace-correlated log with actual UUID",
+            "pass": true
+          },
+          {
+            "name": "own log hash and both identifiers match",
+            "pass": true
+          },
+          {
+            "name": "no hook parse rejection in own log",
+            "pass": true
+          },
+          {
+            "name": "no quota exhaustion in own log",
+            "pass": true
+          },
+          {
+            "name": "one exact explicit preparation request",
+            "pass": true
+          },
+          {
+            "name": "exactly one completed public READY response",
+            "pass": true
+          },
+          {
+            "name": "zero native tool calls",
+            "pass": true
+          },
+          {
+            "name": "original transcript proof accepts actual native rows",
+            "pass": true
+          },
+          {
+            "name": "protected real preparation receipt",
+            "pass": true
+          },
+          {
+            "name": "receipt created inside this live run",
+            "pass": true
+          },
+          {
+            "name": "immutable native identity binding",
+            "pass": true
+          },
+          {
+            "name": "immutable exact workspace and plugin binding",
+            "pass": true
+          },
+          {
+            "name": "immutable runtime matches fresh package and measured payload",
+            "pass": true
+          },
+          {
+            "name": "unchanged production prepared predicate accepts",
+            "pass": true
+          },
+          {
+            "name": "native settings unchanged during the run",
+            "pass": true
+          },
+          {
+            "name": "all owned processes exited",
+            "pass": true
+          },
+          {
+            "name": "temporary trust removed and original settings restored byte-for-byte",
+            "pass": true
+          }
+        ]
+      },
+      "preservation": {
+        "passed": 18,
+        "total": 18,
+        "originalSourceFiles": 619,
+        "integrationSourceFiles": 638,
+        "sharedPluginsUnchanged": true
+      },
+      "nativePackage": {
+        "fileCount": 336,
+        "sourceByteMatches": true,
+        "hooksRenderMatches": true,
+        "archiveSha256": "1a88928dd44099719e8d73fa364d5c57edbb2a1ed5cb98a431bd8ac5f1bf4627"
+      },
+      "modelOverride": false,
+      "forcedCleanup": false,
+      "toolApprovalRequests": 0,
+      "temporaryTrustEntriesRemoved": 1,
+      "settingsRestoredByteForByte": true,
+      "recordHashes": {
+        "ownCliLog": "37f2bd6e8bc93eac7385eec8eb2d77ee978ecb3c9d3771936fe1b6977f840db2",
+        "nativeTranscript": "b33700b8d5fc658adf9ce1f42045aa97436b257b556ac62cdabd5a5959004f11",
+        "protectedPreparationReceipt": "7ebae529964bfc8bbd554be4f77e12f840a3adafd261c5426e137cefee84b097",
+        "result.json": "7d191e8523d864c2136d86e14a77138bb1109788b5097e5738b42f608b4b6401",
+        "independent-evidence.json": "5860ff11e038493415a015b3437567addb6109c14edf7a4d150cc9e66963ebf0",
+        "assertion-replay.json": "c68bd3c4aeb0d3e747d65753717d107a2996f40f07fc16c9857bfdbe9cb3b6a5",
+        "preservation.json": "26ce9f9a8839938f9f31b347d447738e4da27f6e3dee2f305cbf1cf09691aa6f",
+        "package-verification.json": "713715e47273560021aabe46bcb83b14bc8afbcecae85f3f4fff24fa56bd3141",
+        "verify-native.js": "f6a989b079d4a7d6b18c791c4257e9d6233c1292a15643a0162a75e4399e50a5",
+        "run-native.py": "e16237904f3a995536d6e7902fa8a4e1dc10231d508680af42d5468b471c19b7",
+        "scenario.json": "135c0d5cd52f2b32870abd62d24e146a977f044abd653d208147d10c07afbd9c",
+        "trust-add-applied.json": "6f1df7b6dc646cf5ad81644b4c6852e262b32b2f5bda3ceb820eeeb3eb697474",
+        "trust-remove-applied.json": "e5aef5df54e62f26da9af168463b24db7b861b0f502da83347c475cff583fd3a"
+      },
+      "verificationCorrection": "None in this integration recheck; the checker already uses the pinned domain-separated session hash.",
+      "limits": "Successful unchanged production-launcher preparation of the integrated v0.6.0 runtime. Prior full native matrix and invoice/npm checks remain separately dated; no fresh full 45-scenario claim.",
+      "sourceParents": [
+        "a4857b26615d7b0eec2ce0196abf63bd56379cb1",
+        "58381928bfc519d808853b7d0cec4833c25e3424"
+      ],
+      "sourceScope": "Frozen integration of the subsequent main version-only 0.6.0 commit. All 638 source files must match the final source before push. Validation documents are outside the shipped runtime.",
+      "pluginVersion": "0.6.0"
+    }
+  ],
+  "originalRuntimeDigest": "sha256:b73fc2936032f20b6efd0737c1eb7b3c0fe370bc53432222f2788d07f0281531",
+  "originalNativePayloadFiles": 325,
+  "originalNativeArchiveSha256": "ac382c60feb7ef1226935b0b7d29f0bec98705199d032dc1fa8e36ef794fdc74",
+  "mainIntegration": {
+    "mainHead": "63165be6d66aa9a8aa3e0e32695051f557a81275",
+    "conflictedFiles": 52,
+    "preservedMainFeatures": [
+      "confirmed product-scoped work capture",
+      "automatic context discovery",
+      "startup invocation composition",
+      "current native read/edit tool mapping",
+      "portable candidate-stage live testing"
+    ],
+    "preservedRepairGates": [
+      "strict write_file Path/Content protection",
+      "canonical review packets and fresh audit receipts",
+      "parent-child prompt/tree/runtime/result binding",
+      "one-time interactive approvals",
+      "strict Stop/resume observation"
+    ],
+    "focused": {
+      "nativeProvenance": 38,
+      "sessionAdapter": 29,
+      "liveProviderHelpers": 76,
+      "registryGate": 5,
+      "bothDirectoryProofFixtures": true
+    },
+    "limits": "Every assertion from both parents is retained. Registry counts and instruction pins were regenerated for the combined source. Final-head CI is an independent merge gate."
+  },
+  "versionOnlyMainFollowup": {
+    "mainHead": "58381928bfc519d808853b7d0cec4833c25e3424",
+    "priorMainHead": "63165be6d66aa9a8aa3e0e32695051f557a81275",
+    "changedFiles": [
+      "CHANGELOG.md",
+      "README.md",
+      "plugin.json"
+    ],
+    "executableChanges": false,
+    "versionGate": {
+      "passed": 4,
+      "failed": 0
+    },
+    "freshNativeWorkerProof": true
+  },
+  "featureScopeMainIntegration": {
+    "mainHead": "6a1626664340ca38ebd420bbe6bfc67aaee256ea",
+    "conflictedFiles": [
+      "tests/profiles/unit-files.v1.json",
+      "tests/SUITE-OVERVIEW.md"
+    ],
+    "captureCases": 16,
+    "nativeCaptureCases": 6,
+    "registryAndVersionGates": "pass",
+    "noAssertionsRemoved": true,
+    "noTimeoutChanges": true
+  },
+  "priorFinalCi": {
+    "head": "6d14578464e2426eb3cdb3e5abab73e01945b0af",
+    "run": 41450007791,
+    "passedSuites": 83,
+    "failedSuites": 0,
+    "status": "success",
+    "limits": "Passed before the subsequent main feature-scope integration; final integrated-head CI remains a separate merge gate."
+  }
+}

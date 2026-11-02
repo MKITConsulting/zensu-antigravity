@@ -28,12 +28,12 @@ For reanchor, set the shell tool's native working-directory property to the targ
 
 All state-changing helper calls use `{session-helper} --helper <name> -- <arguments>`.
 Read `{plugin_root}/docs/upstream-parity.md` when this skill names a host facility.
-Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles,
-with one call per role containing `TypeName`, `Role`, `Workspace: "inherit"`,
-`Model: "inherit"` and a complete `Prompt`. CLI 1.4.7 accepts this flat descriptor;
-only older hosts whose tool schema requires it use a `Subagents` array. Follow the calling review procedure's private
-lease and actual child-UUID completion checks; a role name or model-written result is not
-proof of execution. Keep implementation in the main conversation. No source-host Agent,
+Use the actual native `invoke_subagent` tool for registered read-only reviewer profiles.
+On agy 1.4.3, use one flat call per role with `TypeName`, `Role`, `Workspace: "inherit"`,
+`Model: "inherit"` and a complete `Prompt`. Use a legacy `Subagents` array only when the
+exposed host schema permits it; never mix both forms or add unknown arguments. Follow the
+calling review procedure's private lease and actual child-UUID completion checks; a role
+name or model-written result is not proof of execution. Keep implementation in the main conversation. No source-host Agent,
 SendMessage, Workflow, desktop transfer or implicit plan-approval callback is assumed.
 Use a direct user question for required input and a persisted step table for progress.
 
@@ -146,17 +146,22 @@ only these points:
    id to `--driver` when you record the criterion.
    The credential-blind rules above bind every driver: never the
    autopilot `storageState` login, and never a secret in a command or in the evidence. An
-   exit-code check reaches only an unauthenticated, synthetic, loopback target and discards its
-   own output (`curl -fsS -o /dev/null http://127.0.0.1:<port>/…`, `<command> >/dev/null 2>&1`),
-   because the evidence runner prints the tail of that output to you. A criterion that needs a
-   token file, ambient credentials or a non-loopback host is `partial`.
+   exit-code check reaches only an unauthenticated, synthetic, loopback target. Before preparing
+   any check, read [acceptance evidence](rules/acceptance-evidence.md) in full: suppress raw
+   application/network output before the evidence runner, while retaining only bounded,
+   predeclared synthetic assertion diagnostics. A criterion that needs a token file, ambient
+   credentials or a non-loopback host is `partial`. Localhost alone does not prove safe output.
 4. **The plugin observes every exit-code check.** Run the check through
    `{session-helper} --helper log -- --evidence-run --scope acceptance --cmd '<check>' --log <run log>`
    and cite the `record=er1_…` id of its summary line. The check must leave the working tree
    unchanged, tracked and untracked non-ignored files alike, so it writes any output outside the
    project or to a gitignored path: a run that changed the tree cannot back a verdict. A Maestro
    flow runs the same way.
-5. **Record each criterion right after you observe it,** never batched at the end. First write `<absolute-evidence.txt>` containing one or two factual sentences about the observed result, then call:
+5. **Record each criterion right after you observe it,** never batched at the end. One real
+   acceptance run may cover multiple ACs on the same unchanged tree: map its assertions first,
+   then immediately record each covered AC separately with the same evidence-run ID under
+   [acceptance evidence](rules/acceptance-evidence.md). Never turn a failed aggregate run, unit
+   run or prose into acceptance proof. First write `<absolute-evidence.txt>` containing one or two factual sentences about the observed result, then call:
 
    ```bash
    {session-helper} --helper log --stdin-file '<absolute-evidence.txt>' -- --acceptance-record --ac AC-001 --verdict pass --driver browser --log '<absolute-run-log>'

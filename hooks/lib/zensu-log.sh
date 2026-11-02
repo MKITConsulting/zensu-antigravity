@@ -327,6 +327,34 @@ _zensu_acceptance_gate() {
   return 1
 }
 
+_zensu_terminal_edit_landing_gate() {
+  local session="$1" receipt state bound changes
+  if [ "${ZENSU_EDIT_LANDING_GATE:-on}" = "off" ]; then
+    tdd_record_bypass "$session" ZENSU_EDIT_LANDING_GATE >/dev/null 2>&1 || true
+    return 0
+  fi
+  receipt="$(tdd_edit_landing_receipt "$session")" || return 1
+  state="$(tdd_state_file "$session")" || return 1
+  # Preserve the legacy zero-change/non-Git exception only without a bound
+  # execution log or receipt. A Git error is never evidence of either case.
+  if [ ! -e "$receipt" ] && [ ! -L "$receipt" ]; then
+    bound="$(ZEL_STATE="$state" node -e 'try { const s=JSON.parse(require("node:fs").readFileSync(process.env.ZEL_STATE,"utf8")); process.stdout.write(s.workflowArtifacts ? "bound" : "unbound"); } catch (_) { process.exit(1); }')" || return 1
+    changes="$(_zensu_unqualified_change_count "$ZENSU_PROJECT_DIR")"
+    if [ "$bound" = "unbound" ] && [ "$changes" = "0" ]; then return 0; fi
+    if [ "$bound" = "unbound" ] && [ "$changes" = "unknown" ]; then
+      if ZEL_ROOT="$ZENSU_PROJECT_DIR" node -e 'const c=require(process.argv[1]).collectChanges({root:process.env.ZEL_ROOT}); process.exit(c.kind === "explicit-no-git" || c.changed_files.length === 0 ? 0 : 1)' \
+        "${ZENSU_PLUGIN_ROOT}/hooks/lib/review-packet-v1.js" >/dev/null 2>&1; then return 0; fi
+    fi
+  fi
+  if ! ZENSU_ELR_RECEIPT="$receipt" ZENSU_ELR_PROJECT_ROOT="$ZENSU_PROJECT_DIR" ZENSU_ELR_SESSION="$session" \
+    node "${ZENSU_PLUGIN_ROOT}/hooks/lib/edit-landing-receipt-v1.js" fresh; then
+    echo "zensu-log.sh --chain-done: the chain stays open; run the edit-landing audit for this generation with current predicate proofs, then retry closure." >&2
+    ZENSU_ELR_RECEIPT="$receipt" ZENSU_ELR_PROJECT_ROOT="$ZENSU_PROJECT_DIR" ZENSU_ELR_SESSION="$session" \
+      node "${ZENSU_PLUGIN_ROOT}/hooks/lib/edit-landing-receipt-v1.js" recovery >&2 || true
+    return 1
+  fi
+}
+
 _evr_dir=""
 _avr_dir=""
 
@@ -2396,6 +2424,7 @@ case "${1:-}" in
                     chain_gate_rc=0
                     _zensu_full_suite_gate "$session_val" || chain_gate_rc=1
                     _zensu_acceptance_gate "$session_val" || chain_gate_rc=1
+                    _zensu_terminal_edit_landing_gate "$session_val" || chain_gate_rc=1
                     [ "$chain_gate_rc" -eq 0 ] || exit 1
                   fi
                   ;;
@@ -2417,6 +2446,7 @@ case "${1:-}" in
               [ -n "$_avg_lines" ] && printf '%s\n' "$_avg_lines" >&2
             else
               chain_change_count="$(_zensu_unqualified_change_count "$ZENSU_PROJECT_DIR")"
+              _zensu_terminal_edit_landing_gate "$session_val" || exit 1
               tdd_mark_unclaimed_review "$session_val" chainDone "$chain_change_count" || {
                 chain_done_rc=$?
                 [ "$chain_done_rc" -eq 4 ] || {
@@ -2433,6 +2463,7 @@ case "${1:-}" in
             fi
           fi
           zensu_render_terminus_bypasses "$session_val"
+          echo "CHAIN CLOSED — render-report-only for this generation; do not reinvoke self-review or reopen it."
           exit 0
         fi
         [ -n "$autopilot_run_val" ] && [ -n "$autopilot_attempt_val" ] && [ -n "$chain_id_val" ] || {
@@ -2465,6 +2496,7 @@ case "${1:-}" in
               || _zensu_full_suite_ticket_matches "$session_val" "$claimed_ticket_val"; then
               _zensu_full_suite_gate "$session_val" || exit 1
               _zensu_acceptance_gate "$session_val" 1 "$(_zensu_autopilot_validate_option "$done_run")" || exit 1
+              _zensu_terminal_edit_landing_gate "$session_val" || exit 1
             fi
             ;;
           max-rounds)
@@ -2484,6 +2516,7 @@ case "${1:-}" in
           [ -n "$_fsg_lines" ] && printf '%s\n' "$_fsg_lines" >&2
           [ -n "$_avg_lines" ] && printf '%s\n' "$_avg_lines" >&2
           zensu_render_terminus_bypasses "$session_val"
+          echo "CHAIN CLOSED — render-report-only for this generation; do not reinvoke self-review or reopen it."
         fi
         exit "$chain_done_rc"
         ;;

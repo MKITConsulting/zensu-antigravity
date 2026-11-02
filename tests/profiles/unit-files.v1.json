@@ -2,26 +2,24 @@
   "schemaVersion": 1,
   "files": [
     {
-      "path": "tests/structure/startup-process-budget.test.js",
-      "registered": 1,
-      "runs": [{ "driver": "tests/structure/test-invocation-chain.sh" }],
-      "summary": "Packaged startup preserves the complete advisory output while bounding subprocess starts and retaining the native 90-second deadline."
-    },
-    {
-      "path": "tests/structure/invocation-chain.test.js",
-      "registered": 7,
-      "runs": [{ "driver": "tests/structure/test-invocation-chain.sh" }],
-      "summary": "Invocation composition preserves startup order, native rendering, private de-bounce, pending context, refusal precedence and truthful diagnostics."
-    },
-    {
       "path": "tests/host/native-agent-provenance.test.js",
-      "registered": 25,
+      "registered": 38,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
         }
       ],
       "summary": "Native agent provenance: real assertions with strict count, completion and no-unexpected-skip verification."
+    },
+    {
+      "path": "tests/host/native-audit-session.test.js",
+      "registered": 7,
+      "runs": [
+        {
+          "driver": "tests/structure/test-workflow-repairs.sh"
+        }
+      ],
+      "summary": "Authoritative native audit identity, explicit session recovery, and terminal freshness gates."
     },
     {
       "path": "tests/host/native-reviewer-outcome.test.js",
@@ -65,7 +63,7 @@
     },
     {
       "path": "tests/host/test-native-review.js",
-      "registered": 10,
+      "registered": 16,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
@@ -105,7 +103,7 @@
     },
     {
       "path": "tests/host/test-session-adapter.js",
-      "registered": 25,
+      "registered": 29,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
@@ -134,6 +132,36 @@
       "summary": "Acceptance records: the record schema and store, the verify-feature driver ids, criteria from the shared lister, the chain anchor, criterion and gate verdicts, and retention."
     },
     {
+      "path": "tests/structure/agy-interactive-run.test.js",
+      "registered": 57,
+      "runs": [
+        {
+          "driver": "tests/structure/test-interactive-live-runner.sh"
+        }
+      ],
+      "summary": "Interactive live transport: exact native turn and child provenance, refusal of permission bypass, one-time operator input, private reasoning redaction and hermetic PTY relay."
+    },
+    {
+      "path": "tests/structure/ai-work-capture.test.js",
+      "registered": 16,
+      "runs": [
+        {
+          "driver": "tests/structure/test-ai-work-capture.sh"
+        }
+      ],
+      "summary": "Work capture: durable exact retries, account binding and human-only decisions."
+    },
+    {
+      "path": "tests/structure/ai-work-native.test.js",
+      "registered": 6,
+      "runs": [
+        {
+          "driver": "tests/structure/test-ai-work-capture.sh"
+        }
+      ],
+      "summary": "Native capture: immutable conversation binding, child refusal and one-use helper authorization."
+    },
+    {
       "path": "tests/structure/antigravity-chain.test.js",
       "registered": 1,
       "runs": [
@@ -154,6 +182,16 @@
       "summary": "Review-aspect activation: which review perspectives a round activates for a given change."
     },
     {
+      "path": "tests/structure/autopilot-budget-lock.test.js",
+      "registered": 5,
+      "runs": [
+        {
+          "driver": "tests/structure/test-autopilot-budget-lock.sh"
+        }
+      ],
+      "summary": "Budget transactions under the real Core lease: eight slow-start writers, bounded contention refusal, semantic rollback and storage substitution while waiting. Atomic replacement faults preserve the failure code, state and lease cleanup."
+    },
+    {
       "path": "tests/structure/chain-recovery-v1.test.js",
       "registered": 21,
       "runs": [
@@ -162,6 +200,16 @@
         }
       ],
       "summary": "The chain shape lattice and the rearm-receipt predicate."
+    },
+    {
+      "path": "tests/structure/edit-landing-scope-v1.test.js",
+      "registered": 22,
+      "runs": [
+        {
+          "driver": "tests/structure/test-workflow-repairs.sh"
+        }
+      ],
+      "summary": "Persistent audit scope, bounded proofs, Git faults and receipt freshness."
     },
     {
       "path": "tests/structure/evidence-run-v1.test.js",
@@ -194,7 +242,7 @@
     },
     {
       "path": "tests/structure/finding-verify-v1.test.js",
-      "registered": 28,
+      "registered": 31,
       "runs": [
         {
           "driver": "tests/structure/test-semantic-units.sh"
@@ -231,6 +279,16 @@
         }
       ],
       "summary": "The pure half of source-write rule (C): gitTargets() repository resolution and the git mutation and option lattice."
+    },
+    {
+      "path": "tests/structure/invocation-chain.test.js",
+      "registered": 7,
+      "runs": [
+        {
+          "driver": "tests/structure/test-invocation-chain.sh"
+        }
+      ],
+      "summary": "Invocation composition preserves startup order, native rendering, private de-bounce, pending context, refusal precedence and truthful diagnostics."
     },
     {
       "path": "tests/structure/native-review-artifacts.test.js",
@@ -363,6 +421,16 @@
       "summary": "The review findings ledger: latest-wins, generations, carried open entries and fail-open verdicts."
     },
     {
+      "path": "tests/structure/review-packet-v1.test.js",
+      "registered": 9,
+      "runs": [
+        {
+          "driver": "tests/structure/test-review-packet.sh"
+        }
+      ],
+      "summary": "Canonical immutable packets and cumulative actual change inventories."
+    },
+    {
       "path": "tests/structure/review-round-scope-v1.test.js",
       "registered": 24,
       "runs": [
@@ -427,6 +495,16 @@
         }
       ],
       "summary": "The runtime-lineage axis: same major (same minor while the major is 0), never backwards, and a sibling plugin root."
+    },
+    {
+      "path": "tests/structure/startup-process-budget.test.js",
+      "registered": 1,
+      "runs": [
+        {
+          "driver": "tests/structure/test-invocation-chain.sh"
+        }
+      ],
+      "summary": "Packaged startup preserves the complete advisory output while bounding subprocess starts and retaining the native 90-second deadline."
     },
     {
       "path": "tests/structure/subagent-shell-guard-v1.test.js",
@@ -508,6 +586,26 @@
       "summary": "The work-order runtime: the CLI error grammar, the ledger-to-stage mapping, lease renewal and expiry, the inert context outside the mode, the DONE delivery order, the gate and the takeover release plan."
     },
     {
+      "path": "tests/structure/workflow-artifacts-v1.test.js",
+      "registered": 6,
+      "runs": [
+        {
+          "driver": "tests/structure/test-workflow-repairs.sh"
+        }
+      ],
+      "summary": "Generation-bound execution markers and evidence-derived native plan progress."
+    },
+    {
+      "path": "tests/structure/workflow-guidance.test.js",
+      "registered": 6,
+      "runs": [
+        {
+          "driver": "tests/structure/test-workflow-repairs.sh"
+        }
+      ],
+      "summary": "Bounded native guidance, safe diagnostics, routing and observed acceptance reuse."
+    },
+    {
       "path": "tests/structure/zen-anchor-assertions.test.js",
       "registered": 12,
       "runs": [
@@ -536,26 +634,6 @@
         }
       ],
       "summary": "The /zensu-doctor invocation allowlist."
-    },
-    {
-      "path": "tests/structure/ai-work-capture.test.js",
-      "registered": 16,
-      "runs": [
-        {
-          "driver": "tests/structure/test-ai-work-capture.sh"
-        }
-      ],
-      "summary": "Work capture: durable exact retries, account binding and human-only decisions."
-    },
-    {
-      "path": "tests/structure/ai-work-native.test.js",
-      "registered": 6,
-      "runs": [
-        {
-          "driver": "tests/structure/test-ai-work-capture.sh"
-        }
-      ],
-      "summary": "Native capture: immutable conversation binding, child refusal and one-use helper authorization."
     }
   ]
 }

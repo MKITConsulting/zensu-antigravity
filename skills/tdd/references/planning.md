@@ -77,3 +77,10 @@ Per integration step — 1 task:
 - `{step_id} [wire]` (current-action label: "Wiring {step_id}")
 
 Create each as a row in the plan's live progress table, with the step/phase label, one-line action, dependencies and `pending` status. Update the Phase 0 analyzing row to `completed`. These are native file edits, not calls to a task API.
+
+
+Reserve lifecycle completion for the helper-managed plan table: `Implementation audit
+accepted`, `Code review converged`, and `Workflow chain closed`. Do not create duplicate
+lifecycle rows or mark them from model judgment. `workflow-artifacts start` creates the
+managed table and successful native transitions reconcile it from observed state. Preserve
+blocked or cancelled work. The table records workflow state, not report delivery.

@@ -13,11 +13,11 @@ Issue a ticket and open its source-tree lease in separate shell calls:
 
 ```sh
 {session-helper} --helper log -- --review-ticket
-{session-helper} --helper review -- --begin --ticket "<returned-ticket>"
+{session-helper} --helper review -- --begin --ticket "<returned-ticket>" --packet-input "<absolute-packet-input.json>"
 ```
 
 Read the returned `schema: zensu-delegated-review-v1`, `execution: delegated`, exact ticket,
-tree, round, role list and `reportTemplate`. An empty ticket or refusal is a blocker: read
+tree, round, role list, `packetHash`, `packetBlock`, `consumerAssignment` and `reportTemplate`. An empty ticket or refusal is a blocker: read
 `--chain-status` and use its supported recovery route; never reset a chain to buy a budget.
 The native runtime owns the required roles. Match the round actually reviewed.
 
@@ -31,17 +31,24 @@ findings, explicitly declining to claim an inspection. With activation disabled,
 role actually reviews, on first and later rounds alike. Never replace a required child with
 main-thread prose or silently omit a selected custom/aspect pass.
 
-On CLI 1.4.7 call the actual native tool once per role with this argument shape, expanding every placeholder:
+On agy 1.4.3, call the actual native tool once per role with these flat arguments,
+expanding every placeholder:
 
 ```json
 {
-    "TypeName": "zensu-review-aspect",
-    "Role": "<exact role from the lease>",
-    "Workspace": "inherit",
-    "Model": "inherit",
-    "Prompt": "<complete REVIEW PACKET v1, assigned perspective, exact ticket/tree/role, inherited evidence and severity blocks, read-only boundary, output schema below>"
+  "TypeName": "zensu-review-aspect",
+  "Role": "<exact role from the lease>",
+  "Workspace": "inherit",
+  "Model": "inherit",
+  "Prompt": "<complete REVIEW PACKET v1, assigned perspective, exact ticket/tree/role, inherited evidence and severity blocks, read-only boundary, output schema below>"
 }
 ```
+
+The historical `{"Subagents":[...]}` batch is supported only when the exposed native tool
+schema accepts it. The observed 1.4.3 validator rejects `Subagents`, despite the public hooks
+reference still listing it. Never combine flat fields with `Subagents`, add undeclared
+arguments or turn a malformed array into a fallback flat request. If the actual schema
+cannot accept the supported shape, report that conflict without changing the plugin or gates.
 
 The exact `Role` equals the lease role, for example `correctness`, not a display label.
 Use the returned assignment's `PromptPrefix` verbatim as the first three prompt lines:
@@ -52,10 +59,11 @@ REVIEW-TREE: <tree>
 REVIEW-ROLE: <role>
 ```
 
-Then append the complete packet and output contract. Never prepend a greeting or omit a
+Then append the exact returned `packetBlock` and output contract. Never prepend a greeting or omit a
 prefix line; the adapter binds these exact identities to the actual native launch.
-Dispatch every required role. Only older host schemas require one `Subagents` array. Every child starts with its own complete
-packet and isolated conversation; no prior role conclusions enter a panel prompt. Custom
+Dispatch every required role exactly once, using one flat call per role on the current host.
+Every child starts with its own complete packet and isolated conversation; no prior role
+conclusions enter a panel prompt. Custom
 personas remain concern text inside this fixed type. Model overrides are not implicit.
 Each child must return one raw JSON object as its entire ordinary final response:
 
@@ -85,8 +93,10 @@ and disclose the uncertainty in the summary.
 
 ## Collect actual completed children
 
-Record each actual returned `conversation_id` from `subagent_info.subagents[]`, matched to
-the exact dispatched type, role, prompt and workspace. The native adapter verifies that
+Record each actual returned `conversation_id` from the native tool result, matched to
+the exact dispatched type, role, prompt and workspace. Historical batch results use
+`subagent_info.subagents[]`; do not infer a current result envelope or fabricate an ID when
+that evidence is absent. The native adapter verifies that
 parent step and child metadata before the first child tool call. A returned UUID or alive
 state proves launch only. Wait for every exact child to complete, then read its ordinary
 final response. Do not call messaging or task tools from a reviewer, fabricate a child ID,
@@ -103,8 +113,8 @@ children under a fresh ticket after correcting the cause.
 
 Run the configured first judge as a fresh `zensu-review-judge` child over the full packet
 and merged panel report. Use the same native shape, `Role: "judge"`, inherited model and
-workspace. When enabled on the first review, dispatch the second judge with another
-call as a fresh child with `Role: "judge-b"` and the same original input
+workspace. When enabled on the first review, dispatch the second judge through its own
+flat call as another fresh child with `Role: "judge-b"` and the same original input
 plus final line `judge_run: second`, excluding the first judge's deltas. Its distinct context is
 real; the canonical add-only and rule-breach rules still apply. Require final raw JSON
 `{"schema":"zensu-review-judge-result-v1","role":"<judge|judge-b>","report":"<complete canonical judge output>"}`.
@@ -117,8 +127,19 @@ For each actual judge UUID collect its protected completion:
 Use the same protected collection route for additional `zensu-review-aspect` children,
 with their exact type and role. Preserve raw results separately; custom roles do not enter
 the base lease's required `perspectives` array or add keys to its strict report template.
-Their verified findings still join the full merged report and ledger, with source labels. A failed configured judge remains a
-named `JUDGE UNAVAILABLE`/second-run gap under the canonical failure policy, not a clean pass.
+Their verified findings still join the full merged report and ledger, with source labels. A missing, rejected, failed, empty or malformed required primary judge blocks consume review:
+record `JUDGE UNAVAILABLE` and retry that actual native role on the same valid lease or
+report the blocker. A completed second judge cannot substitute for it. Preserve each
+completed judge UUID in the report template's `judges` array as `{role, childId}`; keep
+second-run unavailability visible under the documented add-only failure policy.
+
+Before submission dispatch the consume `zensu-code-reviewer` as its own native child using
+`consumerAssignment.PromptPrefix` unchanged. It starts with
+`PRE-MERGED FINDINGS (fan-out)`, then `REVIEW-TICKET:`, `REVIEW-TREE:` and `REVIEW-ROLE: consume`.
+Append the exact canonical `packetBlock`, verified merge and the consume contract. Require
+final raw JSON `{"schema":"zensu-code-review-result-v1","report":"<complete # Code Review Report including - Verdict:>"}`.
+Preserve its normal final completion and set `consumer: {"childId":"<actual-child-uuid>"}` in the
+report template. Neither main-thread prose nor an unfinished child satisfies this stage.
 
 ## Synthesis, reproduction and completion
 

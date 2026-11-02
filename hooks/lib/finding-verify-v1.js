@@ -22,7 +22,10 @@
 // read cap skips the range check and is graded by changed-set membership alone,
 // because an ungradable anchor is not a false one.
 //
-// Stdin carries both inputs behind markers, so one call needs no temp file and has
+// Preferred input is --input <JSON file> containing changedFiles and findings
+// string arrays. Each finding is one array item, even when it contains newlines,
+// delimiter words, quotes or shell syntax. Never interpolate findings into shell.
+// Legacy stdin carries both inputs behind markers, so one call needs no temp file and has
 // no ARG_MAX ceiling. CHANGED-FILES is optional (an absent set makes every real
 // anchor off-changeset); FINDINGS is required:
 //
@@ -245,8 +248,41 @@ function render(report) {
   return out.join("\n");
 }
 
+function parseJsonInput(text) {
+  const value = JSON.parse(text);
+  if (!value || Array.isArray(value) || typeof value !== "object"
+      || !Array.isArray(value.changedFiles) || !Array.isArray(value.findings)
+      || Object.keys(value).some(key => key !== "changedFiles" && key !== "findings")
+      || !value.changedFiles.every(entry => typeof entry === "string" && entry.trim() && !/[\r\n\0]/.test(entry))
+      || !value.findings.every(entry => typeof entry === "string" && entry.trim() && !entry.includes("\0"))) {
+    throw new Error("expected changedFiles and findings string arrays");
+  }
+  return { changedFiles: value.changedFiles, findings: value.findings };
+}
+
+function readJsonInput(file) {
+  const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.size > STDIN_MAX_BYTES) throw new Error("unbounded input");
+    // Bound the actual read too, even if the file grows after stat.
+    const bytes = Buffer.alloc(STDIN_MAX_BYTES + 1);
+    let length = 0;
+    while (length < bytes.length) {
+      const count = fs.readSync(fd, bytes, length, bytes.length - length, null);
+      if (count === 0) break;
+      length += count;
+    }
+    if (length > STDIN_MAX_BYTES) throw new Error("unbounded input");
+    return parseJsonInput(bytes.subarray(0, length).toString("utf8"));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 function parseArgs(argv) {
   let root = "";
+  let input = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = String(argv[i]);
     if (arg === "--root") {
@@ -254,20 +290,30 @@ function parseArgs(argv) {
       i++;
     } else if (arg.startsWith("--root=")) {
       root = arg.slice("--root=".length);
+    } else if (arg === "--input") {
+      input = argv[i + 1] === undefined ? "" : String(argv[++i]);
+    } else if (arg.startsWith("--input=")) {
+      input = arg.slice("--input=".length);
     }
   }
-  return { root };
+  return { root, input };
 }
 
 function cliMain(argv, stdinText) {
   const empty = render({ results: [], dropped: 0 });
-  const { root } = parseArgs(Array.isArray(argv) ? argv : []);
-  if (root === "") return empty;
+  const { root, input } = parseArgs(Array.isArray(argv) ? argv : []);
+  const invalid = "invalid-input malformed, unbounded or unusable finding JSON/root\n" + empty;
+  if (root === "") return input !== null ? invalid : empty;
   let parsed;
   try {
-    parsed = parseInput(stdinText);
+    if (input !== null) {
+      if (!fs.statSync(root).isDirectory()) return invalid;
+      parsed = readJsonInput(input);
+    } else {
+      parsed = parseInput(stdinText);
+    }
   } catch (_) {
-    return empty;
+    return input !== null ? invalid : empty;
   }
   if (parsed === null) return empty;
   try {
@@ -281,7 +327,9 @@ function cliMain(argv, stdinText) {
   }
 }
 
-if (require.main === module) {
+if (require.main === module && parseArgs(process.argv.slice(2)).input !== null) {
+  process.stdout.write(cliMain(process.argv.slice(2), "") + "\n");
+} else if (require.main === module) {
   let buf = "";
   let bytes = 0;
   let overflow = false;
@@ -312,6 +360,7 @@ if (require.main === module) {
 } else {
   module.exports = {
     parseInput,
+    parseJsonInput,
     extractAnchor,
     verifyFindings,
     render,
