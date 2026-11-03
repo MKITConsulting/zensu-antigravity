@@ -5,6 +5,14 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-03
+
+### Fixed
+
+- Keep Zen-mode session summaries, progress indicators and next steps in separate Markdown paragraphs in the Antigravity IDE.
+- Prefer the latest trusted hook-injected progress anchor when a workflow becomes active during the same turn.
+- Create the TDD log directory before the first guarded append in a fresh project, preserving existing path validation.
+
 ## [0.7.2] - 2026-11-03
 
 ### Fixed

@@ -1187,7 +1187,10 @@ zen_is_plain_number() {
 # them are what cost the bytes.
 # The current increase carries the session block, user-style precedence and the
 # native required-workflow-report exception; the measured headroom stays bounded.
-ZEN_DIRECTIVE_CEILING=5100
+# The native IDE needs explicit paragraph boundaries and the newest hook anchor
+# to supersede earlier same-turn instructions. These shared additions total
+# 317 characters; allow 320 more in each budget, keeping headroom bounded.
+ZEN_DIRECTIVE_CEILING=5420
 ZEN_DIRECTIVE_HEADROOM=95
 if ! command -v node >/dev/null 2>&1; then
   check "Z30 directive length bound did not run — node is not on PATH" FAIL
@@ -1232,7 +1235,7 @@ else
   fi
 fi
 
-ZEN_NONE_CEILING=3770
+ZEN_NONE_CEILING=4090
 ZEN_NONE_HEADROOM=95
 if command -v node >/dev/null 2>&1; then
   P30B="$(mktemp -d -t zenmode-z30b-XXXXXX)"; S30B="z30b-$$"
@@ -4538,8 +4541,8 @@ for Z101_NEEDLE in "the ZENSU CHAIN ANCHOR field closing this block reads none" 
 done
 [ "$(fire "$P101" "$S101" "third prompt" | anchor_of)" = "none" ] || Z101_BAD="$Z101_BAD [field not none]"
 printf '%s' "$Z101_SHORT" | grep -qF '{{ZENSU_CHAIN_ANCHOR}}' && Z101_BAD="$Z101_BAD [raw placeholder]"
-[ "${#Z101_SHORT}" -le 1990 ] && [ "${#Z101_SHORT}" -lt "${#Z101_FULL}" ] \
-  || Z101_BAD="$Z101_BAD [short ${#Z101_SHORT} vs full ${#Z101_FULL}, ceiling 1990]"
+[ "${#Z101_SHORT}" -le 2310 ] && [ "${#Z101_SHORT}" -lt "${#Z101_FULL}" ] \
+  || Z101_BAD="$Z101_BAD [short ${#Z101_SHORT} vs full ${#Z101_FULL}, ceiling 2310]"
 if [ -z "$Z101_BAD" ]; then
   check "Z101 the first ACTIVE prompt of a context generation carries the full contract and later ones a short body with every per-turn rule, the substance list, the ranking rule and its counterweight, the whole safety exception and the none field (${#Z101_FULL} then ${#Z101_SHORT} characters)" PASS
 else
@@ -4602,7 +4605,7 @@ Z104="$(HOOK="$HOOK" node -e '
   && check "Z104 the hook holds the full ACTIVE contract first and the short body second, and the short body carries the none-swap span exactly once" PASS \
   || check "Z104 ACTIVE heredoc layout is '${Z104:-unreadable}', want 2:full-first:1:1" FAIL
 
-ZEN_SHORT_ARMED_CEILING=2320
+ZEN_SHORT_ARMED_CEILING=2640
 ZEN_SHORT_ARMED_HEADROOM=95
 Z105_LEN="$(PLUGIN_DIR="$PLUGIN_DIR" HOOK="$HOOK" node -e '
   const fs = require("fs");
