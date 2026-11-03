@@ -1,0 +1,114 @@
+{
+  "schema": "zen-mode-release-readiness-v1",
+  "version": "0.7.0",
+  "status": "local candidate ready with advisories; unpublished",
+  "reviewedImplementation": "c4e98e1e2c048059c0e63d1257258e9131b60632",
+  "frozenRuntimeSource": "f4f3ade14acf0d14d301e6335a033ddfb4a07222",
+  "upstreamMain": "6a1626664340ca38ebd420bbe6bfc67aaee256ea",
+  "upstreamPr9": "681272e14e9dc233c121152200fa4b5583240481",
+  "zipSha256": "1967bb168b4ec6c8bdb2358123737ebb96d8eae45405dd925c2060301b19463a",
+  "runtimeDigest": "sha256:4cccbef8d178d459d1b7b969e63a9efba50ce73f8d394f4a49ddf13b65916a38",
+  "packageFileCount": 337,
+  "deterministic": {
+    "suites": 83,
+    "passed": 83,
+    "structureSuites": 81,
+    "configChecks": 57,
+    "offlineScenarios": 110,
+    "zenChecks": 142,
+    "sourceWriteChecks": 274
+  },
+  "postFix": {
+    "graderTests": 15,
+    "firstTurnCases": 24,
+    "reactionChecks": 32
+  },
+  "adapter": {
+    "tests": 30,
+    "coverage": {
+      "line": 84.18,
+      "branch": 79.43,
+      "function": 88.89
+    },
+    "defaultLineTarget": 90,
+    "defaultTargetMet": false
+  },
+  "native": {
+    "host": "agy 1.4.12",
+    "catalogue": 45,
+    "initialVerified": 43,
+    "retryVerified": 2,
+    "initialExitCode": 1,
+    "retryExitCode": 0,
+    "aggregateVerifierExitCode": 0,
+    "unverifiedScannerExitCode": 0,
+    "singleCleanFullRun": false,
+    "settingsRestored": true,
+    "ownedTransportsExited": 52
+  },
+  "reviewRounds": [
+    {
+      "round": 1,
+      "critical": 0,
+      "important": 1,
+      "fixedIn": "c4e98e1e2c048059c0e63d1257258e9131b60632"
+    },
+    {
+      "round": 2,
+      "critical": 0,
+      "important": 0,
+      "suggestions": 1,
+      "verdict": "suggestions-only"
+    }
+  ],
+  "deferredFindings": [
+    {
+      "severity": "Suggestion",
+      "requirement": "REL-1",
+      "file": "evals/zen-mode-reaction/scenarios/session-block-first-turn.yaml",
+      "line": 110,
+      "mirroredFile": "evals/zen-mode-reaction/scenarios/short-session-block-first-turn.yaml",
+      "title": "Status filter also rejects an imperative with a participial object",
+      "explanation": "The new statusOnly expression rejects the valid next action “Review completed dry-run output.” because it matches “Review completed” without examining the following object. The added positive vector “Review the completed dry-run output.” does not cover this ambiguity. This affects advisory grading accuracy, not shipped runtime behavior.",
+      "suggestedFix": "In a subsequent grader refinement, distinguish completed-status phrases from completed modifying an object, and add this exact positive vector to both mirrored graders’ shared cases."
+    }
+  ],
+  "selfReview": {
+    "verdict": "no must-fix; advisory findings retained",
+    "fixRoundRan": false,
+    "dimensions": {
+      "architecture": "Host-specific behavior remains confined to adapters; this follow-up changes only advisory eval predicates and tests. The packaging guard is unchanged.",
+      "consistency": "Full and short graders are identical; the shared 24-case inventory and mirror test prevent drift. Version fields agree in one release commit.",
+      "edgeCases": "Completed status, labelled recap, empty labels, missing goal, invented history and invalid anchors have negative vectors; participial-object ambiguity remains advisory.",
+      "testCoverage": "Full deterministic gate and native evidence cover the candidate runtime; targeted checks cover later eval/test edits. Normalizer line coverage remains 84.18%, below the workflow-default 90%.",
+      "security": "No authorization relaxation, bypass or new external data sink; native one-time approvals and temporary trust were bounded and cleaned up.",
+      "simplification": "The fix extends the existing small predicate; no new runtime abstraction or dependency.",
+      "conventions": "Current governing AGENTS.md, English tracked content, conventional commits and same-value version invariant are satisfied."
+    },
+    "positive": [
+      "Original working tree and index preserved",
+      "Full runtime artifact is unchanged after native and deterministic validation",
+      "Failed initial observations are retained and explicitly separated from passing retries"
+    ],
+    "improvements": [
+      {
+        "severity": "Suggestion",
+        "requirement": "REL-1",
+        "file": "evals/zen-mode-reaction/scenarios/session-block-first-turn.yaml",
+        "line": 110,
+        "mirroredFile": "evals/zen-mode-reaction/scenarios/short-session-block-first-turn.yaml",
+        "title": "Status filter also rejects an imperative with a participial object",
+        "explanation": "The new statusOnly expression rejects the valid next action “Review completed dry-run output.” because it matches “Review completed” without examining the following object. The added positive vector “Review the completed dry-run output.” does not cover this ambiguity. This affects advisory grading accuracy, not shipped runtime behavior.",
+        "suggestedFix": "In a subsequent grader refinement, distinguish completed-status phrases from completed modifying an object, and add this exact positive vector to both mirrored graders’ shared cases."
+      }
+    ],
+    "risks": [
+      "Advisory grammar false negatives remain possible",
+      "Normalizer coverage target is not reached",
+      "Native CLI evidence does not certify the IDE importer or human acceptance"
+    ]
+  },
+  "capture": "skipped; no confirmed product binding",
+  "humanAcceptance": false,
+  "published": false
+}

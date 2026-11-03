@@ -495,6 +495,56 @@ test('a native PreInvocation drives the actual canonical user-prompt reminder', 
   assert.match(output.hookSpecificOutput.additionalContext, /Zensu workflow reminder/);
 });
 
+test('native zen context preserves session recap, workflow progress and the explicit off switch', (t) => {
+  const options = fixture(t);
+  const plugin = path.join(options.root, 'plugin'), project = path.join(options.root, 'project');
+  fs.mkdirSync(plugin); fs.mkdirSync(project);
+  fs.cpSync(path.join(paths.pluginRoot(), 'hooks'), path.join(plugin, 'hooks'), { recursive: true });
+  fs.writeFileSync(path.join(plugin, 'plugin.json'), JSON.stringify({ name: 'zensu', version: '0.1.0' }));
+  const config = path.join(options.root, 'config.json');
+  fs.writeFileSync(config, JSON.stringify({ hooks: { zenMode: true, zenModeDefault: true } }));
+  const environment = { ...process.env, ZENSU_PLUGIN_ROOT: plugin, ZENSU_PLUGIN_DATA: options.pluginData,
+    ZENSU_PROJECT_DIR: project, ZENSU_CONFIG: config };
+  const input = (id, prompt) => normalizer.normalize({ conversationId: id,
+    workspacePaths: [project], lastUserInput: prompt }, 'PreInvocation');
+  assert.equal(input(SID, 'zen off').prompt, 'zen off');
+  assert.equal(normalizer.normalize({ conversationId: SID, lastUserInput: 'zen off',
+    prompt: 'stale compatibility prompt' }, 'PreInvocation').prompt, 'zen off');
+  for (const id of [SID, OTHER]) bootstrap.bootstrap(input(id, 'Begin.'), { ...options, pluginRoot: plugin });
+  const fire = (id, prompt) => {
+    const run = spawnSync('bash', [path.join(plugin, 'hooks/user-prompt-zen-mode.sh')], {
+      input: JSON.stringify(input(id, prompt)), encoding: 'utf8', env: environment, timeout: 25000,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    if (!run.stdout.trim()) return '';
+    const context = JSON.parse(run.stdout).hookSpecificOutput.additionalContext;
+    const native = spawnSync(process.execPath, [path.join(plugin, 'hooks/antigravity/emit-verdict.js')], {
+      encoding: 'utf8', env: { ...environment, ZV_EVENT: 'PreInvocation', ZV_ROLE: 'context', ZV_TEXT: context },
+    });
+    assert.equal(native.status, 0, native.stderr);
+    assert.deepEqual(JSON.parse(native.stdout), { injectSteps: [{ ephemeralMessage: context }] });
+    return context;
+  };
+  const first = fire(SID, 'Where are we?');
+  assert.match(first, /Give the result in the first sentence/);
+  assert.match(first, /Close with a short session block/);
+  assert.match(first, /ZENSU CHAIN ANCHOR: none/);
+  const later = fire(SID, 'Continue.');
+  assert.match(later, /^zen-mode is ACTIVE; the full zen-mode contract/);
+  assert.match(later, /about 8 lines above a closing session block/);
+
+  // A fixture state is an input to presentation, never evidence that a review ran.
+  core.mutateWorkflowState({ projectRoot: project, sessionId: SID,
+    workflowState: 'implementing', event: 'zen-presentation-fixture' }, (state) => {
+    state.active = true; state.implComplete = false; state.chainDone = false;
+    return state;
+  });
+  assert.match(fire(SID, 'Show progress.'), /ZENSU CHAIN ANCHOR: Zensu: ▶implement ·review ·self-review/);
+  assert.match(fire(SID, 'zen off'), /zen-mode is now OFF/);
+  assert.equal(fire(SID, 'Continue normally.'), '');
+  assert.match(fire(OTHER, 'Where are we?'), /ZENSU CHAIN ANCHOR: none/);
+});
+
 test('PostToolUse correlation is conversation-scoped and never invents a passing exit code', (t) => {
   const options = fixture(t);
   const input = (id, cmd) => ({ conversationId: id, stepIdx: 3, workspacePaths: ['/workspace'],

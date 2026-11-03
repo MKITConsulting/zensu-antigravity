@@ -152,7 +152,8 @@ function normalize(input, event = '', options = {}) {
   out.host_session_id = out.session_id;
   const transcript = firstString(raw.transcriptPath, raw.transcript_path);
   if (transcript) out.transcript_path = transcript;
-  const prompt = firstString(raw.prompt, raw.userMessage, raw.user_message, raw.message,
+  // The host's current human input outranks legacy aliases and transcript fallback.
+  const prompt = firstString(raw.lastUserInput, raw.prompt, raw.userMessage, raw.user_message, raw.message,
     raw.ephemeralMessage, raw.text, object(raw.input).text,
     event === 'PreInvocation' ? transcriptPrompt(raw, out.session_id) : '');
   if (prompt) out.prompt = prompt;

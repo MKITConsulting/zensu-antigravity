@@ -1,6 +1,6 @@
 # Zensu for Antigravity
 
-![version](https://img.shields.io/badge/version-0.7.0-blue)
+![version](https://img.shields.io/badge/version-0.7.1-blue)
 ![host](https://img.shields.io/badge/host-Google%20Antigravity-blue)
 ![license](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue)
 
@@ -112,7 +112,14 @@ the skill; choosing a local implementation route alone does not grant publicatio
 | Native conversation history and handoff | `/zensu-session-trail` |
 | Select vanilla or strict implementation | `/zensu-tdd-mode` |
 | Execute an exactly bound work order | `/zensu-work` |
-| Set session-scoped Zen behavior | `/zensu-zen-mode` |
+| Focused answers with session recap and workflow progress | `/zensu-zen-mode` |
+
+Zen-mode is on by default. Answers lead with the result and close with the session
+goal, up to five earlier-work bullets, and this turn's recap. During a Zensu workflow,
+the state-derived progress line uses `✓` passed, `▶` current, `·` pending and `✗`
+failed or blocked; unknown or closed chains show no line. Your chosen output style
+takes precedence. Use `/zensu-zen-mode` to activate it or say `zen off` to leave it.
+Set `hooks.zenModeDefault: false` in `.zensu/config.json` for opt-in behavior.
 
 ## Enforcement
 
