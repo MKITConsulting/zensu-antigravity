@@ -5,6 +5,8 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-03
+
 ### Added
 
 - Present Zen-mode answers with the result first, a closing session goal and earlier-work recap, and the existing state-derived workflow progress.
