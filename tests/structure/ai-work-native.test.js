@@ -21,6 +21,8 @@ test('native account reporting derives its scope from the immutable binding', ()
   assert.equal(capture.options({ session_id: id }, ['--maintenance-reason', 'Upgrade tooling'], {}, resolver)['maintenance-reason'], 'Upgrade tooling');
   assert.equal(capture.options({ session_id: id }, ['--cross-product-reason', 'Explicit shared goal'], {}, resolver)['cross-product-reason'], 'Explicit shared goal');
   assert.match(capture.primer({ session_id: id }, root), /explicit human confirmation/);
+  assert.match(capture.primer({ session_id: id }, root), /preflight/);
+  assert.match(capture.primer({ session_id: id }, root), /use pause instead/);
   assert.throws(() => capture.options({ session_id: id }, ['--workspace', '/other'], {}, resolver), /Invalid/);
   assert.notEqual(value.session, capture.options({ session_id: 'c4a00f40-89bd-4bb8-b555-3603f5abb49f' }, [], {}, resolver).session);
 });
@@ -61,6 +63,10 @@ test('native entry points preserve goal flags and render checkpoint outcomes', (
   const call = (args, status = 'recording') => cp.spawnSync(process.execPath, ['-e', script, target, ...args], { input: JSON.stringify({ session_id: id }), encoding: 'utf8', env: { ...process.env, ZENSU_HOST_SESSION_ID: id, TEST_CAPTURE_STATUS: status } });
   const begin = call(['begin', '--task', 'goal', '--title', 'Objective', '--criteria', 'v1', '--feature', id, '--feature-revision', id]);
   assert.equal(begin.status, 0); assert.deepEqual(JSON.parse(begin.stdout), { status: 'recording', action: 'begin', feature: id, revision: id });
+  for (const action of ['preflight', 'pause']) {
+    const result = call([action], action === 'pause' ? 'capture_disabled' : 'feature_confirmation_required');
+    assert.equal(result.status, 0); assert.equal(JSON.parse(result.stdout).action, action);
+  }
   const maintenance = call(['begin', '--maintenance-reason', 'Build tooling']);
   assert.equal(maintenance.status, 0); assert.equal(JSON.parse(maintenance.stdout).maintenance, 'Build tooling');
   assert.equal(call(['checkpoint', '--feature', id]).status, 1);
