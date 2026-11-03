@@ -40,7 +40,7 @@ Generated from `tests/profiles/unit-files.v1.json` by `node tests/structure/lib-
 | `host/test-stop-session-state.js` | 4 | – | `test-stop-enforcer.sh` | Native stop session state: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `structure/acceptance-verify-v1.test.js` | 26 | – | `test-acceptance-gate.sh` | Acceptance records: the record schema and store, the verify-feature driver ids, criteria from the shared lister, the chain anchor, criterion and gate verdicts, and retention. |
 | `structure/agy-interactive-run.test.js` | 57 | – | `test-interactive-live-runner.sh` | Interactive live transport: exact native turn and child provenance, refusal of permission bypass, one-time operator input, private reasoning redaction and hermetic PTY relay. |
-| `structure/ai-work-capture.test.js` | 16 | – | `test-ai-work-capture.sh` | Work capture: durable exact retries, account binding and human-only decisions. |
+| `structure/ai-work-capture.test.js` | 21 | – | `test-ai-work-capture.sh` | Work capture: durable exact retries, account binding and human-only decisions. |
 | `structure/ai-work-native.test.js` | 6 | – | `test-ai-work-capture.sh` | Native capture: immutable conversation binding, child refusal and one-use helper authorization. |
 | `structure/antigravity-chain.test.js` | 1 | – | `test-antigravity-chain.sh` | Native antigravity chain: real assertions with strict count, completion and no-unexpected-skip verification. |
 | `structure/aspect-activation-v1.test.js` | 21 | – | `test-semantic-units.sh` | Review-aspect activation: which review perspectives a round activates for a given change. |
