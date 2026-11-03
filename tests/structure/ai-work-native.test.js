@@ -11,6 +11,24 @@ const helpers = require('../../hooks/antigravity/session-helper');
 const guard = require('../../hooks/antigravity/session-command-guard');
 const paths = require('../../hooks/antigravity/session-paths');
 const id = '07c2b604-3664-41b6-b53b-aeb21e4ce361';
+test('native checkpoints forward review files while retaining binding and argument guards', t => {
+  const runtime = require('../../hooks/lib/runtime-hook-session-v1.js');
+  const engine = require('../../hooks/lib/ai-work-capture-v1.js');
+  t.mock.method(runtime, 'resolveHookSession', () => ({ projectRoot: '/bound/worktree' }));
+  const calls = [];
+  t.mock.method(engine, 'run', (action, options, budget) => { calls.push({ action, options, budget }); return { status: 'submitted_for_review' }; });
+  const file = '/bound/worktree/explicit review.json';
+  assert.equal(capture.run({ session_id: id }, 'checkpoint', ['--review-file', file]).status, 'submitted_for_review');
+  assert.equal(calls[0].options['review-file'], file);
+  assert.equal(calls[0].options.workspace, '/bound/worktree');
+  assert.equal(calls[0].options.source, 'antigravity');
+  assert.equal(calls[0].budget, 20000);
+  for (const action of ['begin', 'preflight', 'pause']) assert.throws(() => capture.run({ session_id: id }, action, ['--review-file', file]), /belong to checkpoint/);
+  for (const args of [['--task', 'other'], ['--review-file'], ['--review-file', file, '--review-file', file]]) assert.throws(() => capture.run({ session_id: id }, 'checkpoint', args));
+  assert.throws(() => capture.run({ session_id: id, agent_id: 'child' }, 'checkpoint', ['--review-file', file]), /native main/);
+  assert.equal(calls.length, 1);
+  assert.match(capture.primer({ session_id: id }, root), /checkpoint --review-file/);
+});
 test('native account reporting derives its scope from the immutable binding', () => {
   const resolver = () => ({ projectRoot: '/bound/worktree' });
   const value = capture.options({ session_id: id, cwd: '/untrusted/payload-path' }, ['--task', 'goal', '--title', 'Agreed goal', '--criteria', 'v1'], {}, resolver);
