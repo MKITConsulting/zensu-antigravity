@@ -1,6 +1,6 @@
 {
   "name": "zensu",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Product Lifecycle Manager \u2014 Features as First-Class Citizens (Google Antigravity port)",
   "author": {
     "name": "Zensu",
@@ -16,15 +16,6 @@
     "code-review",
     "antigravity",
     "gemini"
-  ],
-  "agents": [
-    "./agents/zensu-code-reviewer.md",
-    "./agents/zensu-gauntlet-critic.md",
-    "./agents/zensu-plan-review-worker.md",
-    "./agents/zensu-plm.md",
-    "./agents/zensu-pr-review-worker.md",
-    "./agents/zensu-review-aspect.md",
-    "./agents/zensu-review-judge.md"
   ],
   "skills": [
     "./skills/adopt-session",
@@ -60,39 +51,5 @@
     "./skills/zen-mode",
     "./skills/zensu-help"
   ],
-  "commands": [
-    "./commands/zensu-adopt-session.md",
-    "./commands/zensu-autopilot.md",
-    "./commands/zensu-autopilot-adopt.md",
-    "./commands/zensu-autopilot-release.md",
-    "./commands/zensu-bootstrap.md",
-    "./commands/zensu-converge.md",
-    "./commands/zensu-cover.md",
-    "./commands/zensu-delivery-route.md",
-    "./commands/zensu-docs.md",
-    "./commands/zensu-doctor.md",
-    "./commands/zensu-full-suite.md",
-    "./commands/zensu-gauntlet-loop.md",
-    "./commands/zensu-ghost-scan.md",
-    "./commands/zensu-implement.md",
-    "./commands/zensu-pilot.md",
-    "./commands/zensu-plan-review.md",
-    "./commands/zensu-pr-fix-findings.md",
-    "./commands/zensu-pr-team-review.md",
-    "./commands/zensu-pulse.md",
-    "./commands/zensu-recover-chain.md",
-    "./commands/zensu-reset-review-limit.md",
-    "./commands/zensu-security-review.md",
-    "./commands/zensu-self-review.md",
-    "./commands/zensu-session-trail.md",
-    "./commands/zensu-setup.md",
-    "./commands/zensu-tdd.md",
-    "./commands/zensu-tdd-mode.md",
-    "./commands/zensu-verify-feature.md",
-    "./commands/zensu-wargame.md",
-    "./commands/zensu-work.md",
-    "./commands/zensu-zen-mode.md",
-    "./commands/zensu-help.md"
-  ],
-  "hooks": "./hooks.json"
+  "homepage": "https://zensu.dev/antigravity/"
 }

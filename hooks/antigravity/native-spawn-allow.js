@@ -27,9 +27,13 @@ function agentDeclaration(text) {
 
 function ownProfiles(root) {
   const manifest = JSON.parse(provenance.readHostFile(path.join(root, 'plugin.json'), 256 * 1024));
-  if (!Array.isArray(manifest.agents) || !manifest.agents.length) throw Error('Agent inventory is unavailable');
+  if (manifest.name !== 'zensu') throw Error('Plugin identity is unavailable');
+  // Native agy discovers profiles from agents/, not an ignored manifest array.
+  const entries = fs.readdirSync(path.join(root, 'agents')).filter(name => name.endsWith('.md')).sort();
+  if (!entries.length) throw Error('Agent inventory is unavailable');
   const profiles = new Map();
-  for (const relative of manifest.agents) {
+  for (const name of entries) {
+    const relative = `./agents/${name}`;
     if (typeof relative !== 'string' || !/^\.\/agents\/[A-Za-z0-9_-]+\.md$/.test(relative)) throw Error('Agent path is unsafe');
     const declaration = agentDeclaration(provenance.readHostFile(path.join(root, relative), 256 * 1024));
     if (relative !== `./agents/${declaration.name}.md` || profiles.has(declaration.name)) throw Error('Agent identity is ambiguous');

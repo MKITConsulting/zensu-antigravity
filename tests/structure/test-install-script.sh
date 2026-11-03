@@ -119,10 +119,13 @@ S="$TMP/stage/zensu"
 # Pin the STAGE LIST itself rather than eight of its complements: a denylist
 # rewrite would silently pass a per-entry exclusion check.
 STAGED="$(cd "$S" && LC_ALL=C ls -A | LC_ALL=C sort | tr '\n' ' ')"
-EXPECT_STAGED="CHANGELOG.md LICENSE README.md agents commands config.example.json docs harness hooks hooks.json plugin.json rules scripts skills templates "
+EXPECT_STAGED="CHANGELOG.md LICENSE README.md agents config.example.json docs harness hooks hooks.json plugin.json rules scripts skills templates "
 [ "$STAGED" = "$EXPECT_STAGED" ] && ok "staged tree is exactly the curated set" || bad "staged tree differs: got [$STAGED]"
 [ -e "$S/hooks/antigravity/antigravity-shim.sh" ] && ok "hooks/ staged recursively (antigravity/)" || bad "hooks/antigravity missing"
 [ -d "$S/hooks/lib" ] && ok "hooks/ staged recursively (lib/)" || bad "hooks/lib missing"
+[ ! -e "$S/commands" ] && ok "no inert native commands directory" || bad "inert commands directory shipped"
+[ ! -e "$S/hooks/hooks.json" ] && ok "no ignored nested host manifest" || bad "ignored nested hooks manifest shipped"
+[ -f "$S/hooks/inventory.json" ] && ok "dispatcher inventory is retained" || bad "dispatcher inventory missing"
 # Runtime-referenced docs must ship: skills/docs and agents/zensu-plm read
 # docs/documentation-guide.md by path, and zensu-help routes topics to README.
 [ -f "$S/docs/documentation-guide.md" ] && ok "docs/documentation-guide.md ships (skills read it by path)" || bad "docs/documentation-guide.md missing from the stage"

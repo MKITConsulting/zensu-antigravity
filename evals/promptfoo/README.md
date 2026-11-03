@@ -44,7 +44,7 @@ evaluating anything.
     scenario_id: write-gate-create-denied      # unique across the whole suite
     kind: hook                                  # hook | shell | manifest
     hook: pre-bash-zensu-gate.sh
-    event: PreToolUse                           # optional; resolved from hooks/hooks.json
+    event: PreToolUse                           # optional; resolved from hooks/inventory.json
     config: { hooks: { tddImplementation: true } }   # optional ~/.zensu/config.json
     setup: |                                    # optional: arm session state first
       bash "$ZENSU_PLUGIN_ROOT/hooks/lib/zensu-log.sh" --tdd-begin

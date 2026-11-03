@@ -14,7 +14,7 @@ try {
   for (const name of ['antigravity-shim.sh', 'emit-verdict.js', 'normalize-payload.js', 'invocation-chain.js', 'render-context.js', 'session-paths.js']) {
     fs.copyFileSync(path.join(root, 'hooks', 'antigravity', name), path.join(adapter, name));
   }
-  fs.copyFileSync(path.join(root, 'hooks', 'hooks.json'), path.join(hooks, 'hooks.json'));
+  fs.copyFileSync(path.join(root, 'hooks', 'inventory.json'), path.join(hooks, 'inventory.json'));
   // Session bootstrap/guard behavior has separate contract tests. Here they
   // deliberately add no state, so each chain test controls only gate decisions.
   fs.writeFileSync(path.join(adapter, 'session-bootstrap.js'), `process.stdout.write(process.argv.includes('--data-root') ? ${JSON.stringify(path.join(temp, 'data'))} : JSON.stringify({zensuBootstrap:{created:process.env.ZENSU_TEST_CREATED==='1'}}));`);

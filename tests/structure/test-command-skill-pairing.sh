@@ -1,16 +1,6 @@
 #!/usr/bin/env bash
-# Command <-> skill pairing completeness (D4). Every user-facing `/zensu-<name>`
-# is a thin `commands/zensu-<name>.md` shim that loads `skills/<bare-verb>/
-# SKILL.md`. This pins the bijection: one skill and one command per canonical
-# verb, no orphans on either side, and every command body references its skill.
-# The expected counts are DERIVED from the verb roster below rather than
-# hardcoded, so adding a verb cannot leave a stale literal behind. Also pins that
-# plugin.json lists both arrays consistently, and no `/zensu:` colon-form leaks
-# into a command body.
-#
-# `commands` is the host's key, not an internal preference: `agy plugin validate`
-# reports skills/agents/commands/mcpServers/hooks and nothing else, and a shim
-# under any other key is silently ignored — `/zensu-<name>` then does not exist.
+# Legacy source command references stay paired with the native skills.
+# Native packages exclude commands/: current agy discovers skills directly.
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -67,22 +57,6 @@ for v in $VERBS; do
     || bad "command $(cmd_stem "$v"): description missing"
 done
 
-# A command and a skill that share a name become two same-named skills once the
-# host converts commands into skills. `zensu-help` is the one verb where the
-# command stem and the skill dir coincide; probing it live showed the COMMAND
-# wins and its shim still loads the skill by path, so the collision is benign
-# today — but which component shadows the other is host-implementation detail.
-# Pin it so no NEW verb can introduce a second, unverified collision.
-COLLIDE=""
-while IFS= read -r d; do
-  base="$(basename "$d")"
-  [ "$base" = "zensu-help" ] && continue
-  [ -f "$ROOT/commands/$base.md" ] && COLLIDE="$COLLIDE $base"
-done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
-[ -z "$COLLIDE" ] \
-  && ok "no new command/skill name collision (zensu-help is the known, live-verified one)" \
-  || bad "command and skill share a name — the host would install two same-named skills:$COLLIDE"
-
 # The retired rules-presence suite swept for foreign agent-host tool names; that
 # guard had no successor, so it lives here now and covers all three component
 # directories rather than only the deleted rules/.
@@ -111,21 +85,9 @@ while IFS= read -r d; do
 done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
 [ -z "$ORPHAN" ] && ok "no orphan skills (every skill maps to a verb)" || bad "orphan skill(s):$ORPHAN"
 
-# The manifest must declare the shims under `commands`, never the ignored
-# `workflows` key that shipped before the host schema was verified.
-if [ -f "$ROOT/plugin.json" ] && command -v node >/dev/null 2>&1; then
-  node -e '
-    const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-    if (Object.prototype.hasOwnProperty.call(m, "workflows")) process.exit(2);
-    if (!Array.isArray(m.commands)) process.exit(3);
-    process.exit(0);
-  ' "$ROOT/plugin.json" 2>/dev/null
-  case "$?" in
-    0) ok "plugin.json declares the shims under .commands[]" ;;
-    2) bad "plugin.json still declares a .workflows[] key — the host ignores it" ;;
-    *) bad "plugin.json has no .commands[] array" ;;
-  esac
-fi
+# Native plugins do not load commands/ or a commands manifest field.
+node -e 'const m=require(process.argv[1]);process.exit(Object.hasOwn(m,"commands")||Object.hasOwn(m,"workflows")?1:0)' "$ROOT/plugin.json" \
+  && ok "manifest omits ignored commands and workflows fields" || bad "ignored manifest fields remain"
 
 # No `/zensu:` colon-form invocation in any command body.
 if [ -d "$ROOT/commands" ]; then

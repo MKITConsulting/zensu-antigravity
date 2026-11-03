@@ -58,7 +58,7 @@ if node -e '
   const h=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
   const regs=((h.hooks&&h.hooks.PreToolUse)||[]).flatMap(e=>(e.hooks||[]).filter(z=>/pre-edit-tdd-reminder\.sh/.test(z.command||"")));
   process.exit(regs.length===1 && regs[0].timeout===60 ? 0 : 1);
-' "$PLUGIN_DIR/hooks/hooks.json" 2>/dev/null; then
+' "$PLUGIN_DIR/hooks/inventory.json" 2>/dev/null; then
   check "C1c registration carries the 60 s gate timeout" PASS
 else
   check "C1c registration carries the 60 s gate timeout" FAIL

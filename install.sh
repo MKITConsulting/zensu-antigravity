@@ -110,7 +110,7 @@ JS
 # runtime (skills/docs and agents/zensu-plm require docs/documentation-guide.md;
 # skills/zensu-help routes topics to README.md and docs/architecture.md), so
 # excluding them would leave documented prerequisites unreachable once installed.
-STAGE_ENTRIES="plugin.json config.example.json skills agents commands rules templates hooks docs scripts harness README.md CHANGELOG.md LICENSE"
+STAGE_ENTRIES="plugin.json config.example.json skills agents rules templates hooks docs scripts harness README.md CHANGELOG.md LICENSE"
 
 require_node() {
   command -v node >/dev/null 2>&1 \

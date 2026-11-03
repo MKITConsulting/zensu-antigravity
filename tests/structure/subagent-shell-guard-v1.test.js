@@ -204,7 +204,7 @@ const DENIED = [
   ['rm -rf .z*', guard.REASONS.workflowDirectory],
   ['ls ~/.zensu', guard.REASONS.workflowDirectory],
   ['ls ~/.runtime/plugins/data/zensu-zensu/session-control', guard.REASONS.protectedPath],
-  ['cat $HOME/.runtime/plugins/cache/zensu/zensu/9.9.9/hooks/hooks.json', guard.REASONS.protectedPath],
+  ['cat $HOME/.runtime/plugins/cache/zensu/zensu/9.9.9/hooks/inventory.json', guard.REASONS.protectedPath],
   ['rm -rf ~/.runtime/plugins/data', guard.REASONS.protectedParent],
   ['rm -rf ~/.runtime', guard.REASONS.protectedParent],
   ['rm -rf ~/.runtime/plugins/', guard.REASONS.protectedParent],

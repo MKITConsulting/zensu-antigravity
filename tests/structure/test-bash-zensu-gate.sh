@@ -3,7 +3,7 @@ set -u
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOK="$PLUGIN_DIR/hooks/pre-bash-zensu-gate.sh"
-HOOKS_JSON="$PLUGIN_DIR/hooks/hooks.json"
+HOOKS_JSON="$PLUGIN_DIR/hooks/inventory.json"
 
 PASS=0; FAIL=0
 check() {

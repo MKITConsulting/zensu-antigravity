@@ -1,6 +1,6 @@
 # Zensu for Antigravity
 
-![version](https://img.shields.io/badge/version-0.7.1-blue)
+![version](https://img.shields.io/badge/version-0.7.2-blue)
 ![host](https://img.shields.io/badge/host-Google%20Antigravity-blue)
 ![license](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue)
 
@@ -28,7 +28,7 @@ Windows needs Git Bash. CLI behavior is verified separately from the unverified 
 bash install.sh
 ```
 
-The installer stages the manifest, skills, commands, roles, plugin-owned rules, templates, docs, runtime,
+The installer stages the manifest, skills, roles, plugin-owned rules, templates, docs, runtime,
 scripts and harness outside the host installation, renders `hooks.json` from
 `hooks.json.template`, then invokes `agy plugin install`. It writes
 `~/.zensu/antigravity/plugin-root` and seeds `~/.zensu/config.json` only when absent.
@@ -39,29 +39,51 @@ Restart the IDE after updating; IDE execution remains a separate verification ta
 
 ### Native package and Marketplace
 
-The native release artifact, `zensu-antigravity-native-v<VERSION>.zip`, contains a curated
-`zensu/` directory with ready-to-run, relative hook commands. Verify its checksum against
-the release's `SHA256SUMS`, extract it outside Antigravity's plugin directory, then run:
+Download the [native v0.7.2 ZIP](https://github.com/MKITConsulting/zensu-antigravity/releases/download/v0.7.2/zensu-antigravity-native-v0.7.2.zip)
+and its [SHA-256 checksum](https://github.com/MKITConsulting/zensu-antigravity/releases/download/v0.7.2/zensu-antigravity-native-v0.7.2.zip.sha256)
+from the public release. Both downloads work without a GitHub login or Marketplace listing.
+Use a current authenticated Antigravity CLI, Node.js 24 or newer, Bash, Git, curl, unzip
+and the authenticated [Zensu CLI](https://zensu.dev/cli/). Package validation was checked on
+agy 1.4.12/macOS; IDE acceptance is separate. In a new download directory:
 
 ```bash
-agy plugin install /absolute/path/to/extracted/zensu
-agy plugin validate ~/.gemini/config/plugins/zensu
+curl -fLO https://github.com/MKITConsulting/zensu-antigravity/releases/download/v0.7.2/zensu-antigravity-native-v0.7.2.zip
+curl -fLO https://github.com/MKITConsulting/zensu-antigravity/releases/download/v0.7.2/zensu-antigravity-native-v0.7.2.zip.sha256
+shasum -a 256 -c zensu-antigravity-native-v0.7.2.zip.sha256
+# Linux or Git Bash: sha256sum -c zensu-antigravity-native-v0.7.2.zip.sha256
+# Continue only if the checksum reports OK.
+unzip zensu-antigravity-native-v0.7.2.zip -d package
+agy plugin validate ./package/zensu --strict
+agy plugin install ./package/zensu
+agy plugin validate ~/.gemini/config/plugins/zensu --strict
 agy plugin list
 ```
 
-Start a fresh CLI conversation and run `/zensu-help`. The plugin binds its actual installed
-root and version when the conversation begins. The native package needs no installer or
-postinstall script and preserves existing Zensu configuration. For updates, extract and
-verify the new package first, run `agy plugin uninstall zensu`, then install the extracted
-directory. Native imports merge files; uninstalling first prevents obsolete rules and hooks
-from surviving an update. The source ZIP is a separate artifact: use its `install.sh`, rather than importing
-the unrendered repository directly.
+Expect no validation warnings and an enabled `zensu` v0.7.2 with 32 skills, seven agents
+and four hook groups. The optional missing-logo note is informational. A disabled plugin
+keeps its previous preference; enable it explicitly with `agy plugin enable zensu` if desired.
+The ZIP contains a curated `zensu/` directory and relative root hook commands. Native skill
+and agent discovery supplies the user-facing commands and profiles; source-only `commands/`
+shims are not shipped. `hooks/inventory.json` is the engine dispatch inventory, not a host
+registration file. The host reads only the generated root `hooks.json`.
+
+Start a fresh CLI conversation in your project and use `/zensu-help`, `/zensu-setup`, then
+`/zensu-doctor`. These are chat commands, not shell commands. If authentication is missing,
+run `zensu auth login` in your terminal. The plugin binds its installed root and runtime
+when a conversation begins. Package validation alone does not prove gate execution.
+
+For updates, finish active Zensu conversations first. Download, verify, extract and strictly
+validate the new package before running `agy plugin uninstall zensu`, then install the new
+extracted directory as above. This removes obsolete files while preserving Zensu configuration
+and credentials. Keep the previous verified ZIP for rollback using the same procedure.
+Do not import the source archive or repository directly; use its `install.sh` instead.
 
 Google now offers an [official curated Antigravity Marketplace](https://antigravity.google/docs/marketplace?tab=cli).
 Zensu's publisher interest form was submitted on 2026-10-19 and is **awaiting Google's
 review; not yet listed**. There is no documented Claude-style custom marketplace manifest
 to add to this repository.
-Contact **integrations@zensu.dev** for package access and support while listing is pending.
+The native package is publicly available independently of that review. Contact
+**integrations@zensu.dev** for setup and integration support.
 See [distribution and submission details](docs/distribution.md).
 
 Maintainers can build the native artifact from a Git checkout without a logged-in host.

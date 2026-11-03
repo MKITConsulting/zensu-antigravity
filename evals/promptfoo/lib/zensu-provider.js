@@ -133,7 +133,7 @@ function eventForHook(hook) {
             else note(event, entry);
           }
         }
-      const engine = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks/hooks.json'), 'utf8'));
+      const engine = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks/inventory.json'), 'utf8'));
       for (const [neutralEvent, groups] of Object.entries(engine.hooks)) {
         const event = {UserPromptSubmit:'PreInvocation',SessionStart:'PreInvocation'}[neutralEvent] || neutralEvent;
         for (const group of groups) for (const handler of group.hooks) {

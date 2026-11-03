@@ -13,7 +13,7 @@ function fixture(t, startup = ['session-start-pulse.sh', 'session-start-primer.s
   fs.mkdirSync(data, { mode: 0o700 }); fs.mkdirSync(project); fs.mkdirSync(path.join(root, 'hooks'));
   const group = names => [{ hooks: names.map(name => ({ command: `bash "\${ZENSU_PLUGIN_ROOT}/hooks/${name}"` })) }];
   const inventory = { hooks: { SessionStart: group(startup), UserPromptSubmit: group(normal) } };
-  fs.writeFileSync(path.join(root, 'hooks/hooks.json'), JSON.stringify(inventory));
+  fs.writeFileSync(path.join(root, 'hooks/inventory.json'), JSON.stringify(inventory));
   for (const name of [...startup, ...normal]) fs.writeFileSync(path.join(root, 'hooks', name), '# fixture');
   const payload = { session_id: 'invocation-fixture', host_session_id: 'invocation-fixture',
     hook_event_name: 'UserPromptSubmit', prompt: 'first prompt', tool_name: '', tool_input: {} };

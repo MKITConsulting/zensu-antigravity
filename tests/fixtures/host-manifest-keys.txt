@@ -1,18 +1,8 @@
-# Antigravity plugin.json vocabulary, verified against `agy plugin validate`.
-# Verified host version: agy 1.1.10 (2026-08-04).
-#
-# `component` = a key the host resolves into a loadable component.
-# `metadata`  = a key the host carries but does not act on.
-#
-# Anything NOT listed here is DROPPED BY THE HOST WITHOUT A WARNING. That is how
-# `rules` and `workflows` shipped inert while every internal-consistency test
-# stayed green. Re-verify this list on every agy upgrade — a retired key is just
-# as damaging as an unknown one, and no test here can detect that on its own.
+# Native plugin fields checked with agy plugin validate --strict on 1.4.12 (2026-11-03).
+# Agents, rules and root hooks use directory discovery. Commands are not loaded.
+# Keep this checked vocabulary aligned with the real host, not inferred registration.
 component skills
-component agents
-component commands
 component mcpServers
-component hooks
 metadata name
 metadata version
 metadata description
@@ -20,3 +10,4 @@ metadata author
 metadata repository
 metadata license
 metadata keywords
+metadata homepage

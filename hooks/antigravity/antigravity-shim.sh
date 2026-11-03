@@ -34,7 +34,7 @@ bail() {
 select_scripts() {
   SCRIPTS=()
   local selected name
-  selected="$(node - "$ROOT/hooks/hooks.json" "$1" "$2" <<'NODE'
+  selected="$(node - "$ROOT/hooks/inventory.json" "$1" "$2" <<'NODE'
 const fs=require('fs');
 const entry=process.argv[3],tool=process.argv[4];
 const event={ 'pre-tool-chain.sh':'PreToolUse','post-tool-chain.sh':'PostToolUse',

@@ -1434,7 +1434,7 @@ function runPost(payload, env, err) {
 
 function hookRegistered(pluginRoot, event, hookFile) {
   const hookPath = path.join(pluginRoot, 'hooks', hookFile);
-  const hooksJson = path.join(pluginRoot, 'hooks', 'hooks.json');
+  const hooksJson = path.join(pluginRoot, 'hooks', 'inventory.json');
   try {
     if (!fs.statSync(hookPath).isFile()) return REGISTRATION.UNREGISTERED;
   } catch (error) {

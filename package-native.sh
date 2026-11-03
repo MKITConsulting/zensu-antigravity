@@ -66,7 +66,7 @@ for (const group of Object.values(hooks)) {
   }
 }
 if (expected.size) throw Error('Missing hook events');
-for (const excluded of ['.git', '.zensu', 'tests', 'evals', 'node_modules', 'AGENTS.md', 'install.sh', 'hooks.json.template']) {
+for (const excluded of ['.git', '.zensu', 'tests', 'evals', 'node_modules', 'AGENTS.md', 'install.sh', 'hooks.json.template', 'commands', 'hooks/hooks.json']) {
   if (fs.existsSync(path.join(root, excluded))) throw Error(`Development entry leaked: ${excluded}`);
 }
 JS

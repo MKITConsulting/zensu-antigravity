@@ -1722,7 +1722,7 @@ const registrationRoot = (t, manifest, files = [consent.CONSENT_HOOK_FILE, conse
   fs.mkdirSync(path.join(root, 'hooks'));
   for (const file of files) fs.writeFileSync(path.join(root, 'hooks', file), '#!/bin/bash\n');
   if (manifest !== undefined) {
-    fs.writeFileSync(path.join(root, 'hooks', 'hooks.json'), typeof manifest === 'string' ? manifest : JSON.stringify(manifest));
+    fs.writeFileSync(path.join(root, 'hooks', 'inventory.json'), typeof manifest === 'string' ? manifest : JSON.stringify(manifest));
   }
   return root;
 };
@@ -1803,7 +1803,7 @@ test('the registration probes answer unknown when hooks.json cannot be read, par
     assert.equal(consent.consentRecorderRegistered(root), UNKNOWN, label);
   }
   const hooksDir = registrationRoot(t, undefined);
-  fs.mkdirSync(path.join(hooksDir, 'hooks', 'hooks.json'));
+  fs.mkdirSync(path.join(hooksDir, 'hooks', 'inventory.json'));
   assert.equal(consent.consentHookRegistered(hooksDir), UNKNOWN, 'a hooks.json that is a directory');
   if (process.platform !== 'win32') {
     const fileAsHooks = tempDir(t, 'zensu-plugin-');

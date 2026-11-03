@@ -1385,7 +1385,7 @@ NOFOLD="$STATE_DIR/nofold-plugin"
 mkdir -p "$NOFOLD/.runtime-plugin" "$NOFOLD/hooks/lib"
 printf '{"name":"zensu","version":"1.2.3"}\n' > "$NOFOLD/plugin.json"
 printf '{"plugins":[{"name":"zensu","version":"1.2.3"}]}\n' > "$NOFOLD/.runtime-plugin/marketplace.json"
-printf '{"hooks":{}}\n' > "$NOFOLD/hooks/hooks.json"
+printf '{"hooks":{}}\n' > "$NOFOLD/hooks/inventory.json"
 cp "$PLUGIN_DIR/hooks/lib/session-control-core-v1.js" "$PLUGIN_DIR/hooks/lib/zensu-doctor-report.js" "$NOFOLD/hooks/lib/"
 DR_NOFOLD="$(ZENSU_DOCTOR_PLUGIN_DIR="$NOFOLD" ZENSU_CONFIG="$CFG_BAD" ZENSU_PROJECT_DIR="$PROJ" ZDOC_DELIVERY_ROUTE=weird \
   node "$NOFOLD/hooks/lib/zensu-doctor-report.js" 2>&1)"
