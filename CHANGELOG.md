@@ -5,8 +5,6 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-11-02
-
 ### Added
 
 - Present Zen-mode answers with the result first, a closing session goal and earlier-work recap, and the existing state-derived workflow progress.
@@ -15,8 +13,17 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ### Fixed
 
 - Prefer the native host's current `lastUserInput` over compatibility prompt fields, including for the Zen-mode off switch.
-- Reject a recap substituted for a next step in first-turn reaction checks, and identify the native provider as the actual prose-envelope producer.
-- Integrate the native audit/review integrity changes and current main, retaining explicit feature-scoped AI-work capture.
+- Reject completed-status and recap substitutions for next steps in first-turn reaction checks, and identify the native prose-envelope producer correctly.
+
+## [0.7.0] - 2026-11-02
+
+### Added
+
+- **ai-work**: Require explicit feature scope for captured goals (#26)
+
+### Fixed
+
+- Preserve native audit evidence and require fresh review receipts throughout the workflow (#9).
 
 ## [0.6.0] - 2026-11-02
 
