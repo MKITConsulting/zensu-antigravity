@@ -13,7 +13,7 @@ function fixture(t) {
   const hooks = path.join(dir, 'hooks'), adapter = path.join(hooks, 'antigravity');
   fs.mkdirSync(adapter, { recursive: true });
   for (const file of ['antigravity-shim.sh', 'emit-verdict.js', 'session-paths.js', 'invocation-chain.js', 'render-context.js']) fs.copyFileSync(path.join(root, 'hooks/antigravity', file), path.join(adapter, file));
-  fs.copyFileSync(path.join(root, 'hooks/hooks.json'), path.join(hooks, 'hooks.json'));
+  fs.copyFileSync(path.join(root, 'hooks/inventory.json'), path.join(hooks, 'inventory.json'));
   const marker = path.join(dir, 'calls.jsonl'), decisions = path.join(dir, 'decisions');
   const record = `const fs=require('fs');const payload=JSON.parse(fs.readFileSync(0,'utf8'));const record=value=>fs.appendFileSync(${JSON.stringify(marker)},JSON.stringify(value)+'\\n');`;
   fs.writeFileSync(path.join(adapter, 'normalize-payload.js'), `${record}process.stdout.write(payload.workspace_root+'\\n'+JSON.stringify(payload));`);
@@ -29,7 +29,7 @@ function fixture(t) {
   `);
   fs.writeFileSync(path.join(adapter, 'native-agent-lifecycle.js'), `${record}record({operation:process.argv[2],payload});process.stdout.write(process.argv[2]==='--stop-child'?JSON.stringify({decision:'continue',reason:'retry the invalid report'}):'{}');`);
   fs.writeFileSync(path.join(adapter, 'native-spawn-allow.js'), `const fs=require('fs');const input=JSON.parse(fs.readFileSync(0,'utf8'));fs.appendFileSync(${JSON.stringify(marker)},JSON.stringify({operation:'grant'})+'\\n');process.stdout.write(JSON.stringify({allow:input.payload.fixture_grant===true}));`);
-  const inventory = JSON.parse(fs.readFileSync(path.join(hooks, 'hooks.json')));
+  const inventory = JSON.parse(fs.readFileSync(path.join(hooks, 'inventory.json')));
   for (const group of Object.values(inventory.hooks).flat()) for (const hook of group.hooks) {
     const name = hook.command.match(/\/([^/]+\.sh)"$/)[1];
     fs.writeFileSync(path.join(hooks, name), `#!/bin/bash\nnode - <<'NODE'\nNODE\n`);

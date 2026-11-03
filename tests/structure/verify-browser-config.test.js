@@ -33,7 +33,7 @@ function pluginRoot(t, manifest) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'hooks'));
   for (const file of [consent.CONSENT_HOOK_FILE, consent.CONSENT_RECORDER_FILE]) fs.writeFileSync(path.join(root, 'hooks', file), '#!/bin/bash\n');
-  fs.writeFileSync(path.join(root, 'hooks', 'hooks.json'), typeof manifest === 'string' ? manifest : JSON.stringify(manifest));
+  fs.writeFileSync(path.join(root, 'hooks', 'inventory.json'), typeof manifest === 'string' ? manifest : JSON.stringify(manifest));
   return root;
 }
 

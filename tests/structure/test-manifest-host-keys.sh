@@ -1,19 +1,6 @@
 #!/usr/bin/env bash
-# The manifest may declare ONLY keys the Antigravity host actually consumes.
-#
-# This test exists because a whole class of defect was invisible to every other
-# suite in this repo: `plugin.json` declared `rules` and `workflows` arrays, each
-# entry pointed at a real file on disk, and the pairing/manifest tests happily
-# confirmed the arrays and the filesystem agreed — while the host silently
-# ignored both keys. `agy plugin validate` reports exactly five component
-# categories (skills, agents, commands, mcpServers, hooks); anything else is
-# dropped without a warning, so a shim under `workflows` produced no slash
-# command. On agy1.4.2 the plugin-owned rules/AGENTS.md directory channel
-# works independently of any manifest key; the unsupported rules array stays forbidden.
-#
-# Internal consistency is therefore NOT evidence that a key does anything. The
-# allowlist below is the host's vocabulary plus the inert metadata fields, and it
-# is the one assertion in the suite that would have caught the original bug.
+# Native manifest vocabulary and directory-discovered component contract.
+# Recheck with the installed agy host: isolated tests cannot prove host loading.
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -25,7 +12,7 @@ bad() { FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$*"; }
 [ -f "$M" ] || { bad "plugin.json missing"; printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"; exit 1; }
 command -v node >/dev/null 2>&1 || { bad "node required"; printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"; exit 1; }
 
-# The host's vocabulary, verified against `agy plugin validate` on agy 1.1.10.
+# The host's vocabulary, verified against `agy plugin validate --strict` on agy 1.4.12.
 # It is NOT permanent: a host upgrade can add a key (this list then wrongly
 # rejects a legitimate one) or RETIRE one (every suite here stays green while
 # the components go inert again — the original failure mode, one release away).
@@ -56,7 +43,7 @@ esac
 
 # The two keys that actually shipped inert — named explicitly so a regression
 # reads as the specific historical mistake rather than a generic allowlist miss.
-for dead in rules workflows; do
+for dead in rules workflows agents commands hooks; do
   node -e '
     const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
     process.exit(Object.prototype.hasOwnProperty.call(m, process.argv[2]) ? 1 : 0);
@@ -67,7 +54,7 @@ for dead in rules workflows; do
     [ -f "$ROOT/rules/AGENTS.md" ] && [ ! -L "$ROOT/rules/AGENTS.md" ] \
       && ok "native rules directory supplies its regular AGENTS.md without a manifest key" \
       || bad "native rules directory is missing its regular product policy"
-  else
+  elif [ "$dead" = workflows ]; then
     [ -d "$ROOT/$dead" ] \
       && bad "$dead/ directory is back on disk" \
       || ok "no $dead/ directory on disk"
@@ -76,7 +63,7 @@ done
 
 # Every declared component key must resolve to something on disk; a key that is
 # recognised but empty is its own kind of lie.
-for key in skills agents commands; do
+for key in skills; do
   COUNT="$(node -e '
     const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
     const v = m[process.argv[2]];
@@ -86,16 +73,6 @@ for key in skills agents commands; do
     && ok ".$key[] declares $COUNT entr$([ "$COUNT" = 1 ] && echo y || echo ies)" \
     || bad ".$key[] is missing or empty"
 done
-
-# `hooks` is a string path in this manifest, not an array — pin the shape so a
-# future edit cannot turn it into an ignored array form.
-HOOKS_SHAPE="$(node -e '
-  const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-  process.stdout.write(typeof m.hooks);
-' "$M" 2>/dev/null)"
-[ "$HOOKS_SHAPE" = "string" ] \
-  && ok "hooks is a string path ($HOOKS_SHAPE)" \
-  || bad "hooks must be a string path, got $HOOKS_SHAPE"
 
 printf 'Result: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

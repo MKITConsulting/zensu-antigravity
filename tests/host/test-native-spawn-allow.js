@@ -13,8 +13,7 @@ function fixture(t) {
   const pluginRoot = path.join(base, 'plugin'), workspaceRoot = path.join(base, 'project'), home = path.join(base, 'home');
   for (const dir of [pluginRoot, workspaceRoot, home, path.join(pluginRoot, 'agents'), path.join(pluginRoot, 'hooks/lib')]) fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(path.join(root, 'plugin.json'), path.join(pluginRoot, 'plugin.json'));
-  const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'plugin.json')));
-  for (const file of manifest.agents) fs.copyFileSync(path.join(root, file), path.join(pluginRoot, file));
+  for (const file of fs.readdirSync(path.join(root, 'agents'))) fs.copyFileSync(path.join(root, 'agents', file), path.join(pluginRoot, 'agents', file));
   fs.copyFileSync(path.join(root, 'hooks/lib/zensu-config.sh'), path.join(pluginRoot, 'hooks/lib/zensu-config.sh'));
   const environment = { PATH: process.env.PATH, HOME: home };
   const payload = { session_id: '11111111-1111-4111-8111-111111111111', step_idx: 3,
@@ -92,7 +91,5 @@ test('altered tools, ambiguous identity, unregistered or symlinked profiles with
   fs.writeFileSync(file, original); fs.renameSync(file, `${file}.real`); fs.symlinkSync(`${file}.real`, file);
   assert.equal(f.allow(), false);
   fs.unlinkSync(file); fs.renameSync(`${file}.real`, file);
-  const manifestFile = path.join(f.pluginRoot, 'plugin.json'), manifest = JSON.parse(fs.readFileSync(manifestFile));
-  manifest.agents = manifest.agents.filter(item => !item.includes('zensu-review-aspect'));
-  fs.writeFileSync(manifestFile, JSON.stringify(manifest)); assert.equal(f.allow(), false);
+  fs.unlinkSync(file); assert.equal(f.allow(), false);
 });

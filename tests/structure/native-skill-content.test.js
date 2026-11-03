@@ -78,7 +78,7 @@ test('plugin-owned standing policy covers every command without overriding user 
  assert.ok(Buffer.byteLength(policy,'utf8')<24000,'native policy must remain below the loader limit');
  assert.match(policy,/^# Zensu Native Policy: Verified Work, Bound Authority\n/);
  assert.equal(Object.hasOwn(manifest,'rules'),false,'directory discovery does not authorize an unsupported manifest key');
- for(const command of manifest.commands)assert.ok(policy.includes('/'+path.basename(command,'.md')),command);
+ for(const directory of manifest.skills){const name=path.basename(directory);const command=name==='zensu-help'?name:'zensu-'+name;assert.ok(policy.includes('/'+command),command);}
  assert.match(policy,/explicit user choice to implement directly means implement directly/);
  assert.match(policy,/Do not ask again,[\s\S]*arm a Zensu workflow/);
  assert.match(policy,/Documentation and skill paths[\s\S]*verified plugin root/);

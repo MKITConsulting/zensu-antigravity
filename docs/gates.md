@@ -757,7 +757,7 @@ vanished `cwd` never masks one of those denies — a deleted workflow document s
 named deny of §Missing Workflow Baseline. Re-creating the directory, or changing to one that
 exists, is needed only before a subagent is spawned again.
 `tests/structure/test-vanished-session-cwd.sh` pins these verdicts and, for every `PreToolUse`
-registration in `hooks/hooks.json`, that a vanished `cwd` never makes a verdict stricter than
+registration in `hooks/inventory.json`, that a vanished `cwd` never makes a verdict stricter than
 the same call with an existing one.
 
 ## TDD Phase Gate

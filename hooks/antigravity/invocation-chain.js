@@ -110,7 +110,7 @@ function run(payload, options = {}) {
   const root = options.root || paths.pluginRoot();
   const environment = options.environment || process.env;
   const data = environment.ZENSU_PLUGIN_DATA;
-  const inventory = JSON.parse(fs.readFileSync(path.join(root, 'hooks/hooks.json'), 'utf8'));
+  const inventory = JSON.parse(fs.readFileSync(path.join(root, 'hooks/inventory.json'), 'utf8'));
   const normal = handlers(inventory, 'UserPromptSubmit', payload.tool_name || '');
   let startup = [];
   if (options.created) {

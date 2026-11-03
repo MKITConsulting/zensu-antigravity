@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Native role representation. The core 3 roles exist as markdown with
-# frontmatter, are listed in plugin.json .agents[], and all seven role assets
+# frontmatter, are discovered from agents/, and all seven role assets
 # declare a non-empty, WRITE-FREE tools list:
 #   zensu-code-reviewer  -> native file-reading tools only
 #   zensu-review-aspect  -> tools: read, grep, glob                (no run_command)
@@ -21,18 +21,6 @@ ASPECT="$ROOT/agents/zensu-review-aspect.md"
 for f in "$PLM" "$REVIEWER" "$ASPECT"; do
   [ -f "$f" ] && ok "agent present: agents/$(basename "$f")" || bad "agent MISSING: agents/$(basename "$f")"
 done
-
-# Listed in plugin.json .agents[]
-if [ -f "$ROOT/plugin.json" ]; then
-  for a in zensu-plm zensu-code-reviewer zensu-review-aspect; do
-    node -e '
-      const p = JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
-      const arr = p.agents || [];
-      process.exit(arr.some(x => String(x).includes("/'"$a"'.md")) ? 0 : 1);
-    ' "$ROOT/plugin.json" 2>/dev/null \
-      && ok "plugin.json .agents[] lists $a" || bad "plugin.json .agents[] missing $a"
-  done
-fi
 
 # frontmatter name: matches the file (best-effort: name: <basename-without-ext>)
 fm_field() { # $1=file $2=key -> value (first occurrence inside first --- block)

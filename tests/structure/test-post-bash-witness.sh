@@ -11,7 +11,7 @@ check() {
 node - "$ROOT" <<'NODE'
 const fs = require('node:fs'), assert = require('node:assert/strict'), path = require('node:path');
 const root = process.argv[2];
-const inventory = JSON.parse(fs.readFileSync(path.join(root, 'hooks/hooks.json'), 'utf8'));
+const inventory = JSON.parse(fs.readFileSync(path.join(root, 'hooks/inventory.json'), 'utf8'));
 assert.doesNotMatch(JSON.stringify(inventory), /post-bash-witness\.sh/, 'legacy witness must not be registered');
 const docs = fs.readFileSync(path.join(root, 'skills/tdd/references/audit.md'), 'utf8');
 assert.match(docs, /--evidence-run/);

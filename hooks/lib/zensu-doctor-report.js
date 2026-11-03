@@ -485,7 +485,7 @@ function pluginBlock() {
     } catch (error) { line(BAD, 'version sync: required release files are unreadable'); }
   }
 
-  var hj = readJson(path.join(dir, 'hooks', 'hooks.json'));
+  var hj = readJson(path.join(dir, 'hooks', 'inventory.json'));
   if (!hj.ok) {
     line(BAD, 'hooks.json: ' + (hj.missing ? 'missing' : jsonFailure(hj)));
     return;
@@ -1394,7 +1394,7 @@ function reviewerSpawnAutoAllowDisabled(cfgReads) {
 // The MATCHER is part of the answer: a hook registered under a matcher that does not test
 // true for the spawn tool names is exactly as inert as an unregistered one.
 function reviewerSpawnHookWired(root, spawnTools) {
-  var r = readJson(path.join(root, 'hooks', 'hooks.json'));
+  var r = readJson(path.join(root, 'hooks', 'inventory.json'));
   if (r.missing || !r.ok) return 'unknown';
   var tools = Array.isArray(spawnTools) && spawnTools.length ? spawnTools : ['Agent', 'Task'];
   var shared;
@@ -1465,13 +1465,13 @@ function reviewerSpawnGrantRows(disabled) {
   } catch (e) { agents = null; }
   var wiring = reviewerSpawnHookWired(root, spawnTools);
   if (wiring === 'unknown') {
-    line(WARN, 'permissions: hooks/pre-agent-reviewer-allow.sh is installed but hooks/hooks.json '
+    line(WARN, 'permissions: hooks/pre-agent-reviewer-allow.sh is installed but hooks/inventory.json '
       + 'could not be read or parsed, so whether the harness invokes it — and therefore whether '
       + 'any reviewer-spawn grant is in force — could not be judged by this check.');
     return false;
   }
   if (wiring === 'unwired') {
-    line(WARN, 'permissions: hooks/pre-agent-reviewer-allow.sh is present on disk but hooks/hooks.json '
+    line(WARN, 'permissions: hooks/pre-agent-reviewer-allow.sh is present on disk but hooks/inventory.json '
       + 'does not register it on a PreToolUse matcher covering the spawn tools, so the harness never '
       + 'invokes it for a spawn and no reviewer-spawn grant is in force. This is a broken '
       + 'installation, not a configuration choice.');

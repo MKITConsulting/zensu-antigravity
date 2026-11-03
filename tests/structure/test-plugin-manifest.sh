@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # plugin.json manifest sanity. Parses; carries name/version/description; the
-# skills / agents / commands arrays reference paths that EXIST on disk;
-# the `hooks` ref points at ./hooks.json (the install-generated file); declares
+# skills reference paths that EXIST on disk; native directory discovery owns
+# agents and hooks, without ignored manifest fields. Declares
 # NO mcpServers key (CLI-driven, D6); keywords include "antigravity".
 set -u
 
@@ -33,13 +33,11 @@ check_array() { # $1=key
   [ -z "$missing" ] && ok ".$key[] all reference existing paths" || bad ".$key[] missing on disk:$missing"
 }
 check_array skills
-check_array agents
-check_array commands
 
 # array cardinalities
 SK="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).skills||[]).length)' "$M")"
-CMD="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).commands||[]).length)' "$M")"
-AG="$(node -e 'console.log((JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).agents||[]).length)' "$M")"
+CMD="$(find "$ROOT/commands" -maxdepth 1 -name '*.md' -type f | wc -l | tr -d ' ')"
+AG="$(find "$ROOT/agents" -maxdepth 1 -name '*.md' -type f | wc -l | tr -d ' ')"
 # Expected cardinalities come from the filesystem, not from frozen literals:
 # what matters is that the manifest declares exactly what ships, so a new skill
 # that nobody registered fails here instead of silently never loading.
@@ -47,17 +45,17 @@ SK_DISK="$(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc 
 CMD_DISK="$(find "$ROOT/commands" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
 AG_DISK="$(find "$ROOT/agents" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
 [ "$SK" = "$SK_DISK" ] && ok "$SK skills declared, matching skills/ on disk" || bad "skills count = $SK (skills/ has $SK_DISK)"
-[ "$CMD" = "$CMD_DISK" ] && ok "$CMD commands declared, matching commands/ on disk" || bad "commands count = $CMD (commands/ has $CMD_DISK)"
-[ "$AG" = "$AG_DISK" ] && ok "$AG agents declared, matching agents/ on disk" || bad "agents count = $AG (agents/ has $AG_DISK)"
+[ "$CMD" = "$CMD_DISK" ] && ok "$CMD source command references matching commands/ on disk" || bad "commands count = $CMD (commands/ has $CMD_DISK)"
+[ "$AG" = "$AG_DISK" ] && ok "$AG directory-discovered agents matching agents/ on disk" || bad "agents count = $AG (agents/ has $AG_DISK)"
 
 # The canonical 0.27.0 feature inventory must not shrink even if disk and manifest agree.
 [ "$SK" = 32 ] && ok "canonical 32-skill inventory retained" || bad "canonical 32-skill inventory shrank"
-[ "$CMD" = 32 ] && ok "all 32 native command shims registered" || bad "native command inventory incomplete"
+[ "$CMD" = 32 ] && ok "all 32 legacy source command references retained" || bad "native command inventory incomplete"
 [ "$AG" = 7 ] && ok "six canonical profiles plus the native Gauntlet critic retained" || bad "role inventory incomplete"
 
-# hooks ref points at ./hooks.json (string)
-HK="$(get hooks)"
-case "$HK" in *hooks.json*) ok "hooks ref points at hooks.json ($HK)" ;; *) bad "hooks ref wrong: $HK" ;; esac
+# The current host discovers these components by directory, not manifest keys.
+node -e 'const p=require(process.argv[1]); process.exit(["agents","commands","hooks","workflows"].some(k=>Object.hasOwn(p,k))?1:0)' "$M" \
+  && ok "no ignored component registration fields" || bad "ignored component fields remain"
 
 # NO mcpServers / mcp key (CLI-driven, D6)
 node -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit((p.mcpServers||p.mcp)?1:0)' "$M" 2>/dev/null \

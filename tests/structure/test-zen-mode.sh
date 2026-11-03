@@ -18,7 +18,7 @@ PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOK="$PLUGIN_DIR/hooks/user-prompt-zen-mode.sh"
 HELPER="$PLUGIN_DIR/hooks/lib/zensu-zen-mode.sh"
 SKILL="$(skill_text_file "$PLUGIN_DIR/skills/zen-mode")"
-HOOKS_JSON="$PLUGIN_DIR/hooks/hooks.json"
+HOOKS_JSON="$PLUGIN_DIR/hooks/inventory.json"
 PLUGIN_JSON="$PLUGIN_DIR/plugin.json"
 CONTROL_TMP="$(mktemp -d -t zenmode-control-XXXXXX)"
 NO_CONFIG="$CONTROL_TMP/no-such-config.json"
@@ -2450,7 +2450,7 @@ Z40_T="$(node -e '
     }
   }
   process.stdout.write(seen > 1 ? "multiple" : (out || "unregistered"));
-' "$PLUGIN_DIR/hooks/hooks.json" 2>/dev/null)"
+' "$PLUGIN_DIR/hooks/inventory.json" 2>/dev/null)"
 case "$Z40_T" in
   ''|unregistered) check "Z40 the zen-mode hook is not registered in hooks.json — the pin is not measuring anything" FAIL ;;
   invalid)         check "Z40 the zen-mode registration carries no usable timeout — null, 0 and false all read as absent here" FAIL ;;
@@ -3314,7 +3314,7 @@ Z80_TIMEOUT10="$(node -e '
   }
   walk(hooks);
   process.stdout.write(String(count));
-' "$PLUGIN_DIR/hooks/hooks.json" 2>/dev/null)"
+' "$PLUGIN_DIR/hooks/inventory.json" 2>/dev/null)"
 grep -qF "$Z80_TIMEOUT10 sibling entries" "$HOOK" \
   || Z80_BAD="$Z80_BAD sibling-census-disagrees-with-hooks.json($Z80_TIMEOUT10)"
 # (8) the spliced untraversable comment

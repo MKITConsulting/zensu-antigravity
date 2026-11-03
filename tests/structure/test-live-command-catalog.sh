@@ -7,7 +7,7 @@ node - "$ROOT" <<'NODE'
 const assert=require('assert/strict'),fs=require('fs'),path=require('path'),root=process.argv[2];
 const yaml=require(path.join(root,'node_modules/js-yaml'));
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'plugin.json'),'utf8'));
-const registered=manifest.commands.map(name=>path.basename(name,'.md')).sort();
+const registered=manifest.skills.map(dir=>path.basename(dir)).map(name=>name==='zensu-help'?name:'zensu-'+name).sort();
 const rows=yaml.load(fs.readFileSync(path.join(root,'evals/promptfoo/live/scenarios/commands.yaml'),'utf8'));
 const positive=rows.filter(row=>row.vars.scenario_id!=='live-command-negative-control');
 assert.deepEqual(positive.map(row=>row.vars.command).sort(),registered);

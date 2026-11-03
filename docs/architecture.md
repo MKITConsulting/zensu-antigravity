@@ -17,7 +17,7 @@ flowchart TD
     D -->|No| A[Emit supported advisory or empty verdict]
 ```
 
-`hooks.json.template` registers four dispatchers. `hooks/hooks.json` is the engine inventory;
+`hooks.json.template` registers four dispatchers. `hooks/inventory.json` is the engine inventory;
 it is not handed directly to the native importer. The shim normalizes the tool name before
 selecting every matching inventory entry. Only one native PreToolUse handler is registered,
 so the CLI's one-handler behavior cannot silently discard later checks.

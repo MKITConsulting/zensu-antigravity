@@ -15,7 +15,10 @@ Sources checked on 2026-10-19:
 
 `bash package-native.sh <output-directory>` generates a native ZIP and its SHA-256 file.
 The ZIP contains one `zensu/` directory, the installer's curated runtime inventory, and a
-generated `hooks.json`. Its four command handlers resolve relative to the directory
+generated root `hooks.json`. Native `skills/` and `agents/` discovery replace the ignored
+`commands`, `agents` and `hooks` manifest fields. Source-only `commands/` shims do not ship.
+The dispatcher reads `hooks/inventory.json`; it must never be dropped as though it were an
+unused host manifest. Its four command handlers resolve relative to the directory
 containing `hooks.json`, as documented and live-verified on agy 1.4.2. All gates still run
 through the single dispatcher. No runtime scripts or verdict dialects are rewritten.
 
@@ -36,8 +39,9 @@ does not prove hook execution, rule loading or actual denial by the gates.
 Status: **submitted on 2026-10-19; awaiting Google's review, not approved or listed**.
 The Google form displayed its submission confirmation after the public documentation page
 was verified. Submission is an expression of publisher interest, not Marketplace acceptance.
-The repository remains private. The intake form does not require a public repository URL.
-Do not change repository visibility as part of submission.
+The repository and native release downloads are now public. See the
+[installation guide](../README.md#native-package-and-marketplace) for direct ZIP and checksum links.
+The original intake record below remains unchanged as historical submission evidence.
 
 The [versioned submission evidence](marketplace/2026-10-19/README.md) contains the original
 Google confirmation screenshot, the local submission record and SHA-256 checksums.

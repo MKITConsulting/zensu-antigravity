@@ -7,7 +7,7 @@
 # antigravity-shim's normalize-payload.js produces.
 #
 # Antigravity registration lives in hooks.json.template; the shim executes the
-# tracked neutral hooks/hooks.json inventory. First-use private bootstrap owns
+# tracked neutral hooks/inventory.json inventory. First-use private bootstrap owns
 # immutable conversation identity and dispatches the supported startup hooks.
 #
 #   (no arg)       full suite (structural + every offline test)

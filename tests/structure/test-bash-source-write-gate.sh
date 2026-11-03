@@ -8,7 +8,7 @@ set -u
 PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOK="$PLUGIN_DIR/hooks/pre-bash-source-write-gate.sh"
 PARSER="$PLUGIN_DIR/hooks/lib/bash-source-write-parse.js"
-HOOKS_JSON="$PLUGIN_DIR/hooks/hooks.json"
+HOOKS_JSON="$PLUGIN_DIR/hooks/inventory.json"
 
 PASS=0; FAIL=0
 check() {
@@ -1225,7 +1225,7 @@ mkdir -p "$FOREIGN_DATA/session-control/v1/records" "$FOREIGN_DATA/session-contr
 chmod 700 "$FOREIGN_DATA" "$FOREIGN_DATA/session-control" "$FOREIGN_DATA/session-control/v1" \
   "$FOREIGN_DATA/session-control/v1/records" "$FOREIGN_DATA/session-control/v1/locks"
 printf '{"name":"zensu","version":"9.9.9"}\n' > "$FOREIGN_PLUG/plugin.json"
-printf '{"hooks":{}}\n' > "$FOREIGN_PLUG/hooks/hooks.json"
+printf '{"hooks":{}}\n' > "$FOREIGN_PLUG/hooks/inventory.json"
 if node -e '
   const path = require("path");
   const [corePath, data, plug, project, sessionId] = process.argv.slice(1);

@@ -5,6 +5,15 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-03
+
+### Fixed
+
+- Remove ignored native manifest fields and exclude legacy command shims from the installable package.
+- Discover native reviewer profiles from the host's agents directory while retaining exact identity, read-only tool, provenance and configuration checks.
+- Rename the internal gate inventory to `hooks/inventory.json` and update all readers without changing gate order or decisions.
+- Document public native downloads, checksum verification, installation and updates.
+
 ## [0.7.1] - 2026-11-03
 
 ### Added

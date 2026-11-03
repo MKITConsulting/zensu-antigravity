@@ -42,7 +42,7 @@ printf 'version-0.1.0-blue\n' > "$PLUG/README.md"
 printf '## [0.1.0]\n' > "$PLUG/CHANGELOG.md"
 : > "$PLUG/hooks/pre-bash-zensu-gate.sh"
 : > "$PLUG/hooks/orphan-hook.sh"
-cat > "$PLUG/hooks/hooks.json" <<'JSON'
+cat > "$PLUG/hooks/inventory.json" <<'JSON'
 {"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[
   {"type":"command","command":"bash /opt/zensu/hooks/pre-bash-zensu-gate.sh"},
   {"type":"command","command":"bash /opt/zensu/hooks/ghost-hook.sh"}

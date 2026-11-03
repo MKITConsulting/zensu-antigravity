@@ -856,7 +856,7 @@ const manifest = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
 const section = /^## Commands\n([\s\S]*?)(?=^## |$(?![\s\S]))/m.exec(readme);
 assert.ok(section, 'README Commands section is missing');
 const rows = [...section[1].matchAll(/^\| [^|]+ \| `(\/zensu-[a-z0-9-]+)` \|$/gm)].map(m => m[1]);
-const commands = manifest.commands.map(file => '/' + path.basename(file, '.md'));
+const commands = fs.readdirSync(path.join(path.dirname(process.argv[3]), 'commands')).filter(file=>file.endsWith('.md')).map(file => '/' + path.basename(file, '.md'));
 const skills = manifest.skills.map(dir => path.basename(dir)).map(name => '/' + (name === 'zensu-help' ? name : 'zensu-' + name));
 assert.equal(new Set(rows).size, rows.length, 'README contains duplicate commands');
 assert.equal(new Set(commands).size, commands.length, 'manifest contains duplicate commands');
