@@ -5,6 +5,16 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-11-04
+
+### Added
+
+- **ai-work**: Include explicit review context and source links (#33)
+
+### Fixed
+
+- **tdd**: Scope Phase 1.5 preconditions to the dependencies it lists (#34)
+
 ## [0.7.4] - 2026-11-03
 
 ### Added
