@@ -5,6 +5,8 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-11-11
+
 ### Fixed
 
 - Correlate native reviewers with their own completed launch in mixed tool batches, including a pending final file read.
