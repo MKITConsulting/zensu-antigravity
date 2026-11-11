@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "tests/host/native-agent-provenance.test.js",
-      "registered": 38,
+      "registered": 40,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"
@@ -30,6 +30,16 @@
         }
       ],
       "summary": "Native reviewer outcomes: authenticated parent and launch correlation, actual child success, negative-only policy refusal, bounded retries, safe reads and forged-outcome rejection."
+    },
+    {
+      "path": "tests/host/native-self-review.test.js",
+      "registered": 14,
+      "runs": [
+        {
+          "driver": "tests/structure/test-native-session-bridge.sh"
+        }
+      ],
+      "summary": "Native terminal reread admission, current-tree review receipts, one-use revalidation and standalone Zen progress."
     },
     {
       "path": "tests/host/test-native-agent-lifecycle.js",
@@ -63,7 +73,7 @@
     },
     {
       "path": "tests/host/test-native-review.js",
-      "registered": 16,
+      "registered": 17,
       "runs": [
         {
           "driver": "tests/structure/test-native-session-bridge.sh"

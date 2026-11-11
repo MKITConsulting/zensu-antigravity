@@ -1743,14 +1743,18 @@ fi
 # Z44 the module require CLOSURE must be complete, not hand-maintained.
 #
 # "Every module is verified before any is required" holds only while the hook
-# lists every module the three can pull in. The closure is exactly those three
-# today, but nothing said so: a sibling `require('./...')` added to any of them
+# lists every module its entry points can pull in. A sibling require added to any of them
 # drops silently out of the guard and makes the guarantee false.
 Z44_MISSING="$(PLUGIN_DIR="$PLUGIN_DIR" HOOK="$HOOK" node -e '
   const fs = require("fs"), path = require("path");
   const lib = path.join(process.env.PLUGIN_DIR, "hooks", "lib");
   const hook = fs.readFileSync(process.env.HOOK, "utf8");
-  const listed = (hook.match(/"[a-z0-9-]+-v1\.js"/g) || []).map((q) => q.slice(1, -1));
+  const declaration = /const names = (\[[^\]]+\]);/.exec(hook);
+  const listed = declaration ? JSON.parse(declaration[1]) : [];
+  if (!Array.isArray(listed) || new Set(listed).size !== listed.length
+      || listed.some(name => typeof name !== "string" || !/^[a-z0-9-]+\.js$/.test(name))) {
+    throw Error("Invalid verified module inventory");
+  }
   const missing = [];
   for (const name of listed) {
     const file = path.join(lib, name);

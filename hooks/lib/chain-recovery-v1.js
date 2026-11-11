@@ -26,6 +26,7 @@ const RECOVERY_HISTORY_REASON_PREFIX = 'chain-recovered: ';
 // members - so a RENAMED member left a dead key there, and in that file's test
 // literals, with every check green and the blocked mark silently unreachable.
 const CHAIN_OUTCOMES = Object.freeze(['', 'pass', 'no-changes', 'max-rounds']);
+const REVIEW_VERDICTS = Object.freeze(['PASS', 'PASS WITH SUGGESTIONS', 'NEEDS CHANGES']);
 // FROZEN like every other exported shape table. `RECOVERABLE_SHAPES` is exported and feeds
 // `recoverable`, the flag that authorizes `--chain-recover`, while `STUCK_SHAPES` spreads it
 // at load — so a mutation would move `recoverable` and `blocked` without moving `wedged`.
@@ -260,7 +261,7 @@ function blockedRecoveryReason(state, linkage) {
   return 'flag-state';
 }
 
-function classifyChain(input) {
+function classifyChain(input, { reviewVerdict = null } = {}) {
   const state = normalizeChainState(input);
   const { linkage, autopilot } = autopilotLinkage(state);
   const rearmReceipt = rearmReceiptVerdict(state);
@@ -285,6 +286,8 @@ function classifyChain(input) {
 
   return {
     shape,
+    ...(linkage === 'standalone' && state.codeReviewDone && state.reviewTicketConsumed
+      && REVIEW_VERDICTS.includes(reviewVerdict) ? { reviewVerdict } : {}),
     wedged,
     deadEnd: DEAD_END_SHAPES.includes(shape),
     recoverable,
@@ -329,6 +332,7 @@ function countRecoveries(state) {
 
 module.exports = {
   CHAIN_OUTCOMES,
+  REVIEW_VERDICTS,
   ALL_SHAPES,
   BLOCKED_RECOVERY_COMMAND,
   DEAD_END_SHAPES,

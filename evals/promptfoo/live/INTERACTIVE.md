@@ -17,8 +17,11 @@ Build and independently verify a native plugin stage with the repository's
 current packaging tools. Keep that stage immutable for the whole run. Set
 `ZENSU_LIVE_PLUGIN_ROOT` to its canonical absolute directory containing
 `plugin.json`, the native adapter, and generated `hooks.json`. The provider
-loads that exact external stage through each workspace's local plugin registry;
-it does not edit a shared installation.
+copies that exact stage into each claimed workspace's `.agents/plugins/zensu`
+and rewrites only that disposable workspace's registry to its local copy.
+agy 1.5.6 rejects registry paths outside the workspace. Native evidence must
+identify the local copy and the frozen digest; the shared installation is never
+an acceptable fallback. Neither the template nor a shared installation is edited.
 
 Run the owned preparer with the canonical frozen plugin path and, optionally,
 a canonical physical temporary parent directory:
@@ -62,7 +65,7 @@ The regular JSON manifest uses the exact `scenario_id` values from
 This example illustrates one entry; a full run needs all 45 actual scenario
 identifiers. The provider rejects aliases, symlinks, duplicate entries, reused
 claims, and unexpected initial workspace contents. It records each selected
-workspace under `workspace-claims/` before preparing its scenario. A rerun needs
+workspace under `workspace-claims/` before copying the plugin and preparing its scenario. A rerun needs
 new workspaces and a new manifest; preserve the earlier run's results.
 
 The host must already trust each exact workspace. Obtain explicit authorization

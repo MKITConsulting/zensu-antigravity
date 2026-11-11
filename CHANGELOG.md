@@ -5,6 +5,15 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Correlate native reviewers with their own completed launch in mixed tool batches, including a pending final file read.
+- Require observed current-file rereads after code review before native self-review can close the chain; recheck when the one-use authorization is consumed. Preserve canonical zero-change closure and validate fresh cumulative audit evidence after the permitted self-review fix round.
+- Initialize shared parser exports before authorization and helper CLI execution so terminal validation can safely reenter either native entrypoint.
+- Display standalone self-review progress from the verified consume verdict without adding workflow-state fields or retaining progress after closure.
+- Copy the frozen plugin into each isolated CLI test workspace so current Antigravity versions load the intended candidate; retain exact native identity checks and one-time approvals.
+- Correct the standalone progress comment to describe the verified private review verdict.
+
 ## [0.7.5] - 2026-11-04
 
 ### Added

@@ -192,7 +192,25 @@ function fireReport(rows, requireFired) {
 
 // A throwaway workspace per probe: agy anchors project state on the workspace,
 // and a probe must never write into the user's repos.
+function copyCandidate(ws, stage) {
+  if (!isAgyPluginRoot(stage) || !fs.existsSync(path.join(stage, 'plugin.json'))
+      || !fs.existsSync(path.join(stage, 'hooks.json'))) throw Error('incomplete portable plugin stage');
+  const inspect = directory => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isSymbolicLink()) throw Error('portable plugin stage contains a symbolic link');
+      if (entry.isDirectory()) inspect(path.join(directory, entry.name));
+      else if (!entry.isFile()) throw Error('portable plugin stage contains a non-regular file');
+    }
+  };
+  inspect(stage);
+  const target = path.join(ws, '.agents/plugins/zensu');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.cpSync(stage, target, { recursive: true, errorOnExist: true, force: false });
+  return target;
+}
+
 function makeWorkspace(parent, scenarioId) {
+  CANDIDATE_ROOT = '';
   const evidence = evidenceDirectory();
   const manifestFile = process.env.ZENSU_LIVE_WORKSPACE_MANIFEST;
   if (manifestFile) {
@@ -224,6 +242,14 @@ function makeWorkspace(parent, scenarioId) {
     fs.mkdirSync(claims, { recursive: true, mode: 0o700 });
     fs.writeFileSync(path.join(claims, `${scenarioId}.json`), JSON.stringify({ scenarioId, workspace: ws, pid: process.pid }) + '\n',
       { flag: 'wx', mode: 0o600 });
+    if (process.env.ZENSU_LIVE_INTERACTIVE === '1') {
+      // agy 1.5.6 rejects registry paths outside the workspace. Keep the frozen
+      // template untouched and bind every observation to this local copy.
+      CANDIDATE_ROOT = copyCandidate(ws, plugin);
+      fs.writeFileSync(pointer, JSON.stringify({ entries: [{
+        path: path.dirname(CANDIDATE_ROOT), include_only: [path.basename(CANDIDATE_ROOT)],
+      }] }) + '\n', { mode: 0o600 });
+    }
     return ws;
   }
   if (!parent) {
@@ -241,24 +267,13 @@ function makeWorkspace(parent, scenarioId) {
       entries: [{ path: path.dirname(plugin), include_only: [path.basename(plugin)] }],
     }) + '\n', { mode: 0o600 });
   }
-  CANDIDATE_ROOT = '';
-  if (process.env.ZENSU_LIVE_PLUGIN_STAGE) {
+  if (process.env.ZENSU_LIVE_PLUGIN_STAGE || process.env.ZENSU_LIVE_INTERACTIVE === '1') {
     try {
-      const stage = fs.realpathSync(process.env.ZENSU_LIVE_PLUGIN_STAGE);
-      if (!isAgyPluginRoot(stage) || !fs.existsSync(path.join(stage, 'plugin.json'))
-          || !fs.existsSync(path.join(stage, 'hooks.json'))) throw Error('incomplete portable plugin stage');
-      const inspect = directory => {
-        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-          if (entry.isSymbolicLink()) throw Error('portable plugin stage contains a symbolic link');
-          if (entry.isDirectory()) inspect(path.join(directory, entry.name));
-          else if (!entry.isFile()) throw Error('portable plugin stage contains a non-regular file');
-        }
-      };
-      inspect(stage);
-      const target = path.join(ws, '.agents/plugins/zensu');
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.cpSync(stage, target, { recursive: true, errorOnExist: true, force: false });
-      CANDIDATE_ROOT = target;
+      const stage = process.env.ZENSU_LIVE_PLUGIN_STAGE
+        ? fs.realpathSync(process.env.ZENSU_LIVE_PLUGIN_STAGE) : installedPluginRoot();
+      CANDIDATE_ROOT = copyCandidate(ws, stage);
+      if (process.env.ZENSU_LIVE_INTERACTIVE === '1') fs.writeFileSync(path.join(ws, '.agents/plugins.json'),
+        JSON.stringify({ entries: [{ path: path.dirname(CANDIDATE_ROOT), include_only: ['zensu'] }] }) + '\n', { mode: 0o600 });
     } catch (error) {
       fs.rmSync(ws, { recursive: true, force: true });
       throw error;
@@ -291,6 +306,7 @@ function isAgyPluginRoot(dir) {
 // LIVE-UNAVAILABLE.
 function installedPluginRoot() {
   if (process.env.ZENSU_LIVE_PLUGIN_STAGE && (process.env.ZENSU_LIVE_PLUGIN_ROOT || process.env.ZENSU_LIVE_INTERACTIVE === '1')) throw Error('candidate stage and explicit interactive plugin modes cannot be mixed');
+  if (process.env.ZENSU_LIVE_INTERACTIVE === '1' && CANDIDATE_ROOT) return CANDIDATE_ROOT;
   // Candidate mode must never silently exercise the user's global installation.
   if (process.env.ZENSU_LIVE_PLUGIN_STAGE) return CANDIDATE_ROOT || null;
   const explicit = process.env.ZENSU_LIVE_PLUGIN_ROOT;

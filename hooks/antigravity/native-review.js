@@ -79,11 +79,13 @@ function validateJudge(childId, role, lease, binding, options = {}) {
 }
 function validateConsumer(childId, lease, binding, options = {}) {
   const { receipt, result } = stageChild(childId, 'zensu-code-reviewer', 'consume', lease, binding, options);
+  const verdicts = typeof result.report === 'string'
+    ? [...result.report.matchAll(/^- Verdict: (PASS|PASS WITH SUGGESTIONS|NEEDS CHANGES)\s*$/gm)] : [];
   if (result.schema !== 'zensu-code-review-result-v1' || typeof result.report !== 'string'
       || !/^# Code Review Report\s*$/m.test(result.report)
-      || !/^- Verdict: (PASS|PASS WITH SUGGESTIONS|NEEDS CHANGES)\s*$/m.test(result.report)
+      || verdicts.length !== 1
       || result.report.includes('REVIEW PACKET INVALID')) fail('consume reviewer must supply a substantive completed report');
-  return { id: childId, role: 'consume', finalHash: receipt.finalHash };
+  return { id: childId, role: 'consume', finalHash: receipt.finalHash, verdict: verdicts[0][1] };
 }
 
 function enrichLease(result) {

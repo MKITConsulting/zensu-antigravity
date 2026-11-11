@@ -102,16 +102,10 @@ const SHAPE_POSITION = Object.freeze({
   // review that is over, the opposite false claim, and `✗` unconditionally
   // reports every converged chain as failed.
   //
-  // KNOWN RESIDUAL, and it is the reason this entry is `null` rather than a
-  // second position: the outcome signal exists only under BOUND linkage.
-  // `chainOutcome` is one of the five `AUTOPILOT_LINK_FIELDS`, written `""` at a
-  // bound begin and DELETED from a standalone document, so a standalone chain at
-  // this stage carries no outcome at all and neither mark can be justified for
-  // it. Closing that means giving a standalone document its own outcome field,
-  // which is a workflow-state schema change and therefore a `minor` release
-  // under HOST.md §"Runtime Lineage". The cost of the honest answer is named
-  // rather than paid with a false claim: a standalone chain renders no anchor
-  // for its self-review stage.
+  // A standalone chain needs the verified consume verdict from its private
+  // current-tree receipt. The classifier accepts that read-only evidence
+  // separately; no workflow-state field or Autopilot linkage is synthesized.
+  // Old receipts without a verdict continue to render no anchor.
   'awaiting-self-review': null,
   'self-review-unbindable': null,
   // A CLOSED chain renders NO anchor, for the same reason `no-session` does not:
@@ -181,11 +175,11 @@ function anchorTokenSafe(token) {
 // passed" — was a claim this module had no evidence for. `chainOutcome`
 // (`'' | 'pass' | 'no-changes' | 'max-rounds'`) is a workflow-state key that
 // `classifyChain` does not carry as a TOP-LEVEL report field. It does reach the
-// report for a BOUND chain, inside `report.autopilot.outcome`, and
-// `outcomePosition` below reads exactly that — deliberately, and only there. For
-// a STANDALONE chain there is still no outcome signal anywhere the anchor can
-// reach, which is why the two outcome-dependent shapes render nothing at all
-// rather than guessing.
+// report for a BOUND chain, inside `report.autopilot.outcome`, which
+// `outcomePosition` consumes below. For a STANDALONE chain it instead reads
+// `report.reviewVerdict`, supplied by the classifier from a verified private
+// current-tree review receipt. Missing or unverified outcome evidence renders
+// no anchor rather than guessing.
 //
 // Mapping `chain-closed` to `null` removed the only consumer, so the derivation,
 // its `unreviewedDone` rung and the `options.reviewed` parameter all went with
@@ -290,9 +284,14 @@ function placedOutcomes() {
 // stamp the bound max-round handoff leaves; an EMPTY outcome on a bound report at
 // these shapes is evidence the review converged, because the two ways to reach
 // `codeReviewDone === true` are convergence and that handoff. A standalone report
-// carries no outcome field at all and therefore stays null.
+// carries no persisted outcome field; it needs separate verified receipt evidence.
 function outcomePosition(shape, report) {
   if (OUTCOME_DEPENDENT_SHAPES.indexOf(shape) < 0) return null;
+  if (report?.linkage === 'standalone') {
+    if (report.reviewVerdict === 'PASS' || report.reviewVerdict === 'PASS WITH SUGGESTIONS') return OUTCOME_POSITION.pass;
+    if (report.reviewVerdict === 'NEEDS CHANGES') return OUTCOME_POSITION['max-rounds'];
+    return null;
+  }
   if (!report || report.linkage !== 'bound') return null;
   const autopilot = report.autopilot;
   if (!autopilot || typeof autopilot !== 'object') return null;
