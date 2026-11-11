@@ -674,6 +674,32 @@ test('preparation creates only 45 exact disposable workspaces without trust or n
       assert.deepEqual(JSON.parse(fs.readFileSync(path.join(workspace, '.agents/plugins.json'), 'utf8')),
         { entries: [{ path: path.dirname(pluginRoot), include_only: ['zensu'] }] });
     }
+    const provider = path.resolve(__dirname, '../../evals/promptfoo/lib/agy-live-provider.js');
+    const claimed = spawnSync(process.execPath, ['-e', `
+      const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
+      const provider = require(process.argv[1]), entries = JSON.parse(process.argv[2]);
+      const stage = process.env.ZENSU_LIVE_PLUGIN_ROOT;
+      for (const entry of entries.slice(0, 2)) {
+        const ws = provider.makeWorkspace(undefined, entry.scenarioId);
+        const installed = provider.installedPluginRoot();
+        assert.equal(installed, path.join(ws, '.agents/plugins/zensu'));
+        assert.notEqual(installed, stage);
+        assert.deepEqual(fs.readFileSync(path.join(installed, 'hooks.json')), fs.readFileSync(path.join(stage, 'hooks.json')));
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(ws, '.agents/plugins.json'))),
+          { entries: [{ path: path.dirname(installed), include_only: ['zensu'] }] });
+      }
+      fs.symlinkSync(path.join(stage, 'hooks.json'), path.join(stage, 'unsafe-link'));
+      assert.throws(() => provider.makeWorkspace(undefined, entries[2].scenarioId), /symbolic link/);
+      assert.equal(fs.existsSync(path.join(entries[2].workspace, '.agents/plugins/zensu')), false);
+      fs.unlinkSync(path.join(stage, 'unsafe-link'));
+      console.log('local copies verified; unsafe stage refused');
+    `, provider, JSON.stringify(manifest.entries)], {
+      env: { ...process.env, ...value.env }, encoding: 'utf8', timeout: 10000,
+    });
+    assert.equal(claimed.status, 0, claimed.stderr);
+    assert.match(claimed.stdout, /local copies verified; unsafe stage refused/);
+    assert.equal(settingsHash(), settingsBefore);
+    assert.equal(fs.existsSync(marker), false);
   } finally {
     if (priorPath === undefined) delete process.env.PATH; else process.env.PATH = priorPath;
     fs.rmSync(root, { recursive: true, force: true });

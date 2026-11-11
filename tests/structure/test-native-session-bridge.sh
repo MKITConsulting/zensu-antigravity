@@ -9,6 +9,7 @@ check() {
   printf '%s %s\n' "$2" "$1"
 }
 unit_check "native-agent-provenance.test.js" "$ROOT/tests/host/native-agent-provenance.test.js"
+unit_check "native-self-review.test.js" "$ROOT/tests/host/native-self-review.test.js"
 unit_check "native-reviewer-outcome.test.js" "$ROOT/tests/host/native-reviewer-outcome.test.js"
 unit_check "test-native-agent-lifecycle.js" "$ROOT/tests/host/test-native-agent-lifecycle.js"
 unit_check "test-native-agent-shim.js" "$ROOT/tests/host/test-native-agent-shim.js"

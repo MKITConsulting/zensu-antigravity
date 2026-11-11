@@ -228,11 +228,6 @@ function childLaunchStep(source, parent, sidecar) {
   const file = path.join(source.brain, parent.parentSessionId, '.system_generated', 'logs', path.basename(source.transcript));
   const rows = transcriptRows(file);
   if (!rows.every((row, index) => !index || row.step_index > rows[index - 1].step_index)) fail('parent transcript steps are not ordered');
-  const anchor = rows.find(row => row.step_index === sidecar.spawnStepIndex);
-  if (anchor) {
-    if (anchor.type !== 'GENERIC' || anchor.source !== 'MODEL' || anchor.status !== 'DONE') fail('native sidecar batch anchor is incomplete');
-    spawnedChildren(anchor.content);
-  }
   const matches = rows.filter(row => {
     if (row.type !== 'GENERIC' || row.source !== 'MODEL' || row.status !== 'DONE') return false;
     try { return spawnedChildren(row.content).some(child => child.conversationId === source.sessionId); }
@@ -241,23 +236,34 @@ function childLaunchStep(source, parent, sidecar) {
   if (matches.length !== 1) fail('the child has no unique completed parent result');
   const result = matches[0];
   if (sidecar.spawnStepIndex !== result.step_index) {
-    // CLI 1.4.7 assigns every sidecar in a multi-call planner response the final
-    // tool-step index. Accept only that observed shape, with the child's exact
-    // UUID in its own completed result and its descriptor at the matching offset.
-    const planner = [...rows].reverse().find(row => row.step_index < result.step_index
-      && row.type === 'PLANNER_RESPONSE' && row.source === 'MODEL' && row.status === 'DONE');
-    const calls = planner?.tool_calls;
-    if (!Array.isArray(calls) || calls.length < 2 || calls.length > 16
+    // Both CLI and IDE sidecars may name the final tool in a mixed planner
+    // batch. That tool can still be running when this child starts. Authority
+    // comes from this child's completed result and exact accepted descriptor,
+    // never from the unrelated final tool's output or completion status.
+    const { planner, index } = launchBatch(rows, result.step_index);
+    const calls = planner.tool_calls;
+    if (calls.length < 2 || calls.length > 16
         || sidecar.spawnStepIndex !== planner.step_index + calls.length
-        || calls.some(call => call.name !== 'invoke_subagent' || !call.args || Object.hasOwn(call.args, 'Subagents'))) {
+        || calls.some(call => !call || typeof call.name !== 'string' || !call.name
+          || !call.args || typeof call.args !== 'object' || Array.isArray(call.args)
+          || (call.name === 'invoke_subagent' && Object.hasOwn(call.args, 'Subagents')))) {
       fail('native sidecar dispatch step differs from the completed result');
     }
-    const entries = calls.map(call => descriptors(call.args)[0]);
-    const index = result.step_index - planner.step_index - 1;
+    const anchor = rows.find(row => row.step_index === sidecar.spawnStepIndex);
+    if (anchor) {
+      const agentAnchor = calls.at(-1).name === 'invoke_subagent';
+      if (anchor.type !== 'GENERIC' || anchor.source !== 'MODEL'
+          || (agentAnchor ? anchor.status !== 'DONE' : !['RUNNING', 'DONE', 'ERROR'].includes(anchor.status))) {
+        fail('native sidecar batch anchor is incomplete');
+      }
+      if (agentAnchor) spawnedChildren(anchor.content);
+    }
+    const entries = calls.map(call => call.name === 'invoke_subagent' ? descriptors(call.args)[0] : null);
+    const agents = entries.filter(Boolean);
     const entry = entries[index];
     if (!entry || entry.typeName !== sidecar.subagentDescriptor.typeName
         || entry.role !== sidecar.subagentDescriptor.role || entry.prompt !== parent.prompt
-        || new Set(entries.map(item => item.role)).size !== entries.length
+        || new Set(agents.map(item => item.role)).size !== agents.length
         || rows.some(row => row.step_index > planner.step_index && row.step_index <= sidecar.spawnStepIndex
           && row.type === 'PLANNER_RESPONSE')) fail('native multi-call sidecar does not match its exact role and result');
   }

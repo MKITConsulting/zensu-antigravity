@@ -125,7 +125,6 @@ test('multi-call sidecar drift binds only the exact child result and accepted ro
   const original = structuredClone(f.parentRows);
   for (const mutate of [
     rows => rows[1].tool_calls.reverse(),
-    rows => { rows[1].tool_calls[1].name = 'run_command'; },
     rows => { rows[1].tool_calls[1].args.Role = f.descriptor.Role; },
     rows => { rows[1].tool_calls[0].args.Prompt = 'Other prompt'; },
     rows => { rows[1].tool_calls[0].args = { Subagents: [f.descriptor] }; },
@@ -509,6 +508,50 @@ test('parallel correlation rejects ambiguity, reordered calls and foreign batch 
     f => { f.parentRows[2].content = f.parentRows[2].content.replace(pathToFileURL(f.workspace).href, pathToFileURL(f.tmp).href); },
   ]) {
     const f = parallelFixture(t); f.authorizeBoth(); mutate(f);
+    f.writeRows(f.parent, f.parentRows); fs.writeFileSync(f.sidecarFile, JSON.stringify(f.sidecar));
+    assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
+  }
+});
+
+test('mixed planner batches bind each real child while the final file read is absent, running or done', t => {
+  for (const status of [null, 'RUNNING', 'DONE', 'ERROR']) {
+    const f = parallelFixture(t);
+    f.parentRows[1].tool_calls.push({ name: 'read_file', args: { Path: path.join(f.workspace, 'README.md') } });
+    if (status) f.parentRows.push({ step_index: 5, source: 'MODEL', type: 'GENERIC', status,
+      content: status === 'DONE' ? 'Showing lines 1-1 of 1\n1: Fixture' : '' });
+    f.sidecar.spawnStepIndex = 5;
+    fs.writeFileSync(f.sidecarFile, JSON.stringify(f.sidecar));
+    const other = JSON.parse(fs.readFileSync(f.otherSidecarFile, 'utf8'));
+    other.spawnStepIndex = 5;
+    fs.writeFileSync(f.otherSidecarFile, JSON.stringify(other));
+    f.writeRows(f.parent, f.parentRows); f.authorizeBoth();
+    for (const [child, step] of [[f.child, 3], [f.sibling, 4]]) {
+      const payload = { ...f.childPayload, session_id: child, transcript_path: f.transcript(child) };
+      const result = api.prepare(payload, f.options);
+      assert.equal(result.status, 'child', result.reason);
+      assert.equal(result.provenance.spawnStepIndex, step);
+      const lifecycle = require('../../hooks/antigravity/native-agent-lifecycle.js');
+      assert.equal(lifecycle.stopChild({ ...payload, fully_idle: true, termination_reason: 'NO_TOOL_CALL' }, f.options).status, 'completed');
+      assert.equal(lifecycle.completedChild(f.parent, child, f.options).finalText, '{"findings":[]}');
+    }
+  }
+});
+
+test('mixed batches still reject substituted positions, descriptors, parent boundaries and results', t => {
+  for (const mutate of [
+    f => { f.parentRows[1].tool_calls.reverse(); },
+    f => { f.parentRows[1].tool_calls[0].args.Prompt = 'Unapproved replacement'; },
+    f => { f.parentRows[2].status = 'RUNNING'; },
+    f => { f.parentRows[4].source = 'SYSTEM'; },
+    f => { f.parentRows[4].type = 'PLANNER_RESPONSE'; },
+    f => { f.sidecar.spawnStepIndex = 6; },
+    f => { f.parentRows[4].content = f.parentRows[2].content; },
+  ]) {
+    const f = parallelFixture(t);
+    f.parentRows[1].tool_calls.push({ name: 'read_file', args: { Path: path.join(f.workspace, 'README.md') } });
+    f.parentRows.push({ step_index: 5, source: 'MODEL', type: 'GENERIC', status: 'DONE', content: 'File read' });
+    f.sidecar.spawnStepIndex = 5;
+    f.writeRows(f.parent, f.parentRows); f.authorizeBoth(); mutate(f);
     f.writeRows(f.parent, f.parentRows); fs.writeFileSync(f.sidecarFile, JSON.stringify(f.sidecar));
     assert.equal(api.prepare(f.childPayload, f.options).status, 'deny');
   }

@@ -12,7 +12,7 @@ const helpers = require('./session-helper.js');
 // select the adapter directory as Cwd, and Node accepts extensionless imports.
 const NATIVE_STATE_MODULES = [
   'ai-work', 'antigravity-shim', 'autopilot-review', 'lazy-init', 'native-agent-lifecycle',
-  'native-agent-provenance', 'native-review', 'native-review-packet', 'native-spawn-allow', 'normalize-payload',
+  'native-agent-provenance', 'native-review', 'native-review-packet', 'native-self-review', 'native-spawn-allow', 'normalize-payload',
   'review-artifacts', 'review-children', 'session-bootstrap', 'session-command-guard',
   'session-helper', 'session-paths', 'session-trail', 'worker-launch', 'worker-runtime', 'workflow-artifacts',
 ];
@@ -146,7 +146,19 @@ function inspectCommand(payload, options = {}) {
 function guard(payload, options = {}) {
   const result = inspectCommand(payload, options);
   if (result.kind === 'helper') {
-    try { helpers.authorize(result.request, options); } catch (error) {
+    try {
+      const terminal = helpers.terminalReviewRequest(result.request);
+      if (terminal) {
+        require('./native-self-review.js').verify(result.request, payload, {
+          ...options, environment: helpers.helperEnvironment(result.request, options),
+        });
+      }
+      helpers.authorize(result.request, { ...options,
+        ...(terminal ? { terminalContext: {
+          session_id: payload.session_id, transcript_path: payload.transcript_path, step_idx: payload.step_idx,
+        } } : {}),
+      });
+    } catch (error) {
       return { kind: 'deny', reason: `Could not authorize the session-bound helper: ${error.message}` };
     }
   }
@@ -188,6 +200,9 @@ function main() {
   process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { permissionDecision: 'deny',
     permissionDecisionReason: `${result.reason}. Use ${command} as one standalone shell command.` } })}\n`);
 }
+// Terminal verification reuses this parser while the CLI is still executing.
+// Publish the contract before main so that reentrant loading sees it too.
+module.exports = { NATIVE_STATE_MODULES, STATE_MODULES, mentionsProtectedExecution, literalWords, inspectCommand, guard, gatePayload, main };
 if (require.main === module) {
   try { main(); } catch (error) {
     process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { permissionDecision: 'deny',
@@ -195,4 +210,3 @@ if (require.main === module) {
     process.exitCode = 1;
   }
 }
-module.exports = { NATIVE_STATE_MODULES, STATE_MODULES, mentionsProtectedExecution, literalWords, inspectCommand, guard, gatePayload, main };
