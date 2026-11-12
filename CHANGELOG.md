@@ -5,6 +5,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Security
+
+- Update the offline evaluation dependency graph, starting with the critical Mongoose fix, and refresh vulnerable transitive dependencies and override floors. Upgrade promptfoo to 0.125.1 so its Azure authentication dependencies support patched MSAL releases.
+- Pin MongoDB's optional GCP metadata peer separately from promptfoo's newer copy so the installed dependency graph remains valid.
+
 ## [0.7.6] - 2026-11-11
 
 ### Fixed
