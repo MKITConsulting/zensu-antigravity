@@ -7,6 +7,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Security
 
+- Pin Hono to 4.13.16 and basic-ftp to 6.2.4 in the offline evaluation dependency graph, resolving five Hono advisories and the basic-ftp directory-listing parser denial of service.
 - Update the offline evaluation dependency graph, starting with the critical Mongoose fix, and refresh vulnerable transitive dependencies and override floors. Upgrade promptfoo to 0.125.1 so its Azure authentication dependencies support patched MSAL releases.
 - Pin MongoDB's optional GCP metadata peer separately from promptfoo's newer copy so the installed dependency graph remains valid.
 
