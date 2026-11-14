@@ -411,7 +411,11 @@ sys.exit(0 if second=="/exit\\r" else 9)
     const observer = path.join(root, 'observer.js');
     fs.writeFileSync(observer, `const fs=require('fs');const s=JSON.parse(fs.readFileSync(process.argv[2]));
 const done=fs.existsSync(s.ws+'/child-confirmation.json');
-process.stdout.write(JSON.stringify(done?{verified:true,sessionId:'fixture-only',completion:{transcriptHash:'same',decisionsHash:'same'}}:{verified:false}));`);
+const historyFile=s.ws+'/background-observations.json';
+const history=fs.existsSync(historyFile)?JSON.parse(fs.readFileSync(historyFile)):[];
+const backgroundTasksHash=history.length===0?'initial-log':'settled-log';
+if(done){history.push(backgroundTasksHash);fs.writeFileSync(historyFile,JSON.stringify(history));}
+process.stdout.write(JSON.stringify(done?{verified:true,sessionId:'fixture-only',completion:{transcriptHash:'same',decisionsHash:'same',backgroundTasksHash}}:{verified:false}));`);
     const specFile = path.join(root, 'request.json');
     fs.writeFileSync(specFile, JSON.stringify({ runDir: root, ws: root, argv: [], seconds: 8,
       node: process.execPath, observer }));
@@ -466,6 +470,8 @@ sys.exit(0 if sent and confirmed and child.returncode==0 else 1)
     assert.equal(transport.exitCode, 0);
     assert.equal(transport.processExitConfirmed, true);
     assert.equal(transport.processGroupExitConfirmed, true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'background-observations.json'), 'utf8')),
+      ['initial-log', 'settled-log', 'settled-log'], 'exit must wait for two matching task-log observations');
     assert.match(fs.readFileSync(path.join(root, 'terminal.raw'), 'utf8'), /ONE_TIME_ACCEPTED/);
     const inputs = fs.readFileSync(path.join(root, 'operator-input.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
     assert.equal(inputs.length, 5);
@@ -647,6 +653,83 @@ sys.exit(child.returncode)
     const recovery = JSON.parse(fs.readFileSync(path.join(root, 'fixture-recovery.json'), 'utf8'));
     assert.equal(recovery.pid, nativePid);
     assert.equal(recovery.signal, 9);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('PTY refuses completion when the leader exited but its group exit is unconfirmed', () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'zensu-interactive-group-')));
+  try {
+    fs.mkdirSync(path.join(root, 'bin'));
+    fs.writeFileSync(path.join(root, 'bin/agy'), `#!/usr/bin/env python3
+import json,os,pathlib,sys,tty
+tty.setraw(sys.stdin.fileno())
+command=""
+while not command.endswith("\\r"):
+ command+=os.read(sys.stdin.fileno(),1).decode()
+(pathlib.Path.cwd()/"native-exit.json").write_text(json.dumps(command))
+sys.exit(0 if command=="/exit\\r" else 9)
+`, { mode: 0o700 });
+    const observer = path.join(root, 'observer.js');
+    fs.writeFileSync(observer, 'process.stdout.write(JSON.stringify({verified:true,sessionId:"fixture-only",completion:{transcriptHash:"same",decisionsHash:"same"}}));');
+    fs.writeFileSync(path.join(root, 'request.json'), JSON.stringify({ runDir: root, ws: root, argv: [],
+      seconds: 8, node: process.execPath, observer }));
+    const bridge = path.resolve(__dirname, '../../evals/promptfoo/lib/agy-interactive-pty.py');
+    const wrapper = path.join(root, 'group-wrapper.py');
+    fs.writeFileSync(wrapper, `import importlib.util,os,pathlib,sys
+root=pathlib.Path(sys.argv[1])
+spec=importlib.util.spec_from_file_location("bridge",sys.argv[2])
+module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+real_killpg=os.killpg
+def group_still_exists(group,number):
+ if number==0:
+  # Model an unconfirmed group after its real owned leader exited normally.
+  # No orphan is created and termination signals retain their real behavior.
+  (root/"group-check.pid").write_text(str(group))
+  return None
+ return real_killpg(group,number)
+os.killpg=group_still_exists
+sys.argv=[sys.argv[2],str(root/"request.json")]
+sys.exit(module.main())
+`);
+    const controller = path.join(root, 'controller.py');
+    fs.writeFileSync(controller, `import fcntl,os,pty,select,signal,subprocess,sys,termios,time
+master,slave=pty.openpty()
+def attach():
+ os.setsid();fcntl.ioctl(slave,termios.TIOCSCTTY,0)
+child=subprocess.Popen([sys.executable,sys.argv[1],sys.argv[2],sys.argv[3]],stdin=slave,stdout=slave,stderr=slave,preexec_fn=attach,close_fds=True)
+os.close(slave)
+deadline=time.monotonic()+12
+try:
+ while child.poll() is None and time.monotonic()<deadline:
+  ready,_,_=select.select([master],[],[],0.1)
+  if ready:
+   try:
+    if not os.read(master,65536): break
+   except OSError: break
+ child.wait(timeout=3)
+finally:
+ if child.poll() is None:
+  os.kill(child.pid,signal.SIGINT);child.wait(timeout=7)
+ os.close(master)
+sys.exit(child.returncode)
+`);
+    const result = spawnSync('python3', [controller, wrapper, root, bridge], {
+      detached: true, encoding: 'utf8', timeout: 20000,
+      env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}` },
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.signal, null);
+    const transport = JSON.parse(fs.readFileSync(path.join(root, 'transport.json'), 'utf8'));
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'native-exit.json'), 'utf8')), '/exit\r');
+    assert.equal(transport.exitCode, 0, 'the owned native leader exited normally');
+    assert.equal(transport.processExitConfirmed, true);
+    assert.equal(transport.processGroupExitConfirmed, false);
+    assert.equal(transport.reason, 'cleanup-failed');
+    assert.equal(transport.cleanupError.operation, 'verify-group-exit');
+    assert.match(transport.cleanupError.error, /RuntimeError: Owned native process group exit is unconfirmed/);
+    assert.equal(Number(fs.readFileSync(path.join(root, 'group-check.pid'), 'utf8')), transport.pid);
+    assert.deepEqual(transport.automaticInputs, ['/exit']);
+    assert.equal(transport.operatorBytes, 0);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
