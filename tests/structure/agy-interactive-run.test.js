@@ -663,6 +663,7 @@ test('PTY refuses completion when the leader exited but its group exit is unconf
     fs.writeFileSync(path.join(root, 'bin/agy'), `#!/usr/bin/env python3
 import json,os,pathlib,sys,tty
 tty.setraw(sys.stdin.fileno())
+(pathlib.Path.cwd()/"native-ready").write_text("ready")
 command=""
 while not command.endswith("\\r"):
  command+=os.read(sys.stdin.fileno(),1).decode()
@@ -670,7 +671,9 @@ while not command.endswith("\\r"):
 sys.exit(0 if command=="/exit\\r" else 9)
 `, { mode: 0o700 });
     const observer = path.join(root, 'observer.js');
-    fs.writeFileSync(observer, 'process.stdout.write(JSON.stringify({verified:true,sessionId:"fixture-only",completion:{transcriptHash:"same",decisionsHash:"same"}}));');
+    fs.writeFileSync(observer, `const fs=require('fs');const s=JSON.parse(fs.readFileSync(process.argv[2]));
+const ready=fs.existsSync(s.ws+'/native-ready');
+process.stdout.write(JSON.stringify(ready?{verified:true,sessionId:'fixture-only',completion:{transcriptHash:'same',decisionsHash:'same'}}:{verified:false,reason:'fixture not ready'}));`);
     fs.writeFileSync(path.join(root, 'request.json'), JSON.stringify({ runDir: root, ws: root, argv: [],
       seconds: 8, node: process.execPath, observer }));
     const bridge = path.resolve(__dirname, '../../evals/promptfoo/lib/agy-interactive-pty.py');
