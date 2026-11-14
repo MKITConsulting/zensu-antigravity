@@ -53,11 +53,12 @@ function fixture() {
   };
 }
 
-test('literal initial prompt and exact resume UUID survive without permission flags', () => {
+test('literal prompt and exact resume UUID retain strict session-only permissions', () => {
   const value = buildInvocation({ prompt: 'literal $(touch bad)\n`not a shell`', ws: '/owned/workspace',
     runDir: '/owned/evidence', model: 'gemini-3.8-flash-medium',
     extraArgs: ['--conversation', sessionId, '--output-format', 'stream-json', '--log-file', '/owned/evidence/native.log'] });
   assert.deepEqual(value.argv, ['--prompt-interactive', 'literal $(touch bad)\n`not a shell`',
+    '--settings', JSON.stringify({ agentMode: '', toolPermission: 'strict' }),
     '--conversation', sessionId, '--model', 'gemini-3.8-flash-medium', '--log-file', '/owned/evidence/native.log']);
   assert.equal(value.sessionId, sessionId);
   assert.equal(value.cwd, '/owned/workspace');
@@ -70,6 +71,14 @@ function rejectsOption(extraArgs) {
 test("refuses unapproved or ambiguous option [\"--dangerously-skip-permissions\"]", () => rejectsOption(["--dangerously-skip-permissions"]));
 test("refuses unapproved or ambiguous option [\"--dangerously-skip-permissions\",\"true\"]", () => rejectsOption(["--dangerously-skip-permissions", "true"]));
 test("refuses unapproved or ambiguous option [\"--mode\",\"auto\"]", () => rejectsOption(["--mode", "auto"]));
+
+test('callers cannot replace fixed strict settings or add permission grants', () => {
+  for (const value of [
+    { agentMode: 'auto', toolPermission: 'auto' },
+    { permissions: { allow: ['command(*)'] } },
+    { agentMode: '', toolPermission: 'strict' },
+  ]) rejectsOption(['--settings', JSON.stringify(value)]);
+});
 test("refuses unapproved or ambiguous option [\"--allow\",\"*\"]", () => rejectsOption(["--allow", "*"]));
 test("refuses unapproved or ambiguous option [\"--add-dir\",\"/other\"]", () => rejectsOption(["--add-dir", "/other"]));
 test("refuses unapproved or ambiguous option [\"--conversation\",\"latest\"]", () => rejectsOption(["--conversation", "latest"]));
@@ -388,6 +397,10 @@ print("CONFIRM_ONE_TIME_ENTER",flush=True)
 confirmation=os.read(sys.stdin.fileno(),1).decode()
 (p/"confirmation.json").write_text(json.dumps(confirmation))
 if confirmation!="\\r": sys.exit(10)
+print("CONFIRM_CHILD_ONE_TIME",flush=True)
+child_confirmation=os.read(sys.stdin.fileno(),1).decode()
+(p/"child-confirmation.json").write_text(json.dumps(child_confirmation))
+if child_confirmation!="\\x0b": sys.exit(11)
 print("ONE_TIME_ACCEPTED",flush=True)
 second=""
 while not second.endswith("\\r"):
@@ -397,7 +410,7 @@ sys.exit(0 if second=="/exit\\r" else 9)
 `, { mode: 0o700 });
     const observer = path.join(root, 'observer.js');
     fs.writeFileSync(observer, `const fs=require('fs');const s=JSON.parse(fs.readFileSync(process.argv[2]));
-const done=fs.existsSync(s.ws+'/confirmation.json');
+const done=fs.existsSync(s.ws+'/child-confirmation.json');
 process.stdout.write(JSON.stringify(done?{verified:true,sessionId:'fixture-only',completion:{transcriptHash:'same',decisionsHash:'same'}}:{verified:false}));`);
     const specFile = path.join(root, 'request.json');
     fs.writeFileSync(specFile, JSON.stringify({ runDir: root, ws: root, argv: [], seconds: 8,
@@ -411,7 +424,7 @@ def attach():
  fcntl.ioctl(slave,termios.TIOCSCTTY,0)
 child=subprocess.Popen([sys.executable,sys.argv[2],str(root/"request.json")],stdin=slave,stdout=slave,stderr=slave,preexec_fn=attach,close_fds=True)
 os.close(slave)
-seen=b"";sent=False;confirmed=False;refused=False;deadline=time.monotonic()+12
+seen=b"";sent=False;confirmed=False;refused=False;child_refused=False;child_confirmed=False;deadline=time.monotonic()+12
 try:
  while child.poll() is None and time.monotonic()<deadline:
   ready,_,_=select.select([master],[],[],0.1)
@@ -426,6 +439,10 @@ try:
     os.write(master,b"y");sent=True
    if b"CONFIRM_ONE_TIME_ENTER" in seen and not confirmed:
     os.write(master,b"\\r");confirmed=True
+   if b"CONFIRM_CHILD_ONE_TIME" in seen and not child_refused:
+    os.write(master,b"\\x0b\\x0b");child_refused=True
+   if child_refused and seen.count(b"Only y, n, inspected one-time Enter")>=2 and not child_confirmed:
+    os.write(master,b"\\x0b");child_confirmed=True
  child.wait(timeout=3)
 finally:
  if child.poll() is None:
@@ -442,17 +459,23 @@ sys.exit(0 if sent and confirmed and child.returncode==0 else 1)
     assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'confirmation.json'), 'utf8')), '\r');
     assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'second.json'), 'utf8')), '/exit\r');
     const transport = JSON.parse(fs.readFileSync(path.join(root, 'transport.json'), 'utf8'));
-    assert.equal(transport.operatorBytes, 2);
+    assert.equal(transport.operatorBytes, 3);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'child-confirmation.json'), 'utf8')), '\x0b');
     assert.deepEqual(transport.automaticInputs, ['/exit']);
     assert.equal(transport.reason, 'completed');
     assert.equal(transport.exitCode, 0);
+    assert.equal(transport.processExitConfirmed, true);
+    assert.equal(transport.processGroupExitConfirmed, true);
     assert.match(fs.readFileSync(path.join(root, 'terminal.raw'), 'utf8'), /ONE_TIME_ACCEPTED/);
     const inputs = fs.readFileSync(path.join(root, 'operator-input.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
-    assert.equal(inputs.length, 3);
+    assert.equal(inputs.length, 5);
     assert.equal(inputs[0].refused, true);
     assert.equal(inputs[0].byteCount, 2);
     assert.equal(inputs[1].input, 'y');
     assert.equal(inputs[2].input, '\r');
+    assert.equal(inputs[3].refused, true);
+    assert.equal(inputs[3].byteCount, 2);
+    assert.equal(inputs[4].input, '\x0b');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -530,6 +553,8 @@ sys.exit(0 if sent and confirmed and child.returncode==0 else 1)
     assert.deepEqual(transport.automaticInputs, ['cancel-observed-probe', '/exit']);
     assert.equal(transport.reason, 'stop-continuation-observed');
     assert.equal(transport.exitCode, 0);
+    assert.equal(transport.processExitConfirmed, true);
+    assert.equal(transport.processGroupExitConfirmed, true);
     assert.match(fs.readFileSync(path.join(root, 'terminal.raw'), 'utf8'), /ONE_TIME_ACCEPTED/);
     const inputs = fs.readFileSync(path.join(root, 'operator-input.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
     assert.equal(inputs.length, 3);
@@ -613,6 +638,7 @@ sys.exit(child.returncode)
     assert.equal(transport.reason, 'timeout');
     assert.equal(transport.exitCode, null);
     assert.equal(transport.processExitConfirmed, false);
+    assert.equal(transport.processGroupExitConfirmed, false);
     assert.equal(transport.cleanupError.operation, 'signal-SIGKILL');
     assert.match(transport.cleanupError.error, /PermissionError.*fixture signal denial/);
     assert.deepEqual(transport.automaticInputs, []);

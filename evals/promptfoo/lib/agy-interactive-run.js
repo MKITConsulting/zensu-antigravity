@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
+const { resolveBackgroundTask } = require('./agy-background-tasks.js');
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const hash = value => createHash('sha256').update(value).digest('hex');
 
@@ -18,7 +19,10 @@ function canonicalDirectory(value) {
 
 function buildInvocation({ prompt, ws, extraArgs = [], runDir, model }) {
   if (typeof prompt !== 'string' || !prompt || prompt.includes('\0')) throw Error('A literal prompt is required');
-  const argv = ['--prompt-interactive', prompt];
+  // Do not inherit Auto mode or permissive tool defaults from user settings.
+  // These fixed overrides apply only to this process; extraArgs cannot replace them.
+  const argv = ['--prompt-interactive', prompt, '--settings',
+    JSON.stringify({ agentMode: '', toolPermission: 'strict' })];
   let sessionId = '', cliLog = path.join(runDir, 'cli.log');
   const seen = new Set();
   for (let index = 0; index < extraArgs.length; index += 2) {
@@ -72,7 +76,14 @@ function completionProof({ sessionId, prompt, rows, priorRows = [], decisions })
   if (content !== prompt && !(typeof content === 'string'
       && content.startsWith(`<USER_REQUEST>\n${prompt}\n</USER_REQUEST>\n`))) return no('native user prompt does not match');
   const turn = fresh.filter(row => row.step_index > users[0].step_index);
-  if (!turn.length || turn.some(row => !['DONE', 'ERROR'].includes(row.status))) return no('native turn is still pending');
+  if (!turn.length) return no('native turn is still pending');
+  const backgroundTasks = [];
+  for (const row of turn) {
+    if (['DONE', 'ERROR'].includes(row.status)) continue;
+    const completedTask = resolveBackgroundTask(sessionId, row, turn);
+    if (!completedTask) return no('native turn is still pending');
+    backgroundTasks.push(completedTask);
+  }
   const last = turn.at(-1);
   if (last.type !== 'PLANNER_RESPONSE' || last.source !== 'MODEL' || last.status !== 'DONE'
       || (last.tool_calls && last.tool_calls.length) || typeof last.content !== 'string'
@@ -93,7 +104,7 @@ function completionProof({ sessionId, prompt, rows, priorRows = [], decisions })
   }
   return { verified: true, userStep: users[0].step_index, finalStep: last.step_index,
     response: last.content, finalHash: hash(last.content), transcriptHash: hash(JSON.stringify(rows)),
-    decisionsHash: hash(JSON.stringify(decisions)) };
+    decisionsHash: hash(JSON.stringify(decisions)), backgroundTasks };
 }
 
 function observeRun(spec) {
@@ -131,6 +142,11 @@ function observeRun(spec) {
   if (context.host !== 'native' || context.project_root !== spec.ws || context.plugin_root !== spec.pluginRoot
       || context.runtime_digest !== runtimeDigest || context.session_id_hash !== `sha256:${core.sessionKey(sessionId).slice(5)}`) {
     throw Error('Native context does not match the frozen workspace/runtime/session');
+  }
+  if (proof.backgroundTasks?.length) {
+    proof.backgroundTasks = proof.backgroundTasks.map(task => ({ ...task,
+      logHash: hash(provenance.readHostFile(task.logFile)) }));
+    proof.backgroundTasksHash = hash(JSON.stringify(proof.backgroundTasks));
   }
   return { verified: true, sessionId, workspace: spec.ws, pluginRoot: spec.pluginRoot, runtimeDigest,
     transcript, cliLog: spec.cliLog, decisionsFile: spec.decisionsFile, contextPath,
@@ -181,7 +197,8 @@ function runInteractive({ prompt, ws, timeoutS, extraEnv = {}, extraArgs = [], p
     const transport = JSON.parse(fs.readFileSync(path.join(runDir, 'transport.json'), 'utf8'));
     output.exit_code = transport.exitCode ?? -1;
     const expectedReason = stopProbe ? 'stop-continuation-observed' : 'completed';
-    if (transport.reason !== expectedReason || transport.cleanupError) {
+    if (transport.reason !== expectedReason || transport.cleanupError
+        || transport.processExitConfirmed !== true || transport.processGroupExitConfirmed !== true) {
       // A public final on resume is insufficient. Keep the current observer's
       // exact missing proof alongside transport/cleanup failure, so a lost hook
       // witness is not misreported as a generic timeout or successful Stop.
