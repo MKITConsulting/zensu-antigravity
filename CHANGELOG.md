@@ -5,6 +5,14 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-11-15
+
+### Fixed
+
+- **evals**: Verify strict interactive background completion (#40)
+- **deps**: Patch hono and basic-ftp advisories (#39)
+- **deps**: Remediate evaluation dependency advisories (#38)
+
 ### Security
 
 - Pin Hono to 4.13.16 and basic-ftp to 6.2.4 in the offline evaluation dependency graph, resolving five Hono advisories and the basic-ftp directory-listing parser denial of service.
