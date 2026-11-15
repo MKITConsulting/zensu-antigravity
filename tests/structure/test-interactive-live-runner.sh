@@ -9,6 +9,7 @@ check() {
   printf '%s %s\n' "$2" "$1"
 }
 unit_check "agy-interactive-run.test.js" "$ROOT/tests/structure/agy-interactive-run.test.js"
+unit_check "agy-background-completion.test.js" "$ROOT/tests/structure/agy-background-completion.test.js"
 unit_check_done
 printf "Unit files: %s passed / %s failed\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

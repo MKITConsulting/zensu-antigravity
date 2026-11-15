@@ -142,8 +142,18 @@
       "summary": "Acceptance records: the record schema and store, the verify-feature driver ids, criteria from the shared lister, the chain anchor, criterion and gate verdicts, and retention."
     },
     {
+      "path": "tests/structure/agy-background-completion.test.js",
+      "registered": 6,
+      "runs": [
+        {
+          "driver": "tests/structure/test-interactive-live-runner.sh"
+        }
+      ],
+      "summary": "Native background completion: correlated host tasks, protected task logs, immutable transcript evidence and strict idle Stop requirements."
+    },
+    {
       "path": "tests/structure/agy-interactive-run.test.js",
-      "registered": 57,
+      "registered": 59,
       "runs": [
         {
           "driver": "tests/structure/test-interactive-live-runner.sh"
