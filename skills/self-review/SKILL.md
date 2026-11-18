@@ -179,7 +179,24 @@ directly inside a quoted shell parameter; never paste its value into shell sourc
 ## Phase 2: Analyze
 
 Read the current content of each changed file with the Read tool. Read the project
-root `AGENTS.md` so you apply the governing conventions. Score each change on:
+root `AGENTS.md` so you apply the governing conventions.
+
+The native terminal gate requires completed `read_file` or `view_file` results
+after the current ticket's successful code-review command. Read every line;
+bounded ranges may be combined. Earlier implementation reads, pending reads and
+shell output do not establish this terminal reread. For deleted, empty or binary
+files, symbolic links and files exceeding the 2 MiB inspection bound, read the
+accepted lease containing the immutable review packet instead;
+the gate supplies its exact path when needed. Outside the permitted self-review
+fix round, a source change requires a fresh review. After that one fix round,
+retain the original review baseline, refresh the canonical edit audit and reread
+the cumulative inventory, including newly added files. Non-text changes also
+require reading the fresh audit receipt. The gate checks again when the one-use
+helper authorization is consumed. Verified zero-change closure still uses the
+canonical helper's existing zero-change and edit-audit gates.
+This establishes current-file inspection, not the quality of your reflection.
+
+Score each change on:
 
 - **Architecture**: does the approach fit the existing structure? Are better patterns available?
 - **Consistency**: does the code follow the patterns used elsewhere in the codebase?

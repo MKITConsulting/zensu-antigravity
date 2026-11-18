@@ -155,7 +155,8 @@ function authorize(request, options = {}) {
   const now = options.now === undefined ? Date.now() : options.now;
   const record = { schema: 'zensu.antigravity.helper-call.v1', key,
     session_id: request.sessionId, helper: request.helper,
-    created_at_ms: now, expires_at_ms: now + AUTHORIZATION_TTL_MS };
+    created_at_ms: now, expires_at_ms: now + AUTHORIZATION_TTL_MS,
+    ...(options.terminalContext ? { terminalContext: options.terminalContext } : {}) };
   const file = path.join(directory, `${key}-${nonce}.json`);
   fs.writeFileSync(file, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
   return file;
@@ -178,7 +179,7 @@ function consumeAuthorization(request, options = {}) {
     const consumed = `${file}.consumed-${crypto.randomBytes(16).toString('hex')}`;
     try { fs.renameSync(file, consumed); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
     fs.unlinkSync(consumed);
-    return;
+    return record;
   }
   throw new Error('No current PreToolUse authorization matches this helper call; use the exact session-bound command in this conversation');
 }
@@ -198,15 +199,21 @@ function helperEnvironment(request, options = {}) {
   environment.ZENSU_AUDIT_COMMAND_JSON = JSON.stringify(auditCommandPrefix(request.sessionId, environment.ZENSU_PLUGIN_ROOT));
   return environment;
 }
+function terminalReviewRequest(request) {
+  return request.helper === 'log' && request.args.includes('--chain-done');
+}
 function main(argv) {
   const request = parseArguments(argv);
-  consumeAuthorization(request);
+  const authorization = consumeAuthorization(request);
   const root = paths.pluginRoot();
   const [runtime, relative] = HELPERS[request.helper];
   const file = path.join(root, relative);
   const stat = fs.lstatSync(file);
   if (!stat.isFile() || stat.isSymbolicLink() || fs.realpathSync.native(file) !== file) throw new Error('Helper target is unsafe');
   const environment = helperEnvironment(request);
+  if (terminalReviewRequest(request)) {
+    require('./native-self-review.js').verify(request, authorization.terminalContext, { environment });
+  }
   const args = prepareHelperArguments(request, environment);
   const child = spawnSync(runtime, [file, ...args], {
     stdio: request.stdinFile ? ['pipe', 'inherit', 'inherit'] : 'inherit',
@@ -215,10 +222,11 @@ function main(argv) {
   if (child.error) throw child.error;
   process.exitCode = child.status === null ? 2 : child.status;
 }
+// The terminal adapter imports this predicate while the CLI entrypoint runs.
+module.exports = { HELPERS, AUTHORIZATION_TTL_MS, MAX_STDIN_BYTES, stdinSnapshot, parseArguments, validateAuditArguments, prepareHelperArguments, auditCommandPrefix, requestKey,
+  authorize, consumeAuthorization, helperEnvironment, terminalReviewRequest, main };
 if (require.main === module) {
   try { main(process.argv.slice(2)); } catch (error) {
     process.stderr.write(`zensu session helper: ${error.message}\n`); process.exitCode = 2;
   }
 }
-module.exports = { HELPERS, AUTHORIZATION_TTL_MS, MAX_STDIN_BYTES, stdinSnapshot, parseArguments, validateAuditArguments, prepareHelperArguments, auditCommandPrefix, requestKey,
-  authorize, consumeAuthorization, helperEnvironment, main };

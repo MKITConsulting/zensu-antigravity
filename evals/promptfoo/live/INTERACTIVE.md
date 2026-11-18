@@ -7,7 +7,10 @@ model calls through a logged-in `agy`. The deterministic repository gate does
 not supply this evidence.
 
 Interactive mode uses the native TUI so an operator can review each ordinary
-tool request and approve it once or reject it. It never sets a permission bypass,
+tool request and approve it once or reject it. Each launch fixes session-only
+`agentMode: ""` and `toolPermission: "strict"` through `--settings`, so user Auto
+defaults cannot select the probe mode. Arbitrary settings overrides are refused;
+the shared settings file is never changed by the launch. It never sets a permission bypass,
 an automatic approval mode, or an allowlist. A disposable workspace restricts
 the test's scope; it does not authorize a tool call.
 
@@ -17,8 +20,11 @@ Build and independently verify a native plugin stage with the repository's
 current packaging tools. Keep that stage immutable for the whole run. Set
 `ZENSU_LIVE_PLUGIN_ROOT` to its canonical absolute directory containing
 `plugin.json`, the native adapter, and generated `hooks.json`. The provider
-loads that exact external stage through each workspace's local plugin registry;
-it does not edit a shared installation.
+copies that exact stage into each claimed workspace's `.agents/plugins/zensu`
+and rewrites only that disposable workspace's registry to its local copy.
+agy 1.5.6 rejects registry paths outside the workspace. Native evidence must
+identify the local copy and the frozen digest; the shared installation is never
+an acceptable fallback. Neither the template nor a shared installation is edited.
 
 Run the owned preparer with the canonical frozen plugin path and, optionally,
 a canonical physical temporary parent directory:
@@ -62,7 +68,7 @@ The regular JSON manifest uses the exact `scenario_id` values from
 This example illustrates one entry; a full run needs all 45 actual scenario
 identifiers. The provider rejects aliases, symlinks, duplicate entries, reused
 claims, and unexpected initial workspace contents. It records each selected
-workspace under `workspace-claims/` before preparing its scenario. A rerun needs
+workspace under `workspace-claims/` before copying the plugin and preparing its scenario. A rerun needs
 new workspaces and a new manifest; preserve the earlier run's results.
 
 The host must already trust each exact workspace. Obtain explicit authorization
@@ -95,7 +101,8 @@ Review the displayed native request and highlighted option before each input.
 AGY 1.4.3's creation dialog ignores the documented `y` shortcut. Press Enter
 only when the highlighted native option approves this one inspected call;
 use `y`/`n` only where the host supports those shortcuts, or `Ctrl-C` to abort
-the owned run. The relay forwards these explicit operator keys and refuses
+the owned run. For a displayed native child request, `Ctrl-K` approves only the
+inspected request. Combined or pasted keys remain refused. The relay forwards these explicit operator keys and refuses
 pasted prompts, navigation, persistent-choice selectors and mode changes.
 It does not infer from a key alone that the selected native option was safe:
 retain the actual proposal and operator review evidence. Never confirm an
@@ -122,6 +129,15 @@ native JSON or stream events. Verification correlates the exact workspace,
 session, own CLI log, private runtime binding, frozen plugin digest, literal
 user prompt, completed transcript, and normal fully idle Stop decisions.
 Thinking fields are excluded from exported transcript rows.
+
+AGY 1.5.9 can retain a historical RUNNING command row after its background task
+finishes. The observer requires the exact preceding command, task identity,
+host-authored completion envelope, timestamps and protected native task log.
+The terminal response and both normal fully idle Stop handlers remain required.
+Original rows remain unchanged, and task-log changes reset the stable observation.
+A completed command's nonzero exit is preserved for scenario assertions; transport
+completion alone never establishes functional success. The owned process and
+process group must both be confirmed exited.
 
 Each native turn has a unique `runs/turn-*` directory containing its request,
 own CLI log, hook decisions, raw terminal capture, operator input events,

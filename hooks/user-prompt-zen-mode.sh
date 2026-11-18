@@ -257,6 +257,7 @@ zen_prompt_and_anchor() {
     const path = require("path");
     const fs = require("fs");
     let prompt = "";
+    let hookPayload = {};
     // A SEPARATE variable, because `fault` below is overwritten on every healthy
     // anchor path, so a class set here would be silently cleared. A lost prompt
     // is the one fault that costs the user the `zen off` escape, so it is never
@@ -265,6 +266,7 @@ zen_prompt_and_anchor() {
     let payloadFault = "";
     try {
       const j = JSON.parse(fs.readFileSync(0, "utf8") || "{}");
+      hookPayload = j;
       if (typeof j.prompt === "string") prompt = j.prompt;
       else payloadFault = "prompt field";
     } catch (_) { prompt = ""; payloadFault = "payload"; }
@@ -282,7 +284,7 @@ zen_prompt_and_anchor() {
       } else if (!root || !key) {
         fault = "no session anchor";
       } else {
-        const names = ["chain-recovery-v1.js", "zen-anchor-v1.js", "session-control-core-v1.js"];
+        const names = ["chain-recovery-v1.js", "zen-anchor-v1.js", "session-control-core-v1.js", "completed-review-v1.js", "in-thread-review-v1.js", "review-packet-v1.js", "runtime-hook-session-v1.js", "evidence-run-v1.js", "runtime-path-v1.js", "session-auto-adopt-v1.js", "review-evidence-lease-v1.js", "zensu-artifact-redact-v1.js", "secret-patterns.js", "full-suite-policy-v1.js", "review-evidence-sweep-v1.js", "ci-contract-v1.js"];
         const resolved = names.map(function (n) { return path.resolve(n); });
         fault = "modules";
         resolved.forEach(function (p) {
@@ -326,7 +328,9 @@ zen_prompt_and_anchor() {
           // passes the lstat guard, throws a TypeError here, and was disclosed
           // as a corrupt document. The classes exist to draw exactly that line.
           fault = "anchor render";
-          const report = chain.classifyChain(state);
+          const reviewVerdict = state.codeReviewDone && !state.chainDone
+            ? require(resolved[3]).outcomeForState(state, process.env, hookPayload) : null;
+          const report = chain.classifyChain(state, { reviewVerdict });
           // THE WHOLE REPORT, not `report.shape`. Two shapes are reached from
           // `codeReviewDone === true` and that flag does not say whether the
           // review PASSED; the module reads the outcome off the report to tell

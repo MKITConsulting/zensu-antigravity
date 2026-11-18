@@ -16,6 +16,14 @@ import time
 import tty
 
 
+def require_group_exit(child):
+    try:
+        os.killpg(child.pid, 0)
+    except ProcessLookupError:
+        return
+    raise RuntimeError("Owned native process group exit is unconfirmed")
+
+
 def main():
     spec_path = pathlib.Path(sys.argv[1])
     spec = json.loads(spec_path.read_text())
@@ -54,7 +62,7 @@ def main():
         os.write(terminal, ("\r\nInteractive live probe: " + spec["ws"]
                            + "\r\nReview each tool and the selected option. Enter confirms only"
                            + " an inspected one-time choice; y/n work where supported."
-                           + " Ctrl-C aborts. No navigation, paste or always/auto grants.\r\n").encode())
+                           + " Inspected child Ctrl-K approves one displayed tool. Ctrl-C aborts. No navigation, paste or always/auto grants.\r\n").encode())
         started = time.monotonic()
         next_observe = started
         stable = None
@@ -84,11 +92,11 @@ def main():
                     # Its highlighted one-time choice accepts an explicit Enter.
                     # The operator must inspect that choice before confirming it;
                     # navigation, persistent-choice selectors and paste stay refused.
-                    if data not in (b"y", b"n", b"\r", b"\x03"):
+                    if data not in (b"y", b"n", b"\r", b"\x03", b"\x0b"):
                         inputs.write(json.dumps({"elapsed": now - started, "refused": True,
                                                  "byteCount": len(data)}) + "\n")
                         inputs.flush()
-                        os.write(terminal, b"\r\nOnly y, n, inspected one-time Enter or Ctrl-C is accepted.\r\n")
+                        os.write(terminal, b"\r\nOnly y, n, inspected one-time Enter, child Ctrl-K or Ctrl-C is accepted.\r\n")
                         continue
                     inputs.write(json.dumps({"elapsed": now - started,
                                              "input": data.decode("ascii")}) + "\n")
@@ -129,7 +137,8 @@ def main():
                         proof = {"verified": False, "reason": "observer output unavailable"}
                     (run_dir / "latest-observation.json").write_text(json.dumps(proof, indent=2) + "\n")
                     key = (proof.get("sessionId"), proof.get("completion", {}).get("transcriptHash"),
-                           proof.get("completion", {}).get("decisionsHash")) if proof.get("verified") else None
+                           proof.get("completion", {}).get("decisionsHash"),
+                           proof.get("completion", {}).get("backgroundTasksHash")) if proof.get("verified") else None
                     if key is not None and key == stable:
                         if spec.get("stopProbe") and proof.get("completion", {}).get("kind") == "stop-continuation":
                             # This bounded scenario proves Stop/continuation,
@@ -175,6 +184,12 @@ def main():
                     os.killpg(child.pid, signal.SIGTERM)
                 except ProcessLookupError:
                     pass
+                # Release only our terminal before waiting for native teardown.
+                # Forced or interrupted exits still cannot become completion.
+                if master is not None:
+                    cleanup_operation = "close-owned-terminal"
+                    os.close(master)
+                    master = None
                 cleanup_operation = "wait-after-SIGTERM"
                 try:
                     child.wait(timeout=5)
@@ -186,7 +201,11 @@ def main():
                         pass
                     cleanup_operation = "wait-after-SIGKILL"
                     child.wait(timeout=5)
-        except (OSError, subprocess.TimeoutExpired) as error:
+            if child is not None:
+                cleanup_operation = "verify-group-exit"
+                require_group_exit(child)
+                record["processGroupExitConfirmed"] = True
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
             # A denied signal must retain the original timeout/abort and the
             # owned PID. Never hide it behind a missing transport.json or claim
             # that cleanup succeeded; the operator must inspect this process.
@@ -194,6 +213,7 @@ def main():
                 "operation": cleanup_operation,
                 "error": type(error).__name__ + ": " + str(error),
             }
+            record["processGroupExitConfirmed"] = False
             if record["reason"] in ("completed", "stop-continuation-observed"):
                 record["reason"] = "cleanup-failed"
         if child is not None:

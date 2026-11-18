@@ -53,11 +53,12 @@ function fixture() {
   };
 }
 
-test('literal initial prompt and exact resume UUID survive without permission flags', () => {
+test('literal prompt and exact resume UUID retain strict session-only permissions', () => {
   const value = buildInvocation({ prompt: 'literal $(touch bad)\n`not a shell`', ws: '/owned/workspace',
     runDir: '/owned/evidence', model: 'gemini-3.8-flash-medium',
     extraArgs: ['--conversation', sessionId, '--output-format', 'stream-json', '--log-file', '/owned/evidence/native.log'] });
   assert.deepEqual(value.argv, ['--prompt-interactive', 'literal $(touch bad)\n`not a shell`',
+    '--settings', JSON.stringify({ agentMode: '', toolPermission: 'strict' }),
     '--conversation', sessionId, '--model', 'gemini-3.8-flash-medium', '--log-file', '/owned/evidence/native.log']);
   assert.equal(value.sessionId, sessionId);
   assert.equal(value.cwd, '/owned/workspace');
@@ -70,6 +71,14 @@ function rejectsOption(extraArgs) {
 test("refuses unapproved or ambiguous option [\"--dangerously-skip-permissions\"]", () => rejectsOption(["--dangerously-skip-permissions"]));
 test("refuses unapproved or ambiguous option [\"--dangerously-skip-permissions\",\"true\"]", () => rejectsOption(["--dangerously-skip-permissions", "true"]));
 test("refuses unapproved or ambiguous option [\"--mode\",\"auto\"]", () => rejectsOption(["--mode", "auto"]));
+
+test('callers cannot replace fixed strict settings or add permission grants', () => {
+  for (const value of [
+    { agentMode: 'auto', toolPermission: 'auto' },
+    { permissions: { allow: ['command(*)'] } },
+    { agentMode: '', toolPermission: 'strict' },
+  ]) rejectsOption(['--settings', JSON.stringify(value)]);
+});
 test("refuses unapproved or ambiguous option [\"--allow\",\"*\"]", () => rejectsOption(["--allow", "*"]));
 test("refuses unapproved or ambiguous option [\"--add-dir\",\"/other\"]", () => rejectsOption(["--add-dir", "/other"]));
 test("refuses unapproved or ambiguous option [\"--conversation\",\"latest\"]", () => rejectsOption(["--conversation", "latest"]));
@@ -388,6 +397,10 @@ print("CONFIRM_ONE_TIME_ENTER",flush=True)
 confirmation=os.read(sys.stdin.fileno(),1).decode()
 (p/"confirmation.json").write_text(json.dumps(confirmation))
 if confirmation!="\\r": sys.exit(10)
+print("CONFIRM_CHILD_ONE_TIME",flush=True)
+child_confirmation=os.read(sys.stdin.fileno(),1).decode()
+(p/"child-confirmation.json").write_text(json.dumps(child_confirmation))
+if child_confirmation!="\\x0b": sys.exit(11)
 print("ONE_TIME_ACCEPTED",flush=True)
 second=""
 while not second.endswith("\\r"):
@@ -397,8 +410,12 @@ sys.exit(0 if second=="/exit\\r" else 9)
 `, { mode: 0o700 });
     const observer = path.join(root, 'observer.js');
     fs.writeFileSync(observer, `const fs=require('fs');const s=JSON.parse(fs.readFileSync(process.argv[2]));
-const done=fs.existsSync(s.ws+'/confirmation.json');
-process.stdout.write(JSON.stringify(done?{verified:true,sessionId:'fixture-only',completion:{transcriptHash:'same',decisionsHash:'same'}}:{verified:false}));`);
+const done=fs.existsSync(s.ws+'/child-confirmation.json');
+const historyFile=s.ws+'/background-observations.json';
+const history=fs.existsSync(historyFile)?JSON.parse(fs.readFileSync(historyFile)):[];
+const backgroundTasksHash=history.length===0?'initial-log':'settled-log';
+if(done){history.push(backgroundTasksHash);fs.writeFileSync(historyFile,JSON.stringify(history));}
+process.stdout.write(JSON.stringify(done?{verified:true,sessionId:'fixture-only',completion:{transcriptHash:'same',decisionsHash:'same',backgroundTasksHash}}:{verified:false}));`);
     const specFile = path.join(root, 'request.json');
     fs.writeFileSync(specFile, JSON.stringify({ runDir: root, ws: root, argv: [], seconds: 8,
       node: process.execPath, observer }));
@@ -411,7 +428,7 @@ def attach():
  fcntl.ioctl(slave,termios.TIOCSCTTY,0)
 child=subprocess.Popen([sys.executable,sys.argv[2],str(root/"request.json")],stdin=slave,stdout=slave,stderr=slave,preexec_fn=attach,close_fds=True)
 os.close(slave)
-seen=b"";sent=False;confirmed=False;refused=False;deadline=time.monotonic()+12
+seen=b"";sent=False;confirmed=False;refused=False;child_refused=False;child_confirmed=False;deadline=time.monotonic()+12
 try:
  while child.poll() is None and time.monotonic()<deadline:
   ready,_,_=select.select([master],[],[],0.1)
@@ -426,6 +443,10 @@ try:
     os.write(master,b"y");sent=True
    if b"CONFIRM_ONE_TIME_ENTER" in seen and not confirmed:
     os.write(master,b"\\r");confirmed=True
+   if b"CONFIRM_CHILD_ONE_TIME" in seen and not child_refused:
+    os.write(master,b"\\x0b\\x0b");child_refused=True
+   if child_refused and seen.count(b"Only y, n, inspected one-time Enter")>=2 and not child_confirmed:
+    os.write(master,b"\\x0b");child_confirmed=True
  child.wait(timeout=3)
 finally:
  if child.poll() is None:
@@ -442,17 +463,25 @@ sys.exit(0 if sent and confirmed and child.returncode==0 else 1)
     assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'confirmation.json'), 'utf8')), '\r');
     assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'second.json'), 'utf8')), '/exit\r');
     const transport = JSON.parse(fs.readFileSync(path.join(root, 'transport.json'), 'utf8'));
-    assert.equal(transport.operatorBytes, 2);
+    assert.equal(transport.operatorBytes, 3);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'child-confirmation.json'), 'utf8')), '\x0b');
     assert.deepEqual(transport.automaticInputs, ['/exit']);
     assert.equal(transport.reason, 'completed');
     assert.equal(transport.exitCode, 0);
+    assert.equal(transport.processExitConfirmed, true);
+    assert.equal(transport.processGroupExitConfirmed, true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'background-observations.json'), 'utf8')),
+      ['initial-log', 'settled-log', 'settled-log'], 'exit must wait for two matching task-log observations');
     assert.match(fs.readFileSync(path.join(root, 'terminal.raw'), 'utf8'), /ONE_TIME_ACCEPTED/);
     const inputs = fs.readFileSync(path.join(root, 'operator-input.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
-    assert.equal(inputs.length, 3);
+    assert.equal(inputs.length, 5);
     assert.equal(inputs[0].refused, true);
     assert.equal(inputs[0].byteCount, 2);
     assert.equal(inputs[1].input, 'y');
     assert.equal(inputs[2].input, '\r');
+    assert.equal(inputs[3].refused, true);
+    assert.equal(inputs[3].byteCount, 2);
+    assert.equal(inputs[4].input, '\x0b');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -530,6 +559,8 @@ sys.exit(0 if sent and confirmed and child.returncode==0 else 1)
     assert.deepEqual(transport.automaticInputs, ['cancel-observed-probe', '/exit']);
     assert.equal(transport.reason, 'stop-continuation-observed');
     assert.equal(transport.exitCode, 0);
+    assert.equal(transport.processExitConfirmed, true);
+    assert.equal(transport.processGroupExitConfirmed, true);
     assert.match(fs.readFileSync(path.join(root, 'terminal.raw'), 'utf8'), /ONE_TIME_ACCEPTED/);
     const inputs = fs.readFileSync(path.join(root, 'operator-input.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
     assert.equal(inputs.length, 3);
@@ -613,6 +644,7 @@ sys.exit(child.returncode)
     assert.equal(transport.reason, 'timeout');
     assert.equal(transport.exitCode, null);
     assert.equal(transport.processExitConfirmed, false);
+    assert.equal(transport.processGroupExitConfirmed, false);
     assert.equal(transport.cleanupError.operation, 'signal-SIGKILL');
     assert.match(transport.cleanupError.error, /PermissionError.*fixture signal denial/);
     assert.deepEqual(transport.automaticInputs, []);
@@ -621,6 +653,86 @@ sys.exit(child.returncode)
     const recovery = JSON.parse(fs.readFileSync(path.join(root, 'fixture-recovery.json'), 'utf8'));
     assert.equal(recovery.pid, nativePid);
     assert.equal(recovery.signal, 9);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('PTY refuses completion when the leader exited but its group exit is unconfirmed', () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'zensu-interactive-group-')));
+  try {
+    fs.mkdirSync(path.join(root, 'bin'));
+    fs.writeFileSync(path.join(root, 'bin/agy'), `#!/usr/bin/env python3
+import json,os,pathlib,sys,tty
+tty.setraw(sys.stdin.fileno())
+(pathlib.Path.cwd()/"native-ready").write_text("ready")
+command=""
+while not command.endswith("\\r"):
+ command+=os.read(sys.stdin.fileno(),1).decode()
+(pathlib.Path.cwd()/"native-exit.json").write_text(json.dumps(command))
+sys.exit(0 if command=="/exit\\r" else 9)
+`, { mode: 0o700 });
+    const observer = path.join(root, 'observer.js');
+    fs.writeFileSync(observer, `const fs=require('fs');const s=JSON.parse(fs.readFileSync(process.argv[2]));
+const ready=fs.existsSync(s.ws+'/native-ready');
+process.stdout.write(JSON.stringify(ready?{verified:true,sessionId:'fixture-only',completion:{transcriptHash:'same',decisionsHash:'same'}}:{verified:false,reason:'fixture not ready'}));`);
+    fs.writeFileSync(path.join(root, 'request.json'), JSON.stringify({ runDir: root, ws: root, argv: [],
+      seconds: 8, node: process.execPath, observer }));
+    const bridge = path.resolve(__dirname, '../../evals/promptfoo/lib/agy-interactive-pty.py');
+    const wrapper = path.join(root, 'group-wrapper.py');
+    fs.writeFileSync(wrapper, `import importlib.util,os,pathlib,sys
+root=pathlib.Path(sys.argv[1])
+spec=importlib.util.spec_from_file_location("bridge",sys.argv[2])
+module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+real_killpg=os.killpg
+def group_still_exists(group,number):
+ if number==0:
+  # Model an unconfirmed group after its real owned leader exited normally.
+  # No orphan is created and termination signals retain their real behavior.
+  (root/"group-check.pid").write_text(str(group))
+  return None
+ return real_killpg(group,number)
+os.killpg=group_still_exists
+sys.argv=[sys.argv[2],str(root/"request.json")]
+sys.exit(module.main())
+`);
+    const controller = path.join(root, 'controller.py');
+    fs.writeFileSync(controller, `import fcntl,os,pty,select,signal,subprocess,sys,termios,time
+master,slave=pty.openpty()
+def attach():
+ os.setsid();fcntl.ioctl(slave,termios.TIOCSCTTY,0)
+child=subprocess.Popen([sys.executable,sys.argv[1],sys.argv[2],sys.argv[3]],stdin=slave,stdout=slave,stderr=slave,preexec_fn=attach,close_fds=True)
+os.close(slave)
+deadline=time.monotonic()+12
+try:
+ while child.poll() is None and time.monotonic()<deadline:
+  ready,_,_=select.select([master],[],[],0.1)
+  if ready:
+   try:
+    if not os.read(master,65536): break
+   except OSError: break
+ child.wait(timeout=3)
+finally:
+ if child.poll() is None:
+  os.kill(child.pid,signal.SIGINT);child.wait(timeout=7)
+ os.close(master)
+sys.exit(child.returncode)
+`);
+    const result = spawnSync('python3', [controller, wrapper, root, bridge], {
+      detached: true, encoding: 'utf8', timeout: 20000,
+      env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}` },
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.signal, null);
+    const transport = JSON.parse(fs.readFileSync(path.join(root, 'transport.json'), 'utf8'));
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'native-exit.json'), 'utf8')), '/exit\r');
+    assert.equal(transport.exitCode, 0, 'the owned native leader exited normally');
+    assert.equal(transport.processExitConfirmed, true);
+    assert.equal(transport.processGroupExitConfirmed, false);
+    assert.equal(transport.reason, 'cleanup-failed');
+    assert.equal(transport.cleanupError.operation, 'verify-group-exit');
+    assert.match(transport.cleanupError.error, /RuntimeError: Owned native process group exit is unconfirmed/);
+    assert.equal(Number(fs.readFileSync(path.join(root, 'group-check.pid'), 'utf8')), transport.pid);
+    assert.deepEqual(transport.automaticInputs, ['/exit']);
+    assert.equal(transport.operatorBytes, 0);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -674,6 +786,32 @@ test('preparation creates only 45 exact disposable workspaces without trust or n
       assert.deepEqual(JSON.parse(fs.readFileSync(path.join(workspace, '.agents/plugins.json'), 'utf8')),
         { entries: [{ path: path.dirname(pluginRoot), include_only: ['zensu'] }] });
     }
+    const provider = path.resolve(__dirname, '../../evals/promptfoo/lib/agy-live-provider.js');
+    const claimed = spawnSync(process.execPath, ['-e', `
+      const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
+      const provider = require(process.argv[1]), entries = JSON.parse(process.argv[2]);
+      const stage = process.env.ZENSU_LIVE_PLUGIN_ROOT;
+      for (const entry of entries.slice(0, 2)) {
+        const ws = provider.makeWorkspace(undefined, entry.scenarioId);
+        const installed = provider.installedPluginRoot();
+        assert.equal(installed, path.join(ws, '.agents/plugins/zensu'));
+        assert.notEqual(installed, stage);
+        assert.deepEqual(fs.readFileSync(path.join(installed, 'hooks.json')), fs.readFileSync(path.join(stage, 'hooks.json')));
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(ws, '.agents/plugins.json'))),
+          { entries: [{ path: path.dirname(installed), include_only: ['zensu'] }] });
+      }
+      fs.symlinkSync(path.join(stage, 'hooks.json'), path.join(stage, 'unsafe-link'));
+      assert.throws(() => provider.makeWorkspace(undefined, entries[2].scenarioId), /symbolic link/);
+      assert.equal(fs.existsSync(path.join(entries[2].workspace, '.agents/plugins/zensu')), false);
+      fs.unlinkSync(path.join(stage, 'unsafe-link'));
+      console.log('local copies verified; unsafe stage refused');
+    `, provider, JSON.stringify(manifest.entries)], {
+      env: { ...process.env, ...value.env }, encoding: 'utf8', timeout: 10000,
+    });
+    assert.equal(claimed.status, 0, claimed.stderr);
+    assert.match(claimed.stdout, /local copies verified; unsafe stage refused/);
+    assert.equal(settingsHash(), settingsBefore);
+    assert.equal(fs.existsSync(marker), false);
   } finally {
     if (priorPath === undefined) delete process.env.PATH; else process.env.PATH = priorPath;
     fs.rmSync(root, { recursive: true, force: true });

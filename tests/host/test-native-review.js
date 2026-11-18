@@ -36,6 +36,18 @@ test('a delegated report requires all roles from distinct observed children on i
   assert.equal(assurance.reportHash,hash(JSON.stringify(f.report)));
   assert.equal(review.validateAssurance(assurance,f.report,f.lease),assurance);
   assert.equal(new Set(assurance.children.map(child=>child.id)).size,3);
+  assert.equal(assurance.consumer.verdict, 'PASS');
+});
+test('the consumed verdict comes only from one exact completed reviewer verdict line', () => {
+  for (const verdict of ['PASS', 'PASS WITH SUGGESTIONS', 'NEEDS CHANGES']) {
+    const f=fixture(), record=f.records.get(f.report.consumer.childId);
+    record.finalText=JSON.stringify({schema:'zensu-code-review-result-v1',role:'consume',report:'# Code Review Report\n- Verdict: '+verdict});
+    record.finalHash=hash(record.finalText);
+    assert.equal(native.verifyReport(f.report,f.lease,f.binding,f.options).consumer.verdict, verdict);
+    const value=JSON.parse(record.finalText); value.report+='\n- Verdict: PASS';
+    record.finalText=JSON.stringify(value);record.finalHash=hash(record.finalText);
+    assert.throws(()=>native.verifyReport(f.report,f.lease,f.binding,f.options),/substantive/);
+  }
 });
 test('missing or reused child identities cannot attest an independent panel', () => {
   for(const mutate of [f=>delete f.report.perspectives[0].childId,f=>f.report.perspectives[0].childId=parentId,f=>f.report.perspectives[1].childId=f.report.perspectives[0].childId,f=>f.records.clear()]) {

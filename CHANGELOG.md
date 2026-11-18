@@ -5,6 +5,31 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-11-15
+
+### Fixed
+
+- **evals**: Verify strict interactive background completion (#40)
+- **deps**: Patch hono and basic-ftp advisories (#39)
+- **deps**: Remediate evaluation dependency advisories (#38)
+
+### Security
+
+- Pin Hono to 4.13.16 and basic-ftp to 6.2.4 in the offline evaluation dependency graph, resolving five Hono advisories and the basic-ftp directory-listing parser denial of service.
+- Update the offline evaluation dependency graph, starting with the critical Mongoose fix, and refresh vulnerable transitive dependencies and override floors. Upgrade promptfoo to 0.125.1 so its Azure authentication dependencies support patched MSAL releases.
+- Pin MongoDB's optional GCP metadata peer separately from promptfoo's newer copy so the installed dependency graph remains valid.
+
+## [0.7.6] - 2026-11-11
+
+### Fixed
+
+- Correlate native reviewers with their own completed launch in mixed tool batches, including a pending final file read.
+- Require observed current-file rereads after code review before native self-review can close the chain; recheck when the one-use authorization is consumed. Preserve canonical zero-change closure and validate fresh cumulative audit evidence after the permitted self-review fix round.
+- Initialize shared parser exports before authorization and helper CLI execution so terminal validation can safely reenter either native entrypoint.
+- Display standalone self-review progress from the verified consume verdict without adding workflow-state fields or retaining progress after closure.
+- Copy the frozen plugin into each isolated CLI test workspace so current Antigravity versions load the intended candidate; retain exact native identity checks and one-time approvals.
+- Correct the standalone progress comment to describe the verified private review verdict.
+
 ## [0.7.5] - 2026-11-04
 
 ### Added
