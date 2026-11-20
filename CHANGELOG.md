@@ -5,6 +5,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-11-20
+
+### Fixed
+
+- **tdd**: Treat a spec-named dependency as a precondition, not consent (#36)
+
 ## [0.7.7] - 2026-11-15
 
 ### Fixed
